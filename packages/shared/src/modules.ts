@@ -107,3 +107,52 @@ export function modulesByGroup(): Record<ModuleGroup, PlatformModule[]> {
   for (const m of PLATFORM_MODULES) (out[m.group] ??= []).push(m);
   return out;
 }
+
+/**
+ * Atlases — the navigation rail of the Kharita design language.
+ * Each atlas is a bound collection of "sheets" (modules). Groups map onto atlases
+ * so a new module only needs a `group`; the rail never changes.
+ */
+export type AtlasId = "home" | "analysis" | "markets" | "tools" | "lab" | "journal" | "learn" | "community";
+
+export interface Atlas {
+  id: AtlasId;
+  nameAr: string;
+  nameEn: string;
+  /** mono eyebrow printed on the sheet bar */
+  code: string;
+  route: string;
+  groups: ModuleGroup[];
+}
+
+export const ATLASES: Atlas[] = [
+  { id: "home", nameAr: "الورقة اليومية", nameEn: "Daily Sheet", code: "SHEET 00", route: "/", groups: ["core"] },
+  { id: "analysis", nameAr: "التحليل", nameEn: "Analysis", code: "ATLAS 01", route: "/chart", groups: ["analysis", "intelligence"] },
+  { id: "markets", nameAr: "الأسواق", nameEn: "Markets", code: "ATLAS 02", route: "/markets", groups: ["markets"] },
+  { id: "tools", nameAr: "الأدوات", nameEn: "Tools", code: "ATLAS 03", route: "/tools/risk", groups: ["tools", "productivity"] },
+  { id: "lab", nameAr: "المختبر", nameEn: "Lab", code: "ATLAS 04", route: "/lab/backtest", groups: ["testing"] },
+  { id: "journal", nameAr: "السجل", nameEn: "Journal", code: "ATLAS 05", route: "/journal", groups: ["journal"] },
+  { id: "learn", nameAr: "التعلم", nameEn: "Learn", code: "ATLAS 06", route: "/academy", groups: ["education"] },
+  { id: "community", nameAr: "المجتمع", nameEn: "Community", code: "ATLAS 07", route: "/community", groups: ["community"] },
+];
+
+export function atlasOf(group: ModuleGroup): Atlas | undefined {
+  return ATLASES.find((a) => a.groups.includes(group));
+}
+
+export function modulesOfAtlas(id: AtlasId): PlatformModule[] {
+  const atlas = ATLASES.find((a) => a.id === id);
+  if (!atlas) return [];
+  return PLATFORM_MODULES.filter((m) => atlas.groups.includes(m.group)).sort((a, b) => a.order - b.order);
+}
+
+/** Which atlas a route belongs to (longest matching module route wins). */
+export function atlasForRoute(pathname: string): Atlas | undefined {
+  if (pathname === "/") return ATLASES[0];
+  const clean = pathname.split("#")[0] ?? pathname;
+  const match = PLATFORM_MODULES
+    .filter((m) => m.route !== "/" && clean.startsWith(m.route.split("#")[0] ?? m.route))
+    .sort((a, b) => b.route.length - a.route.length)[0];
+  if (match) return atlasOf(match.group);
+  return ATLASES.find((a) => a.id !== "home" && clean.startsWith("/" + (a.route.split("/")[1] ?? "")));
+}

@@ -225,11 +225,12 @@ JWT + scrypt · RBAC بست أدوار · Rate limiting (عام + حساس) · H
 ## 11. الوحدات الستون
 السجل الرسمي في [`packages/shared/src/modules.ts`](./packages/shared/src/modules.ts) ويُعرض في `/modules` داخل المنصة. الكتالوج مع وصف كل وحدة ومرحلتها: [`docs/10-modules-catalog.md`](./docs/10-modules-catalog.md).
 
-## 12. نظام التصميم
-Premium · Minimal · Dark · Fast — الرموز اللونية (`#0b0c0f` خلفية، ذهبي `#d5b15d`، أخضر `#37c7a0`، أحمر `#f07882`)، RTL/LTR، Sidebar قابل للطي، ⌘K Command Bar، حفظ آخر حالة. ➡ [`docs/11-ui-design-system.md`](./docs/11-ui-design-system.md)
+## 12. نظام التصميم: «خريطة» (Kharita)
+الشارت خريطة والمحرك مسّاح. خمسة ألوان فقط (ميدان/حبر، زنجار للطلب، كهرمان للعرض، ختم للإبطال)، IBM Plex Sans Arabic + Plex Mono، ليلي افتراضي ونهاري ورقي بارد، سكة أطالس بدل الشريط الجانبي، كتلة عنوان تحت كل شارت، ورقة ميدان يومية بدل لوحة البطاقات، مناطق مهشّرة باتجاه يحدد الطلب/العرض. ➡ [`docs/12-design-system-kharita.md`](./docs/12-design-system-kharita.md) · صفحة المفهوم: [`docs/design/kharita-proposal-01.html`](./docs/design/kharita-proposal-01.html)
 
 ## 13. قرارات معمارية (ADR)
 - [ADR-0001](./docs/adr/0001-deterministic-engine-llm-explains.md) — المحرك حتمي والـLLM يشرح فقط
 - [ADR-0002](./docs/adr/0002-fastify-over-nestjs.md) — Fastify بدل NestJS
 - [ADR-0003](./docs/adr/0003-lightweight-charts-plus-overlay.md) — lightweight-charts + overlay خاص
 - [ADR-0004](./docs/adr/0004-versioned-scoring.md) — أوزان التقييم المُنسَّخة
+- [ADR-0005](./docs/adr/0005-kharita-design-language.md) — اعتماد لغة التصميم «خريطة»

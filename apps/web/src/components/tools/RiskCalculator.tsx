@@ -22,8 +22,8 @@ export function RiskCalculator({ mode = "risk" }: { mode?: "risk" | "position" }
   );
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <div className="card space-y-3 p-4">
-        <h2 className="font-bold text-gold-light">{mode === "risk" ? L("حاسبة المخاطرة", "Risk Calculator") : L("حاسبة حجم الصفقة", "Position Calculator")}</h2>
+      <div className="sheet space-y-3 p-4">
+        <span className="eyebrow">ATLAS 03 · {mode === "risk" ? "16" : "17"}</span><h2 className="font-semibold">{mode === "risk" ? L("حاسبة المخاطرة", "Risk Calculator") : L("حاسبة حجم الصفقة", "Position Calculator")}</h2>
         <div className="grid grid-cols-2 gap-3">
           <div><label className="label">{L("الأصل", "Instrument")}</label><select className="input font-mono" value={symbol} onChange={(e) => setSymbol(e.target.value)}>{DEFAULT_INSTRUMENTS.map((i) => <option key={i.symbol}>{i.symbol}</option>)}</select></div>
           <div><label className="label">{L("الاتجاه", "Direction")}</label><select className="input" value={f.direction} onChange={(e) => setF({ ...f, direction: e.target.value as "long" | "short" })}><option value="long">Long</option><option value="short">Short</option></select></div>
@@ -35,17 +35,17 @@ export function RiskCalculator({ mode = "risk" }: { mode?: "risk" | "position" }
           {field("pipValuePerLot", L("قيمة النقطة / لوت", "Pip value / lot"))}
           {field("maxRiskPercent", L("الحد الأقصى للمخاطرة %", "Max risk %"), "0.1")}
         </div>
-        <p className="text-[11px] text-ink-faint">{L(`حجم النقطة للأداة: ${inst.pipSize} · حجم العقد: ${inst.contractSize}. تحقق من مواصفات وسيطك.`, `Pip size: ${inst.pipSize} · contract size: ${inst.contractSize}. Verify with your broker's specs.`)}</p>
+        <p className="text-[11px] text-ink-3">{L(`حجم النقطة للأداة: ${inst.pipSize} · حجم العقد: ${inst.contractSize}. تحقق من مواصفات وسيطك.`, `Pip size: ${inst.pipSize} · contract size: ${inst.contractSize}. Verify with your broker's specs.`)}</p>
       </div>
-      <div className="card p-4">
-        <h3 className="mb-3 text-xs font-bold tracking-wider text-gold">{L("النتائج", "Results")}</h3>
+      <div className="sheet p-4">
+        <h3 className="mb-3 eyebrow">{L("النتائج", "Results")}</h3>
         <dl className="grid grid-cols-2 gap-2 text-sm">
           {([
             ["Risk $", r.riskAmount], ["Risk %", f.riskPercent + "%"], ["Stop distance", `${r.stopDistance} (${r.stopDistancePips} pips)`], ["Position size (lots)", r.positionSizeLots],
             ["Potential loss", r.potentialLoss], ["Potential profit", r.potentialProfit ?? "—"], ["R multiple", r.rMultiple ?? "—"], ["R:R", r.riskReward ?? "—"],
-          ] as [string, string | number][]).map(([k, v]) => <div key={k} className="rounded-lg border border-line p-2"><dt className="text-[11px] text-ink-muted">{k}</dt><dd className="font-mono text-base text-ink">{v}</dd></div>)}
+          ] as [string, string | number][]).map(([k, v]) => <div key={k} className="rounded border border-hair p-2"><dt className="text-[11px] text-ink-2">{k}</dt><dd className="font-mono text-base text-ink">{v}</dd></div>)}
         </dl>
-        {r.warnings.length > 0 && <ul className="mt-3 space-y-1 text-xs text-warn">{r.warnings.map((w) => <li key={w}>⚠ {WARN[w as keyof typeof WARN]?.[locale] ?? w}</li>)}</ul>}
+        {r.warnings.length > 0 && <ul className="mt-3 space-y-1 text-xs text-down">{r.warnings.map((w) => <li key={w}>⚠ {WARN[w as keyof typeof WARN]?.[locale] ?? w}</li>)}</ul>}
       </div>
     </div>
   );

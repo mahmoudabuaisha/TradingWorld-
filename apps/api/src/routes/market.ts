@@ -36,17 +36,36 @@ export default async function marketRoutes(app: FastifyInstance, ctx: AppContext
     return { ...answer, engineVersion: result.engineVersion, generatedAt: result.generatedAt };
   });
 
-  /** Watchlist overview: regime / zones count / volatility per symbol. */
+  /** Watchlist overview for the Daily Sheet: regime, bias, zones, last liquidity event, narrative and a terrain spark per symbol. */
   app.get("/overview", async (req) => {
     const symbols = String((req.query as { symbols?: string }).symbols ?? "XAUUSD,EURUSD,BTCUSD,US100").split(",").slice(0, 12);
     const rows = await Promise.all(symbols.map(async (s) => {
       try {
         const r = await ctx.analysis.run(s, "15m");
-        return { symbol: r.symbol, price: r.lastPrice, regime: r.base.regime.trend, volatility: r.base.regime.volatility, htfBias: r.htfBias, zones: r.zones.length, topZone: r.zones[0] ? { name: r.zones[0].name, nameAr: r.zones[0].nameAr, score: r.zones[0].score, status: r.zones[0].status } : null };
+        const instrument = findInstrument(s);
+        const spark = instrument ? (await ctx.providers.for(instrument).getCandles(instrument, "15m", 48)).map((c) => c.close) : [];
+        const sweep = r.base.sweeps.filter((x) => x.reclaimed).slice(-1)[0];
+        const first = spark[0] ?? r.lastPrice;
+        return {
+          symbol: r.symbol,
+          price: r.lastPrice,
+          precision: instrument?.pricePrecision ?? 2,
+          changePct: first ? ((r.lastPrice - first) / first) * 100 : 0,
+          regime: r.base.regime.trend,
+          volatility: r.base.regime.volatility,
+          htfBias: r.htfBias,
+          baseBias: r.base.bias,
+          session: r.session.current,
+          zones: r.zones.length,
+          topZone: r.zones[0] ? { id: r.zones[0].id, name: r.zones[0].name, nameAr: r.zones[0].nameAr, score: r.zones[0].score, status: r.zones[0].status, direction: r.zones[0].direction, top: r.zones[0].top, bottom: r.zones[0].bottom } : null,
+          lastSweep: sweep ? { side: sweep.side, level: sweep.level, poolKind: sweep.poolKind, displacementAfter: sweep.displacementAfter, time: sweep.time } : null,
+          narrative: r.narrative,
+          spark,
+        };
       } catch (e) {
         return { symbol: s, error: (e as Error).message };
       }
     }));
-    return { rows };
+    return { rows, generatedAt: Math.floor(Date.now() / 1000) };
   });
 }

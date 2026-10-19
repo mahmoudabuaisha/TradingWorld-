@@ -16,8 +16,8 @@ export function Timer() {
     return () => clearInterval(id);
   }, [running]);
   return (
-    <div className="card p-6 text-center">
-      <div className="text-[10px] tracking-widest text-gold">{locale === "ar" ? "المؤقت" : "TIMER"}</div>
+    <div className="sheet p-6 text-center">
+      <span className="eyebrow">ATLAS 03 · 52 · TIMER</span>
       <div className="my-3 font-mono text-6xl font-bold">{fmt(left)}</div>
       <div className="flex justify-center gap-2">
         <button className="btn" onClick={() => setRunning((r) => !r)}>{running ? "⏸" : "▶"}</button>
@@ -43,15 +43,15 @@ export function Stopwatch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running]);
   return (
-    <div className="card p-6 text-center">
-      <div className="text-[10px] tracking-widest text-gold">{locale === "ar" ? "ساعة الإيقاف" : "STOPWATCH"}</div>
-      <div className="my-3 font-mono text-6xl font-bold">{fmt(elapsed)}<span className="text-2xl text-ink-muted">.{String(Math.floor((elapsed % 1000) / 100))}</span></div>
+    <div className="sheet p-6 text-center">
+      <span className="eyebrow">ATLAS 03 · 53 · STOPWATCH</span>
+      <div className="my-3 font-mono text-6xl font-bold">{fmt(elapsed)}<span className="text-2xl text-ink-2">.{String(Math.floor((elapsed % 1000) / 100))}</span></div>
       <div className="flex justify-center gap-2">
         <button className="btn" onClick={() => setRunning((r) => !r)}>{running ? "⏸" : "▶"}</button>
         <button className="btn-ghost" onClick={() => setLaps((l) => [elapsed, ...l])} disabled={!running}>Lap</button>
         <button className="btn-ghost" onClick={() => { setRunning(false); setElapsed(0); setLaps([]); }}>↺</button>
       </div>
-      <ol className="mt-4 space-y-1 font-mono text-sm text-ink-muted">{laps.map((l, i) => <li key={i}>#{laps.length - i} · {fmt(l)}</li>)}</ol>
+      <ol className="mt-4 space-y-1 font-mono text-sm text-ink-2">{laps.map((l, i) => <li key={i}>#{laps.length - i} · {fmt(l)}</li>)}</ol>
     </div>
   );
 }
@@ -70,11 +70,11 @@ export function Calculator() {
     [locale === "ar" ? "الفرق السعري" : "Price diff", "b-a"],
   ];
   return (
-    <div className="card p-4">
-      <div className="text-[10px] tracking-widest text-gold">{locale === "ar" ? "الحاسبة" : "CALCULATOR"}</div>
+    <div className="sheet p-4">
+      <span className="eyebrow">ATLAS 03 · 54 · CALCULATOR</span>
       <input className="input mt-2 font-mono text-lg" value={expr} onChange={(e) => { setExpr(e.target.value); setOut(evalSafe(e.target.value)); }} placeholder="(2650-2645)*100" />
-      <div className="mt-2 font-mono text-3xl text-gold-light">{out || "0"}</div>
-      <div className="mt-3 text-xs text-ink-muted">{locale === "ar" ? "اختصارات (استبدل الرموز بالأرقام):" : "Shortcuts (replace symbols with numbers):"}</div>
+      <div className="mono mt-2 text-3xl">{out || "0"}</div>
+      <div className="mt-3 text-xs text-ink-2">{locale === "ar" ? "اختصارات (استبدل الرموز بالأرقام):" : "Shortcuts (replace symbols with numbers):"}</div>
       <div className="mt-1 flex flex-wrap gap-1.5">{quick.map(([n, e]) => <button key={n} className="chip hover:text-ink" onClick={() => setExpr(e)}>{n}: <span className="font-mono">{e}</span></button>)}</div>
     </div>
   );
@@ -92,11 +92,11 @@ export function TimezoneConverter() {
   const base = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), h || 0, m || 0));
   const instant = new Date(base.getTime() - offsetMin(from, base) * 60000);
   return (
-    <div className="card p-4">
-      <div className="text-[10px] tracking-widest text-gold">{locale === "ar" ? "محول المناطق الزمنية" : "TIME ZONE CONVERTER"}</div>
+    <div className="sheet p-4">
+      <span className="eyebrow">ATLAS 03 · 55 · TIME ZONES</span>
       <div className="mt-2 flex gap-2"><input type="time" className="input w-32 font-mono" value={time} onChange={(e) => setTime(e.target.value)} /><select className="input" value={from} onChange={(e) => setFrom(e.target.value)}>{zones.map((z) => <option key={z}>{z}</option>)}</select></div>
-      <ul className="mt-3 grid grid-cols-1 gap-1 text-sm sm:grid-cols-2">{zones.map((z) => <li key={z} className="flex justify-between rounded border border-line px-2 py-1"><span className="text-ink-muted">{z}</span><span className="font-mono">{instant.toLocaleTimeString("en-GB", { timeZone: z, hour: "2-digit", minute: "2-digit" })}</span></li>)}</ul>
-      <p className="mt-2 text-[11px] text-ink-faint">{locale === "ar" ? "يراعي التوقيت الصيفي وفق بيانات المتصفح لليوم الحالي." : "DST-aware using the browser's tz database for today's date."}</p>
+      <ul className="mt-3 grid grid-cols-1 gap-1 text-sm sm:grid-cols-2">{zones.map((z) => <li key={z} className="flex justify-between rounded border border-hair px-2 py-1"><span className="text-ink-2">{z}</span><span className="font-mono">{instant.toLocaleTimeString("en-GB", { timeZone: z, hour: "2-digit", minute: "2-digit" })}</span></li>)}</ul>
+      <p className="mt-2 text-[11px] text-ink-3">{locale === "ar" ? "يراعي التوقيت الصيفي وفق بيانات المتصفح لليوم الحالي." : "DST-aware using the browser's tz database for today's date."}</p>
     </div>
   );
 }

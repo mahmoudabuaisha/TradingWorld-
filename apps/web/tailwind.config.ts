@@ -1,24 +1,32 @@
 import type { Config } from "tailwindcss";
 
-/** Design tokens — premium dark trading interface (see docs/11-ui-design-system.md). */
+/**
+ * Kharita design tokens. Every colour is a CSS custom property defined once in globals.css,
+ * so night/day switching is a single attribute on <html>.
+ */
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
-  darkMode: "class",
+  darkMode: ["selector", '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
-        bg: { DEFAULT: "#0b0c0f", panel: "#13151a", panel2: "#191b21", hover: "#1f2229" },
-        line: "#2d3038",
-        gold: { DEFAULT: "#d5b15d", light: "#f1d99a", dim: "#65532c" },
-        ink: { DEFAULT: "#f4f2ed", muted: "#a9a9b0", faint: "#6f7079" },
-        up: "#37c7a0",
-        down: "#f07882",
-        info: "#8db7ff",
-        warn: "#f0b35c",
+        field: "var(--field)",
+        sheet: "var(--sheet)",
+        raised: "var(--raised)",
+        hair: "var(--hair)",
+        rule: "var(--rule)",
+        ink: { DEFAULT: "var(--ink)", 2: "var(--ink-2)", 3: "var(--ink-3)" },
+        up: "var(--up)",
+        down: "var(--down)",
+        stamp: "var(--stamp)",
+        "up-wash": "var(--up-wash)",
+        "down-wash": "var(--down-wash)",
+        flag: "var(--flag)",
       },
-      fontFamily: { sans: ["Inter", "Tahoma", "Arial", "sans-serif"], mono: ["JetBrains Mono", "ui-monospace", "monospace"] },
-      borderRadius: { xl: "14px", "2xl": "20px" },
-      boxShadow: { glow: "0 0 0 1px rgba(213,177,93,.25), 0 10px 40px rgba(0,0,0,.45)" },
+      fontFamily: { sans: ["var(--font-ui)"], mono: ["var(--font-mono)"] },
+      borderRadius: { DEFAULT: "4px", sm: "3px", md: "4px", lg: "4px", xl: "6px", "2xl": "8px" },
+      boxShadow: { sheet: "0 12px 40px rgba(0,0,0,.35)" },
+      fontSize: { "2xs": ["10.5px", "14px"] },
     },
   },
   plugins: [],

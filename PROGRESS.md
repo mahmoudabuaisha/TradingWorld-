@@ -4,7 +4,7 @@
 >
 > دليل الحالات: ⬜ مخطط · 🟦 هيكل أولي (يعمل كواجهة/بنية) · 🟨 قيد التنفيذ · 🟩 منجز (مكتمل ومختبَر) · ✅ معتمد (راجعه صاحب المشروع)
 
-**آخر تحديث:** 2026-10-19 · **الإصدار:** 0.1.0 · **المحرك:** engine 1.0.0 / scoring-v1
+**آخر تحديث:** 2026-10-19 (مساءً) · **الإصدار:** 0.2.0 · **المحرك:** engine 1.0.0 / scoring-v1
 
 ---
 
@@ -16,7 +16,8 @@
 | packages/shared | 🟩 | — | أنواع · schemas · سجل الـ60 وحدة · حاسبات · جلسات |
 | packages/analysis-engine | 🟩 | 13 ✓ | حتمي ومُنسَّخ؛ انظر §3 |
 | apps/api | 🟩 (MVP) | 5 ✓ | مستودعات ذاكرة افتراضيًا؛ Prisma لاحقًا (DB-02) |
-| apps/web | 🟩 (MVP shell) | build ✓ | 24 مسارًا؛ RTL/LTR؛ داكن Premium |
+| apps/web | 🟩 (MVP shell) | build ✓ | 24 مسارًا؛ RTL/LTR؛ لغة «خريطة» (المرحلتان A وB) |
+| نظام التصميم «خريطة» | ✅ معتمد | — | docs/12 · ADR-0005 · المراحل C وD قادمة |
 | packages/db (Prisma + Timescale) | 🟦 | — | schema كاملة؛ لم يُولَّد client بعد (يحتاج DATABASE_URL) |
 | services/ml | 🟦 | 3 ✓ | Walk-forward + registry + weight proposals |
 | التوثيق (PROJECT.md + docs/) | 🟩 | — | |
@@ -27,7 +28,7 @@
 
 | # | الوحدة | المسار | المرحلة | الحالة | معتمد | ما أُنجز / ما يلزم |
 |---|---|---|---|---|---|---|
-| 1 | 🏠 الرئيسية — Dashboard | `/` | MVP | 🟦 هيكل أولي | ☐ | Dashboard بـWatchlist overview + ساعة التداول + إجراءات سريعة. يحتاج: Widgets قابلة للسحب، Focus Mode |
+| 1 | 🏠 الرئيسية — Dashboard | `/` | MVP | 🟨 قيد التنفيذ | ☐ | الورقة اليومية (خريطة): ماذا تغير منذ الأمس، المتابعة كتضاريس، روتين اليوم (محفوظ محليًا)، الصفقات المفتوحة بخط أبعاد، ساعة المسح. يحتاج: Widgets قابلة للسحب، Focus Mode، حفظ الروتين في الخادم |
 | 2 | 📊 التحليل — Analysis | `/chart` | MVP | 🟨 قيد التنفيذ | ☐ | شارت lightweight-charts + overlay مناطق + مستويات + markers BOS/CHoCH + Side Panel + تفاصيل المنطقة. يحتاج: أدوات الرسم، حفظ التحليل، مقارنة الأصول |
 | 3 | 🧠 المعلومات الخاصة — Proprietary Intelligence | `/intel` | P2 | ⬜ مخطط | ☐ |  |
 | 4 | 🤖 مساعد التحليل بالـAI — AI Analysis Assistant | `/chart#ai` | MVP | 🟨 قيد التنفيذ | ☐ | AI Chat مؤسَّس على JSON المحرك؛ مُفسِّر حتمي + Claude اختياري |
@@ -76,14 +77,14 @@
 | 47 | 👥 مساحات الفرق — Team Workspaces | `/community/teams` | P3 | ⬜ مخطط | ☐ |  |
 | 48 | 🏆 نظام الإنجازات والتقدم — Progress System | `/progress` | P3 | ⬜ مخطط | ☐ |  |
 | 49 | ☁️ المزامنة بين الأجهزة — Cloud Sync | `/settings/sync` | P2 | ⬜ مخطط | ☐ |  |
-| 50 | 🔎 البحث الشامل — Global Search | `/search` | P2 | 🟦 هيكل أولي | ☐ | ⌘K: بحث في الوحدات والأصول |
+| 50 | 🔎 البحث الشامل — Global Search | `/search` | P2 | 🟦 هيكل أولي | ☐ | ⌘K: بحث في الأوراق (برقم الورقة وكود الأطلس) والأصول |
 | 51 | ⏰ المنبهات والتذكيرات — Alarms & Reminders | `/tools/alarms` | P2 | ⬜ مخطط | ☐ |  |
 | 52 | ⏱️ المؤقت — Timer | `/tools/timer` | MVP | 🟦 هيكل أولي | ☐ | Presets + صوت اختياري |
 | 53 | ⏱️ ساعة الإيقاف — Stopwatch | `/tools/stopwatch` | MVP | 🟦 هيكل أولي | ☐ | Laps |
 | 54 | 🧮 الحاسبة العامة — Calculator | `/tools/calculator` | MVP | 🟦 هيكل أولي | ☐ | تعبيرات + اختصارات R/% |
 | 55 | 🌍 محول المناطق الزمنية — Time Zone Converter | `/tools/timezones` | MVP | 🟦 هيكل أولي | ☐ | DST-aware |
 | 56 | 👤 الملف الشخصي — Profile | `/profile` | MVP | 🟦 هيكل أولي | ☐ | بطاقة المستخدم + Watchlist |
-| 57 | ⚙️ الإعدادات — Settings | `/settings` | MVP | 🟦 هيكل أولي | ☐ | اللغة/الأصل/الفريم/الوضع الافتراضي |
+| 57 | ⚙️ الإعدادات — Settings | `/settings` | MVP | 🟦 هيكل أولي | ☐ | المسح ليلي/نهاري/النظام، اللغة، الأصل، الفريم، وضع التحليل |
 | 58 | 🛡️ لوحة الإدارة — Admin Panel | `/admin` | MVP | 🟦 هيكل أولي | ☐ | Overview · users · roles · zone log · audit · AI research (factor frequency) |
 | 59 | 🔒 نظام الصلاحيات والحماية — Security & Permissions | `/admin/security` | MVP | 🟨 قيد التنفيذ | ☐ | JWT/scrypt/RBAC/rate-limit/helmet/zod/audit. يحتاج: 2FA، جلسات/أجهزة، Prisma sessions |
 | 60 | 💳 الاشتراكات والباقات — Subscriptions & Plans | `/plans` | P3 | ⬜ مخطط | ☐ |  |
@@ -131,9 +132,11 @@
 | AI-01 | Outcome tracker يملأ `ZoneOutcome` عند انتهاء دورة الحياة | 🔴 | ⬜ |
 | AI-02 | Zone feedback 👍/👎 (منفصل عن نتائج السوق) | 🟠 | ⬜ |
 | AI-03 | أول تدريب walk-forward على ≥ 5k منطقة ← اقتراح scoring-v2 | 🟢 | ⬜ |
-| UI-01 | أدوات الرسم (خطوط، فيبوناتشي، مستطيلات) مرتبطة بالوقت/السعر | 🔴 | ⬜ |
+| UI-01 | أدوات الرسم (خطوط، فيبوناتشي، مستطيلات) مرتبطة بالوقت/السعر، بالطباشير (لون الإنسان) | 🔴 | ⬜ |
+| UI-04 | خريطة المرحلة C: التعليق المساحي بخط دليل، كومة الأدلة، بوصلة الانحياز، قرص الجلسات، الختم على الشارت، الأبعاد في الحاسبات | 🔴 | ⬜ |
+| UI-05 | خريطة المرحلة D: أشرطة التضاريس في الأسواق، بقية الأوراق، مراجعة الوصولية، خيار الأخضر/الأحمر الكلاسيكي | 🟠 | ⬜ |
 | UI-02 | Widgets قابلة للسحب في Dashboard + Focus Mode | 🟠 | ⬜ |
-| UI-03 | Light theme | 🟢 | ⬜ |
+| UI-03 | Light theme (المسح النهاري) | 🟢 | 🟩 |
 | OPS-01 | Monitoring (OpenTelemetry) + logs + alerting | 🟠 | ⬜ |
 | OPS-02 | Backups يومية + اختبار استرجاع | 🔴 | ⬜ |
 | NOTIF-01 | Push (Web Push) + Email للتنبيهات | 🟠 | ⬜ |
@@ -147,6 +150,10 @@
 
 | التاريخ | النطاق | التغيير | الحالة | معتمد |
 |---|---|---|---|---|
+| 2026-10-19 | design · docs | اعتماد لغة التصميم «خريطة»: docs/12 + ADR-0005 + صفحة المفهوم في docs/design؛ docs/11 أصبح أرشيفًا | ✅ | ☑ 2026-10-19 |
+| 2026-10-19 | apps/web (المرحلة A) | رموز خريطة في globals.css + tailwind (ليلي/نهاري/النظام)، IBM Plex Sans Arabic + Plex Mono مستضافان ذاتيًا، سكربت الثيم قبل أول رسم، إعادة تسمية كل أصناف الألوان، إزالة الرموز التعبيرية من الواجهة | 🟩 | ☐ |
+| 2026-10-19 | apps/web (المرحلة B) | السكة بثمانية أطالس مع فهرس الأوراق، شريط الورقة (الموقع، ⌘K، ساعة UTC والجلسة، ليل/نهار، اللغة)، شريط الهاتف، كتلة العنوان تحت الشارت، الورقة اليومية بدل الـDashboard، فهرس الأوراق بترقيم المواصفة، مناطق مهشّرة بكنتور وتسميات مونو على الشارت، أيقونات خطية | 🟩 | ☐ |
+| 2026-10-19 | packages/shared · apps/api | `ATLASES` و`atlasOf/modulesOfAtlas/atlasForRoute` في سجل الوحدات؛ `/overview` يرجع narrative وlastSweep وspark وchangePct وsession لكل أصل | 🟩 | ☐ |
 | 2026-10-19 | docs | إنشاء PROJECT.md و PROGRESS.md و docs/ (11 وثيقة + 4 ADR) و README | 🟩 | ☐ |
 | 2026-10-19 | services/ml | خدمة FastAPI: features · walk-forward · registry · propose_weights + 3 اختبارات | 🟦 | ☐ |
 | 2026-10-19 | packages/db | Prisma schema (16 نموذجًا) + SQL hypertable/compression | 🟦 | ☐ |

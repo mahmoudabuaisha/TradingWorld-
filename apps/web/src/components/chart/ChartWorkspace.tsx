@@ -10,7 +10,18 @@ import { TradingChart } from "./TradingChart";
 import { SidePanel } from "./SidePanel";
 import { ZoneDetails } from "./ZoneDetails";
 import { AiChat } from "./AiChat";
+import { TitleBlock } from "./TitleBlock";
+import { Icon } from "../Icon";
 
+function pipPrice(p: number | undefined, precision: number) {
+  if (p === undefined) return null;
+  const s = p.toFixed(precision);
+  if (precision < 2) return <>{Number(s).toLocaleString("en-US")}</>;
+  const [i, f] = s.split(".");
+  return <>{Number(i).toLocaleString("en-US")}.{f!.slice(0, -2)}<span className="pip">{f!.slice(-2)}</span></>;
+}
+
+/** SHEET 02 — the analysis workspace: ribbon, field, legend, assistant, title block. */
 export function ChartWorkspace() {
   const { locale, symbol, timeframe, setSymbol, setTimeframe, mode, setMode, showLowQuality } = useApp();
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -21,15 +32,15 @@ export function ChartWorkspace() {
   const [toast, setToast] = useState<string>();
   const [error, setError] = useState<string>();
   const instrument = useMemo(() => findInstrument(symbol) ?? DEFAULT_INSTRUMENTS[0]!, [symbol]);
+  const price = live?.close ?? candles[candles.length - 1]?.close;
 
   const load = useCallback(async () => {
     setError(undefined);
     try {
       const [c, a] = await Promise.all([api.candles(symbol, timeframe, 600), api.analysis(symbol, timeframe, showLowQuality)]);
-      setCandles(c.candles); setProvider({ id: c.provider, ...c.status }); setAnalysis(a); setSelected(undefined);
+      setCandles(c.candles); setLive(undefined); setProvider({ id: c.provider, ...c.status }); setAnalysis(a); setSelected(undefined);
     } catch (e) { setError((e as Error).message); }
   }, [symbol, timeframe, showLowQuality]);
-
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
@@ -37,42 +48,47 @@ export function ChartWorkspace() {
       if (m.type === "candle") {
         setLive(m.update.candle);
         if (m.update.closed) setCandles((prev) => (prev.length && prev[prev.length - 1]!.time < m.update.candle.time ? [...prev, m.update.candle] : prev));
-      } else if (m.type === "analysis") {
-        if (mode === "ai") setAnalysis(m.result);
-      } else if (m.type === "status") setProvider(m.provider);
+      } else if (m.type === "analysis") { if (mode === "ai") setAnalysis(m.result); }
+      else if (m.type === "status") setProvider(m.provider);
       else if (m.type === "alert") { setToast(m.event.message[locale]); setTimeout(() => setToast(undefined), 8000); }
     });
     return off;
   }, [symbol, timeframe, mode, locale]);
 
   return (
-    <div className="flex h-[calc(100vh-7.5rem)] flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <select className="input w-auto font-mono" value={symbol} onChange={(e) => setSymbol(e.target.value)}>
-          {DEFAULT_INSTRUMENTS.map((i) => <option key={i.symbol} value={i.symbol}>{i.symbol} · {locale === "ar" ? i.nameAr : i.name}</option>)}
+    <div className="-mx-4 -my-4 flex h-[calc(100vh-var(--bar-h))] flex-col md:-mx-6 md:-my-5">
+      {/* ribbon */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-hair px-4 py-2 md:px-6">
+        <select id="symbol" className="input w-auto py-1 font-mono text-base font-semibold" value={symbol} onChange={(e) => setSymbol(e.target.value)} style={{ direction: "ltr" }}>
+          {DEFAULT_INSTRUMENTS.map((i) => <option key={i.symbol} value={i.symbol}>{i.symbol}</option>)}
         </select>
-        <div className="flex flex-wrap gap-1">
-          {TIMEFRAMES.map((tf) => <button key={tf} onClick={() => setTimeframe(tf as Timeframe)} className={`rounded-md px-2 py-1 font-mono text-xs ${tf === timeframe ? "bg-[#252117] text-gold-light" : "text-ink-muted hover:bg-bg-hover"}`}>{tf}</button>)}
+        <span className="mono text-xl">{pipPrice(price, instrument.pricePrecision)}</span>
+        <div className="flex flex-wrap gap-0.5" style={{ direction: "ltr" }}>
+          {TIMEFRAMES.map((tf) => <button key={tf} onClick={() => setTimeframe(tf as Timeframe)} className={`mono rounded px-2 py-1 text-xs ${tf === timeframe ? "bg-ink text-field" : "text-ink-3 hover:bg-raised hover:text-ink"}`}>{tf}</button>)}
         </div>
-        <div className="ms-auto flex items-center gap-1 rounded-lg border border-line p-0.5 text-xs">
-          <button onClick={() => setMode("manual")} className={`rounded-md px-2 py-1 ${mode === "manual" ? "bg-[#252117] text-gold-light" : "text-ink-muted"}`}>{t(locale, "chart", "manual")}</button>
-          <button onClick={() => setMode("ai")} className={`rounded-md px-2 py-1 ${mode === "ai" ? "bg-[#252117] text-gold-light" : "text-ink-muted"}`}>{t(locale, "chart", "ai")}</button>
+        <div className="flex overflow-hidden rounded-full border border-hair text-xs">
+          <button onClick={() => setMode("manual")} className={`px-3 py-1 ${mode === "manual" ? "bg-ink text-field" : "text-ink-3"}`}>{t(locale, "chart", "manual")}</button>
+          <button onClick={() => setMode("ai")} className={`px-3 py-1 ${mode === "ai" ? "bg-ink text-field" : "text-ink-3"}`}>{t(locale, "chart", "ai")}</button>
         </div>
-        <button className="btn-ghost" onClick={() => void load()}>⟳</button>
+        <span className="flex-1" />
+        <span className="hidden text-xs text-ink-3 lg:inline">{locale === "ar" ? instrument.nameAr : instrument.name}</span>
+        <button className="btn-ghost px-2" onClick={() => void load()} aria-label="refresh"><Icon name="refresh" size={15} /></button>
       </div>
-      {error && <div className="rounded-lg border border-down/40 bg-down/10 px-3 py-2 text-xs text-down">{error} — {locale === "ar" ? "تأكد من تشغيل الـ API على" : "make sure the API is running at"} {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}</div>}
-      {toast && <div className="rounded-lg border border-gold/50 bg-[#252117] px-3 py-2 text-xs text-gold-light">🔔 {toast}</div>}
+      {error && <div className="border-b border-stamp/40 bg-sheet px-4 py-2 text-xs text-stamp md:px-6">{error} · {locale === "ar" ? "تأكد من تشغيل الـ API على" : "make sure the API is running at"} {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}</div>}
+      {toast && <div className="border-b border-hair bg-raised px-4 py-2 text-xs md:px-6"><Icon name="bell" size={13} className="me-1 inline" />{toast}</div>}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1fr_320px]">
-        <div className="card relative min-h-[380px] overflow-hidden">
+      {/* field + legend */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_300px]">
+        <div className="relative min-h-[360px]">
           <TradingChart candles={candles} liveCandle={live} analysis={mode === "ai" ? analysis : undefined} precision={instrument.pricePrecision} selectedZoneId={selected?.id} onSelectZone={setSelected} />
-          {selected && mode === "ai" && <div className="absolute bottom-3 start-3 z-10 w-[min(520px,calc(100%-1.5rem))]"><ZoneDetails zone={selected} precision={instrument.pricePrecision} onClose={() => setSelected(undefined)} /></div>}
+          {selected && mode === "ai" && <div className="absolute bottom-3 start-3 z-10 w-[min(540px,calc(100%-1.5rem))]"><ZoneDetails zone={selected} precision={instrument.pricePrecision} onClose={() => setSelected(undefined)} /></div>}
         </div>
-        <div className="grid min-h-0 grid-rows-[1fr_280px] gap-3">
+        <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_230px]">
           <SidePanel analysis={mode === "ai" ? analysis : undefined} precision={instrument.pricePrecision} selected={selected?.id} onSelect={setSelected} provider={provider} />
           <AiChat zoneId={selected?.id} />
         </div>
       </div>
+      <TitleBlock analysis={mode === "ai" ? analysis : undefined} provider={provider} symbol={symbol} timeframe={timeframe} />
     </div>
   );
 }

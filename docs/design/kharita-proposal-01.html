@@ -1,0 +1,692 @@
+<title>Kharita Design Language</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout concept: a surveyor's map sheet. The chart is the field; every control lives in the sheet's margins
+   (ribbon, legend column, title block). Sections below are further sheets from the same field notebook. */
+:root {
+  /* Night survey (default) */
+  --field: #13181b;
+  --sheet: #191f23;
+  --raised: #1f262b;
+  --hair: #243036;
+  --rule: #2f3b42;
+  --ink: #e8ebe6;
+  --ink-2: #a3adae;
+  --ink-3: #6d7a80;
+  --up: #22a08a;
+  --down: #c0821a;
+  --stamp: #cf4266;
+  --up-wash: rgba(34, 160, 138, .16);
+  --down-wash: rgba(192, 130, 26, .16);
+  --flag: #e8ebe6;
+  --font-ui: "IBM Plex Sans Arabic", "IBM Plex Sans", system-ui, "Segoe UI", Tahoma, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius: 4px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --field: #eef0ec; --sheet: #f6f7f4; --raised: #ffffff; --hair: #d8ded9; --rule: #bfc9c4;
+    --ink: #1a2124; --ink-2: #4f5c61; --ink-3: #8a979b;
+    --up: #0f9a82; --down: #b9781a; --stamp: #b83556;
+    --up-wash: rgba(15, 154, 130, .14); --down-wash: rgba(185, 120, 26, .14);
+    --flag: #1a2124;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --field: #eef0ec; --sheet: #f6f7f4; --raised: #ffffff; --hair: #d8ded9; --rule: #bfc9c4;
+  --ink: #1a2124; --ink-2: #4f5c61; --ink-3: #8a979b;
+  --up: #0f9a82; --down: #b9781a; --stamp: #b83556;
+  --up-wash: rgba(15, 154, 130, .14); --down-wash: rgba(185, 120, 26, .14);
+  --flag: #1a2124;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--field); color: var(--ink); overflow-x: clip;
+  font-family: var(--font-ui); font-size: 15px; line-height: 1.75;
+  padding-block: 0 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1180px; margin-inline: auto; }
+h1, h2, h3 { margin: 0; text-wrap: balance; font-weight: 600; line-height: 1.25; }
+h2 { font-size: 24px; }
+h3 { font-size: 16px; }
+p { margin: 0; max-width: 68ch; }
+a { color: inherit; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); direction: ltr; unicode-bidi: isolate; display: inline-block; }
+.muted { color: var(--ink-2); }
+.faint { color: var(--ink-3); }
+
+/* masthead */
+.mast { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; padding-block: 36px 28px; border-bottom: 1px solid var(--rule); }
+.mast .name { font-size: clamp(44px, 7vw, 76px); font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+.mast .latin { font-family: var(--font-mono); font-size: 13px; letter-spacing: .3em; color: var(--ink-3); margin-top: 6px; direction: ltr; }
+.thesis { font-size: 19px; font-weight: 500; margin-top: 18px; max-width: 34ch; }
+.mast-side { display: grid; gap: 10px; justify-items: end; font-size: 13px; color: var(--ink-2); }
+.toggle { font: inherit; font-size: 13px; color: var(--ink); background: var(--sheet); border: 1px solid var(--rule); border-radius: 999px; padding: 6px 14px; cursor: pointer; display: inline-flex; gap: 8px; align-items: center; }
+.toggle:hover { background: var(--raised); }
+.toggle:focus-visible, button:focus-visible, .layer:focus-visible { outline: 2px solid var(--flag); outline-offset: 2px; }
+.etym { font-size: 13px; color: var(--ink-2); max-width: 58ch; margin-top: 12px; }
+
+section { padding-block: 40px; border-bottom: 1px solid var(--hair); }
+.sec-head { display: grid; gap: 6px; margin-bottom: 22px; }
+.lead { color: var(--ink-2); max-width: 70ch; }
+
+/* ───────── workspace mock ───────── */
+.ws-scroll { overflow-x: auto; border: 1px solid var(--rule); background: var(--field); }
+.ws { min-width: 1180px; display: grid; grid-template-rows: auto auto auto; }
+.ribbon { display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-bottom: 1px solid var(--hair); font-size: 12px; }
+.ribbon .sym { font-family: var(--font-mono); font-size: 20px; font-weight: 600; letter-spacing: .02em; direction: ltr; }
+.ribbon .px { font-family: var(--font-mono); font-size: 20px; direction: ltr; color: var(--ink); }
+.ribbon .px small { font-size: 14px; color: var(--ink-3); font-weight: 400; }
+.tfs { display: flex; gap: 2px; font-family: var(--font-mono); font-size: 11px; direction: ltr; }
+.tfs span { padding: 3px 7px; color: var(--ink-3); border-radius: 3px; }
+.tfs span.on { color: var(--ink); background: var(--raised); box-shadow: inset 0 0 0 1px var(--rule); }
+.modes { display: flex; border: 1px solid var(--rule); border-radius: 999px; overflow: hidden; }
+.modes span { padding: 3px 12px; color: var(--ink-3); }
+.modes span.on { background: var(--ink); color: var(--field); }
+.ribbon .spacer { flex: 1; }
+.feed { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; direction: ltr; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--up); display: inline-block; }
+.kbd { font-family: var(--font-mono); font-size: 10px; border: 1px solid var(--rule); padding: 1px 6px; border-radius: 3px; color: var(--ink-3); }
+
+.body { display: grid; grid-template-columns: 1fr 292px; min-height: 0; }
+.fieldwrap { position: relative; min-width: 0; }
+.fieldwrap svg { width: 100%; height: auto; display: block; }
+.legend { border-inline-start: 1px solid var(--hair); display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 0; min-height: 0; overflow: hidden; }
+.leg { padding: 10px 12px; border-bottom: 1px solid var(--hair); min-width: 0; }
+.leg h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: .08em; color: var(--ink-3); font-weight: 500; display: flex; justify-content: space-between; }
+.leg h4 .eyebrow { font-size: 10px; }
+
+/* zone list */
+.zl { display: grid; gap: 6px; font-size: 12px; }
+.zl .z { display: grid; grid-template-columns: 14px 1fr auto; gap: 8px; align-items: start; padding: 5px 8px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--sheet); }
+.zl .z.sel { border-color: var(--ink); }
+.sw { width: 14px; height: 30px; border-radius: 2px; margin-top: 2px; }
+.sw.up { background: repeating-linear-gradient(45deg, var(--up) 0 1px, var(--up-wash) 1px 5px); }
+.sw.down { background: repeating-linear-gradient(-45deg, var(--down) 0 1px, var(--down-wash) 1px 5px); }
+.zl .score { font-family: var(--font-mono); font-size: 13px; font-weight: 600; direction: ltr; }
+.zl .st { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); direction: ltr; letter-spacing: .06em; }
+.zl .nm { line-height: 1.35; }
+
+/* title block */
+.tblock { display: grid; grid-template-columns: repeat(6, auto) 1fr; gap: 0; border-top: 1px solid var(--hair); font-family: var(--font-mono); font-size: 10.5px; direction: ltr; text-align: left; }
+.tblock div { padding: 6px 12px; border-right: 1px solid var(--hair); }
+.tblock div:last-child { border-right: 0; }
+.tblock b { display: block; font-weight: 500; color: var(--ink-3); font-size: 9.5px; letter-spacing: .1em; }
+.tblock span { color: var(--ink); }
+.tblock span.ar { unicode-bidi: plaintext; }
+
+/* ───────── confluence stack ───────── */
+.stack { display: grid; grid-template-columns: 1fr 44px; gap: 10px; align-items: end; }
+.layers { display: flex; flex-direction: column-reverse; gap: 2px; }
+.layer { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; font-size: 11px; line-height: 1; border: 1px solid var(--rule); border-radius: 2px; background: var(--sheet); cursor: pointer; user-select: none; transition: transform .18s ease, opacity .18s ease; }
+.layer.up.on { background: var(--up-wash); border-color: var(--up); }
+.layer.down.on { background: var(--down-wash); border-color: var(--down); }
+.layer.off { border-style: dashed; color: var(--ink-3); opacity: .7; }
+.layer .w { font-family: var(--font-mono); font-size: 11px; direction: ltr; }
+.layer:hover { transform: translateX(-3px); }
+.dim { position: relative; height: 100%; display: grid; place-items: center; }
+.dim .line { position: absolute; inset-block: 0; inset-inline-start: 50%; width: 1px; background: var(--ink); }
+.dim .line::before, .dim .line::after { content: ""; position: absolute; inset-inline-start: -4px; width: 9px; height: 1px; background: var(--ink); }
+.dim .line::before { top: 0; } .dim .line::after { bottom: 0; }
+.dim .val { position: relative; background: var(--sheet); padding: 2px 4px; font-family: var(--font-mono); font-size: 13px; font-weight: 600; direction: ltr; writing-mode: vertical-rl; transform: rotate(180deg); }
+
+/* ───────── sections ───────── */
+.grid { display: grid; gap: 14px; }
+.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sheet { background: var(--sheet); border: 1px solid var(--hair); border-radius: var(--radius); padding: 18px; min-width: 0; overflow-wrap: anywhere; }
+.sheet h3 { margin-bottom: 8px; }
+.sheet p { font-size: 14px; color: var(--ink-2); }
+.principle { border-top: 2px solid var(--ink); padding-top: 12px; }
+.principle .mark { font-family: var(--font-mono); font-size: 22px; line-height: 1; margin-bottom: 10px; direction: ltr; }
+
+/* swatches */
+.swatches { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.swatch { border-radius: var(--radius); padding: 14px 12px; min-height: 120px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid var(--hair); }
+.swatch b { display: block; font-size: 14px; }
+.swatch small { font-family: var(--font-mono); font-size: 11px; direction: ltr; display: block; opacity: .85; }
+.swatch .role { font-size: 12px; line-height: 1.4; }
+
+/* type */
+.spec-ar { font-size: 34px; font-weight: 500; line-height: 1.3; }
+.spec-ar.light { font-weight: 300; }
+.price { font-family: var(--font-mono); font-size: clamp(30px, 9vw, 44px); font-weight: 500; direction: ltr; letter-spacing: -.01em; line-height: 1; }
+.price .pip { font-weight: 300; color: var(--ink-2); }
+.price .delta { font-size: 16px; font-weight: 400; margin-left: 10px; }
+.scale { display: grid; gap: 6px; font-size: 13px; color: var(--ink-2); }
+.scale div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dashed var(--hair); padding-bottom: 4px; }
+
+/* components */
+.comp { display: grid; gap: 10px; }
+.comp .demo { background: var(--field); border: 1px solid var(--hair); border-radius: var(--radius); padding: 14px; min-height: 150px; display: grid; place-items: center; }
+.stampbox { position: relative; height: 110px; width: 100%; border: 1px dashed var(--rule); border-radius: var(--radius); display: grid; place-items: center; background: repeating-linear-gradient(45deg, transparent 0 6px, var(--up-wash) 6px 7px); }
+.stamp { border: 2px solid var(--stamp); color: var(--stamp); font-family: var(--font-mono); font-weight: 600; letter-spacing: .18em; padding: 4px 14px; transform: rotate(-9deg); border-radius: 3px; font-size: 13px; direction: ltr; background: color-mix(in srgb, var(--field) 82%, transparent); }
+.callout { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); padding: 12px 14px; font-size: 13px; width: 100%; position: relative; }
+.callout .t { font-weight: 600; margin-bottom: 6px; }
+.callout ol { margin: 6px 0 0; padding-inline-start: 18px; color: var(--ink-2); }
+.callout .inv { margin-top: 8px; color: var(--stamp); font-size: 12.5px; }
+.callout .pin { position: absolute; inset-inline-start: -22px; top: 22px; width: 22px; height: 1px; background: var(--ink); }
+.callout .pin::after { content: ""; position: absolute; inset-inline-start: -5px; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
+.terrain { display: grid; grid-template-columns: 70px 1fr auto auto; gap: 12px; align-items: center; width: 100%; font-size: 13px; }
+.terrain .s { font-family: var(--font-mono); font-weight: 600; direction: ltr; }
+.terrain .v { font-family: var(--font-mono); direction: ltr; color: var(--ink-2); }
+
+/* daily sheet */
+.daily { background: var(--sheet); border: 1px solid var(--hair); border-radius: var(--radius); padding: 22px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 26px; }
+.daily h3 { font-size: 20px; }
+.daily .date { font-family: var(--font-mono); color: var(--ink-3); font-size: 12px; direction: ltr; letter-spacing: .1em; }
+.lines { display: grid; gap: 8px; margin-top: 12px; font-size: 14px; }
+.lines div { display: grid; grid-template-columns: 18px 1fr; gap: 8px; border-bottom: 1px dashed var(--hair); padding-bottom: 6px; }
+.lines .k { font-family: var(--font-mono); color: var(--ink-3); font-size: 12px; direction: ltr; }
+.check { display: grid; gap: 6px; font-size: 14px; }
+.check label { display: flex; gap: 10px; align-items: center; }
+.check input { accent-color: var(--ink); }
+.trade { border: 1px solid var(--rule); border-radius: var(--radius); padding: 12px; margin-top: 14px; font-size: 13px; }
+
+/* table */
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tbl th, .tbl td { text-align: start; padding: 10px 12px; border-bottom: 1px solid var(--hair); vertical-align: top; }
+.tbl th { font-size: 12px; color: var(--ink-3); font-weight: 500; letter-spacing: .04em; }
+.tbl td:first-child { color: var(--ink-2); }
+.tbl-wrap { overflow-x: auto; }
+
+/* plan */
+.steps { display: grid; gap: 10px; }
+.step { display: grid; grid-template-columns: 80px 1fr auto; gap: 14px; align-items: start; padding: 12px 14px; background: var(--sheet); border: 1px solid var(--hair); border-radius: var(--radius); font-size: 14px; }
+.step .ph { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); direction: ltr; letter-spacing: .08em; }
+.step .est { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); direction: ltr; white-space: nowrap; }
+code { font-family: var(--font-mono); font-size: .9em; background: var(--raised); padding: 1px 5px; border-radius: 3px; direction: ltr; unicode-bidi: isolate; }
+
+footer { padding-top: 24px; font-size: 12px; color: var(--ink-3); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+@media (max-width: 900px) {
+  .mast { grid-template-columns: 1fr; }
+  .mast-side { justify-items: start; }
+  .g3, .g4, .swatches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .daily { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .g2, .g3, .g4, .swatches { grid-template-columns: 1fr; }
+  .step { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .layer { transition: none; } .layer:hover { transform: none; } }
+</style>
+
+<div dir="rtl" lang="ar" class="wrap">
+
+<header class="mast">
+  <div>
+    <span class="eyebrow">TRADINGWORLD · DESIGN LANGUAGE · PROPOSAL 01</span>
+    <h1 class="name">خريطة</h1>
+    <div class="latin">K H A R I T A</div>
+    <p class="thesis">الشارت خريطة. المحرك مسّاح يضع علاماته عليها. والمتداول هو من يقرأ الأرض ويقرر.</p>
+    <p class="etym">كلمة Chart وكلمة خريطة تعودان إلى الأصل نفسه: الورقة المرسومة. لغة التصميم تبني على هذا المعنى: أدوات مساحة لا طاولة كازينو. لا توهج، لا أخضر وأحمر صارخين، لا بطاقات متكررة. حبر على ورق، وتعليقات مرسومة بخط يد مهندس.</p>
+  </div>
+  <div class="mast-side">
+    <button class="toggle" id="themeToggle" type="button"><span id="themeIcon">☾</span><span id="themeLabel">مسح ليلي</span></button>
+    <div>الوضع الافتراضي ليلي. النهاري ورقة خرائط باردة، ليس ورقًا كريميًا.</div>
+  </div>
+</header>
+
+<!-- ───────────────────────── workspace ───────────────────────── -->
+<section id="workspace">
+  <div class="sec-head">
+    <span class="eyebrow">SHEET 01 · ANALYSIS WORKSPACE</span>
+    <h2>مساحة التحليل</h2>
+    <p class="lead">كل عنصر على الشاشة يحمل معلومة. المناطق تُرسم كأحزمة ارتفاع مُهشّرة: اتجاه التهشير يحدد الاتجاه حتى بالأبيض والأسود، وكثافته تحدد القوة. الشرح لا يظهر في نافذة تطفو فوق الشارت بل كتعليق مساحي مربوط بخط دليل إلى المنطقة نفسها.</p>
+  </div>
+  <div class="ws-scroll">
+  <div class="ws">
+    <div class="ribbon">
+      <span class="sym">XAUUSD</span>
+      <span class="px" id="pxLive">2,650.<small>34</small></span>
+      <div class="tfs"><span>1m</span><span class="on">5m</span><span>15m</span><span>1h</span><span>4h</span><span>1d</span><span>1w</span></div>
+      <div class="modes"><span>مسح يدوي</span><span class="on">مسح آلي</span></div>
+      <span class="spacer"></span>
+      <svg id="dialMini" width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"></svg>
+      <span class="feed"><span class="dot"></span>DEMO FEED · LIVE · <span id="utcMini">12:41:07</span> UTC</span>
+      <span class="kbd">⌘K</span>
+    </div>
+    <div class="body">
+      <div class="fieldwrap"><svg id="field" viewBox="0 0 1000 620" role="img" aria-label="شارت الذهب على فريم خمس دقائق مع منطقتين مكتشفتين وتعليق مساحي"></svg></div>
+      <aside class="legend">
+        <div class="leg">
+          <h4><span>الانحياز عبر الفريمات</span><span class="eyebrow">BIAS COMPASS</span></h4>
+          <svg id="compass" viewBox="0 0 268 96" width="100%" height="82" aria-label="بوصلة الانحياز: اليومي صاعد، الأربع ساعات والساعة وربع الساعة هابطة"></svg>
+        </div>
+        <div class="leg">
+          <h4><span>تراكم الأدلة · المنطقة المحددة</span><span class="eyebrow">CONFLUENCE</span></h4>
+          <div class="stack" id="stackMini"></div>
+        </div>
+        <div class="leg" style="overflow:auto">
+          <h4><span>المناطق الظاهرة</span><span class="eyebrow">3 HIGH · 1 MED · 4 HIDDEN</span></h4>
+          <div class="zl">
+            <div class="z sel"><span class="sw up"></span><div><div class="nm">طلب: مستوى 1d + سحب سيولة البيع + اندفاع صاعد</div><div class="st">CONFIRMED · TESTED ×0</div></div><span class="score">85</span></div>
+            <div class="z"><span class="sw down"></span><div><div class="nm">عرض: سحب سيولة الشراء + CHoCH هابط + FVG</div><div class="st">ACTIVE</div></div><span class="score">78</span></div>
+            <div class="z"><span class="sw up"></span><div><div class="nm">طلب: Order Block + مستوى 4h</div><div class="st">WEAKENED · TESTED ×3</div></div><span class="score">61</span></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <div class="tblock">
+      <div><b>INSTRUMENT</b><span>XAUUSD · 5m</span></div>
+      <div><b>ENGINE</b><span>1.0.0</span></div>
+      <div><b>SCORING</b><span>scoring-v1</span></div>
+      <div><b>HTF</b><span>1d ▲ · 4h ▼ · 1h ▼ · 15m ▼</span></div>
+      <div><b>REGIME</b><span>RANGING · LOW VOL</span></div>
+      <div><b>SESSION</b><span>LONDON</span></div>
+      <div><b>ANALYSIS, NOT ADVICE</b><span class="ar">كل منطقة قابلة للتفسير والاختبار. لا توصية ولا وعد بالربح.</span></div>
+    </div>
+  </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── principles ───────────────────────── -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">SHEET 02 · PRINCIPLES</span>
+    <h2>خمسة مبادئ</h2>
+  </div>
+  <div class="grid g3">
+    <div class="principle"><div class="mark">▲▽</div><h3>أرض لا طرفية</h3><p>السعر تضاريس. المستويات خطوط كنتور، المناطق أحزمة ارتفاع، السيولة ماء راكد يبحث عنه السعر. لا شاشة تيرمينال مليئة بالأرقام المضيئة.</p></div>
+    <div class="principle"><div class="mark">⌐┘</div><h3>تعليق لا زخرفة</h3><p>كل خط على الشاشة خط دليل أو خط أبعاد أو حد. التدرجات اللونية للمزاج ممنوعة. إن لم يحمل العنصر معلومة فليس له مكان.</p></div>
+    <div class="principle"><div class="mark">≡≡</div><h3>الدليل طبقات</h3><p>قوة المنطقة ليست رقمًا في دائرة بل سُمك مادي: كل عامل موجود طبقة شفافة فوق الأخرى، والدرجة هي ارتفاع الكومة. الغائب يظهر كطبقة منقطة.</p></div>
+    <div class="principle"><div class="mark">·  ·</div><h3>هدوء إلا عند تحرك الأرض</h3><p>لا وميض على كل تحديث سعر. الحركة محجوزة لتغير الحالة: منطقة اختُبرت، أُبطلت، أو تفاعلت. عندها يُعاد رسم خط الكنتور ويتثبت ختم.</p></div>
+    <div class="principle"><div class="mark">ع A</div><h3>خطّان وشبكة واحدة</h3><p>العربية والإنجليزية من العائلة نفسها، بالأوزان نفسها، والأرقام دائمًا بخط أحادي العرض من اليسار إلى اليمين. تنقلب الشبكة مع اللغة ولا ينقلب الإيقاع.</p></div>
+    <div class="principle"><div class="mark">M / H</div><h3>لون للآلة ولون للإنسان</h3><p>ما وجده المحرك يُرسم بلونين فقط: زنجار للطلب وكهرمان للعرض. ما يرسمه المتداول بنفسه يُرسم بالطباشير. تعرف من نظرة واحدة من وضع الخط.</p></div>
+  </div>
+</section>
+
+<!-- ───────────────────────── color ───────────────────────── -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">SHEET 03 · COLOR</span>
+    <h2>خمسة ألوان لا أكثر</h2>
+    <p class="lead">تخلّينا عن الأخضر والأحمر. الزوج زنجار/كهرمان يقرؤه المصاب بعمى الألوان الأحمر والأخضر بوضوح، واجتاز فحص الفصل اللوني على الخلفيتين الليلية والنهارية. من يريد الأخضر والأحمر الكلاسيكيين يجدهما خيارًا في الإعدادات.</p>
+  </div>
+  <div class="swatches">
+    <div class="swatch" style="background:var(--up);color:#0b1513"><div><b>زنجار</b><small>Verdigris · #22a08a / #0f9a82</small></div><div class="role">طلب، صاعد، تفاعل إيجابي، اتصال حي</div></div>
+    <div class="swatch" style="background:var(--down);color:#1a1206"><div><b>كهرمان</b><small>Amber · #c0821a / #b9781a</small></div><div class="role">عرض، هابط، تحذير هادئ</div></div>
+    <div class="swatch" style="background:var(--stamp);color:#fff2f4"><div><b>ختم</b><small>Stamp · #cf4266 / #b83556</small></div><div class="role">أُبطلت، حذف، خطأ. يظهر كختم مائل لا كلون خلفية</div></div>
+    <div class="swatch" style="background:var(--ink);color:var(--field)"><div><b>طباشير / حبر</b><small>Chalk · Ink</small></div><div class="role">كل ما يرسمه الإنسان: خطوطه، تحديده، زر الفعل الأساسي</div></div>
+    <div class="swatch" style="background:var(--sheet);color:var(--ink)"><div><b>الميدان والورقة</b><small>#13181b · #191f23 / #eef0ec · #f6f7f4</small></div><div class="role">خلفيات بميل بارد خفيف نحو الزنجار. لا أسود نقي ولا كريمي دافئ</div></div>
+  </div>
+</section>
+
+<!-- ───────────────────────── type ───────────────────────── -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">SHEET 04 · TYPE</span>
+    <h2>عائلة واحدة للغتين</h2>
+    <p class="lead">IBM Plex Sans Arabic للواجهة بالعربية واللاتينية معًا، وIBM Plex Mono لكل رقم. العائلة صُممت للهندسة والتوثيق، وهذا بالضبط ما نفعله: نوثّق قراءة السوق.</p>
+  </div>
+  <div class="grid g2">
+    <div class="sheet">
+      <div class="spec-ar">تم سحب سيولة البيع عند 2,641.20 ثم أغلقت الشمعة فوق المستوى.</div>
+      <div class="spec-ar light" style="margin-top:10px">يتقاطع مع Order Block يومي غير مُخفَّف.</div>
+      <div class="scale" style="margin-top:18px">
+        <div><span>عنوان الورقة</span><span class="mono">600 / 24px</span></div>
+        <div><span>عنوان بطاقة</span><span class="mono">600 / 16px</span></div>
+        <div><span>نص</span><span class="mono">400 / 15px · 1.75</span></div>
+        <div><span>تسمية هامش</span><span class="mono">Mono 500 / 11px · +0.12em · uppercase</span></div>
+      </div>
+    </div>
+    <div class="sheet">
+      <div class="price">2,650.<span class="pip">34</span><span class="delta" style="color:var(--up)">+4.12</span></div>
+      <p style="margin-top:12px">الأرقام بخط أحادي العرض وأعمدة ثابتة. الرقمان الأخيران من السعر أخف وزنًا لأنهما ضجيج التنفيذ لا المعلومة. القيم تُكتب دائمًا من اليسار إلى اليمين داخل النص العربي بلا كسر للاتجاه.</p>
+      <div class="scale" style="margin-top:18px">
+        <div><span>سعر رئيسي</span><span class="mono">Mono 500 / 44px</span></div>
+        <div><span>سعر في جدول</span><span class="mono">Mono 400 / 13px · tabular</span></div>
+        <div><span>درجة منطقة</span><span class="mono">Mono 600 / 13px</span></div>
+        <div><span>حالة</span><span class="mono">Mono 400 / 10px · +0.06em</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── components ───────────────────────── -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">SHEET 05 · SIGNATURE COMPONENTS</span>
+    <h2>مكونات لا تجدها في منصة أخرى</h2>
+    <p class="lead">سبع قطع تحمل هوية المنصة وتستبدل الأنماط المعتادة: شريط التقدم، البطاقة الرقمية، النافذة المنبثقة، والمؤشر الدائري.</p>
+  </div>
+  <div class="grid g3">
+    <div class="comp sheet"><h3>كومة الأدلة</h3><p>اضغط على أي طبقة لتُخفيها أو تُعيدها وشاهد الدرجة تتغير. يستبدل شريط التقدم والرقم داخل الدائرة.</p><div class="demo"><div class="stack" id="stackBig" style="width:100%"></div></div></div>
+    <div class="comp sheet"><h3>بوصلة الانحياز</h3><p>إبرة لكل فريم أعلى. كل الإبر في اتجاه واحد تعني توافقًا، وتشتتها يعني تعارضًا. تستبدل صف الشارات الملونة.</p><div class="demo"><svg id="compassBig" viewBox="0 0 268 96" width="100%" height="110"></svg></div></div>
+    <div class="comp sheet"><h3>قرص الجلسات</h3><p>اليوم كحلقة. آسيا ولندن ونيويورك أقواس، والتداخل قوس أثخن، والعقرب هو الآن بتوقيت UTC. يعمل بالفعل.</p><div class="demo"><svg id="dialBig" viewBox="0 0 160 160" width="150" height="150"></svg></div></div>
+    <div class="comp sheet"><h3>التعليق المساحي</h3><p>الشرح مربوط إلى المنطقة بخط دليل ودبوس. يبقى الشارت ظاهرًا كاملًا ولا شيء يحجبه.</p><div class="demo"><div class="callout" style="margin-inline-start:22px;width:calc(100% - 22px)"><span class="pin"></span><div class="t">طلب: مستوى 1d + سحب سيولة البيع + اندفاع صاعد</div><div class="mono faint" style="font-size:11px">85 / 100 · CONFIRMED · 2,641.20 – 2,646.80</div><ol><li>تقاطع مع Order Block يومي عند 2,644.10</li><li>سحب PDL بإغلاق فوقه</li><li>اندفاع 2.3×ATR غادر المنطقة</li></ol><div class="inv">إغلاق شمعة 5m تحت 2,641.20 يبطل المنطقة.</div></div></div></div>
+    <div class="comp sheet"><h3>الختم</h3><p>منطقة أُبطلت لا تختفي ولا تصبح رمادية. يُختم عليها كما يُختم على رسم هندسي ملغى، ثم تُؤرشف للتعلم.</p><div class="demo"><div class="stampbox"><span class="stamp">INVALIDATED · أُبطلت</span></div></div></div>
+    <div class="comp sheet"><h3>خط الأبعاد</h3><p>المسافة إلى وقف الخسارة والهدف تُرسم كأبعاد على مخطط، على الشارت وفي الحاسبات. R تصبح شيئًا تراه.</p><div class="demo"><svg viewBox="0 0 300 110" width="100%" height="110" aria-label="خط أبعاد يوضح مسافة الوقف 1R والهدف 3R"><g stroke="var(--ink)" fill="none" stroke-width="1"><line x1="20" y1="30" x2="20" y2="90"/><line x1="100" y1="30" x2="100" y2="90"/><line x1="280" y1="30" x2="280" y2="90"/><line x1="20" y1="48" x2="100" y2="48"/><line x1="100" y1="48" x2="280" y2="48"/><path d="M26 44 L20 48 L26 52"/><path d="M94 44 L100 48 L94 52"/><path d="M106 44 L100 48 L106 52"/><path d="M274 44 L280 48 L274 52"/></g><g font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink)" text-anchor="middle"><text x="60" y="40">1.0R · 5.20</text><text x="190" y="40">3.0R · 15.60</text></g><g font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-3)" text-anchor="middle"><text x="20" y="104">SL 2,645.00</text><text x="100" y="104">ENTRY 2,650.20</text><text x="280" y="104">TP 2,665.80</text></g><rect x="100" y="60" width="180" height="22" fill="var(--up-wash)"/><rect x="20" y="60" width="80" height="22" fill="var(--down-wash)"/></svg></div></div>
+    <div class="comp sheet"><h3>شريط التضاريس</h3><p>صف قائمة المتابعة. بدل الخط المتعرج الملون، تضاريس بثلاثة خطوط كنتور ونقطة نهاية. يُظهر الاتجاه والتذبذب دون لون.</p><div class="demo" style="display:grid;gap:10px;place-items:stretch"><div class="terrain"><span class="s">XAUUSD</span><svg class="tstrip" viewBox="0 0 160 36" height="36" width="100%" data-seed="7"></svg><span class="v">2,650.34</span><span class="sw up" style="height:18px"></span></div><div class="terrain"><span class="s">EURUSD</span><svg class="tstrip" viewBox="0 0 160 36" height="36" width="100%" data-seed="3"></svg><span class="v">1.08512</span><span class="sw down" style="height:18px"></span></div><div class="terrain"><span class="s">BTCUSD</span><svg class="tstrip" viewBox="0 0 160 36" height="36" width="100%" data-seed="11"></svg><span class="v">67,120</span><span class="sw up" style="height:18px"></span></div></div></div>
+  </div>
+</section>
+
+<!-- ───────────────────────── daily sheet ───────────────────────── -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">SHEET 06 · THE DAILY SHEET</span>
+    <h2>الرئيسية ورقة ميدان لا لوحة مؤشرات</h2>
+    <p class="lead">لا شبكة من البطاقات الرقمية. ورقة واحدة بتاريخ اليوم: ماذا تغير منذ الأمس بكلمات المحرك، قائمة المتابعة كتضاريس، روتين اليوم كقائمة تحقق، والصفقة المفتوحة بأبعادها.</p>
+  </div>
+  <div class="daily">
+    <div>
+      <div class="date">SUN · 19 OCT 2026 · WEEK 43 · LONDON OPEN IN 00:48</div>
+      <h3 style="margin-top:6px">ماذا تغير منذ إغلاق الأمس</h3>
+      <div class="lines">
+        <div><span class="k">▲</span><span>الذهب: سحب سيولة البيع تحت PDL ثم استعادة، المنطقة 85 ما زالت غير مختبرة.</span></div>
+        <div><span class="k">▼</span><span>اليورو: CHoCH هابط على 1h، الانحياز اليومي والأربع ساعات أصبح متعارضًا.</span></div>
+        <div><span class="k">≈</span><span>بيتكوين: نطاق عرضي ضيق، تقلب منخفض، لا منطقة تتجاوز حد الجودة.</span></div>
+        <div><span class="k">!</span><span>حدث عالي التأثير بعد ساعتين وخمس عشرة دقيقة: قرار الفائدة. السوق يدخل فترة حساسة.</span></div>
+      </div>
+      <div class="trade"><div class="mono faint" style="font-size:11px">OPEN TRADE · XAUUSD · LONG · 0.20 LOT</div><div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:6px"><span class="mono">ENTRY 2,650.20</span><span class="mono" style="color:var(--down)">SL 2,645.00</span><span class="mono" style="color:var(--up)">TP 2,665.80</span><span class="mono">NOW +0.8R</span></div></div>
+    </div>
+    <div>
+      <h3>روتين اليوم</h3>
+      <div class="check" style="margin-top:12px">
+        <label><input type="checkbox" id="r1" checked> فحص التقويم الاقتصادي</label>
+        <label><input type="checkbox" id="r2" checked> تحديد الانحياز على 1d و4h</label>
+        <label><input type="checkbox" id="r3"> مراجعة المستويات على الذهب واليورو</label>
+        <label><input type="checkbox" id="r4"> تحديد سقف المخاطرة لليوم: 1%</label>
+        <label><input type="checkbox" id="r5"> جلسة لندن 09:00 إلى 11:30</label>
+        <label><input type="checkbox" id="r6"> مراجعة الصفقات وإغلاق الورقة</label>
+      </div>
+      <p style="margin-top:16px;font-size:13px">الأهداف هنا عملية: عدد التحليلات، الالتزام بسقف المخاطرة، إكمال الروتين. لا هدف ربح على هذه الورقة أبدًا.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── avoid ───────────────────────── -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">SHEET 07 · WHAT WE LEAVE BEHIND</span>
+    <h2>ما نتركه وما نضعه مكانه</h2>
+  </div>
+  <div class="tbl-wrap">
+  <table class="tbl">
+    <thead><tr><th>المألوف في منصات التداول</th><th>في خريطة</th><th>السبب</th></tr></thead>
+    <tbody>
+      <tr><td>أسود مع ذهبي أو نيون</td><td>ميدان بارد، طباشير، زنجار وكهرمان</td><td>الذهبي صار علامة قنوات الإشارات. نريد علامة المختبر لا الكازينو</td></tr>
+      <tr><td>أخضر وأحمر مشبعان</td><td>زنجار وكهرمان مع تهشير باتجاهين</td><td>يقرؤه 8% من الرجال المصابين بعمى الألوان، ويبقى مقروءًا بالطباعة بالأبيض والأسود</td></tr>
+      <tr><td>شريط جانبي بستين عنصرًا</td><td>سكة من ست أطالس وبحث ⌘K للورقة المطلوبة</td><td>القائمة الطويلة تُقرأ كل مرة. الأطلس يُحفظ مرة واحدة</td></tr>
+      <tr><td>نافذة منبثقة لشرح المنطقة</td><td>تعليق مساحي بخط دليل</td><td>الشارت هو السياق. حجبه يقطع الفهم</td></tr>
+      <tr><td>درجة داخل دائرة تقدم</td><td>كومة أدلة بسُمك مادي</td><td>الدرجة مجموع عوامل، والكومة تُظهر المجموع وأجزاءه معًا</td></tr>
+      <tr><td>بطاقات مؤشرات على الرئيسية</td><td>ورقة ميدان يومية</td><td>المتداول يحتاج إلى ما تغيّر، لا إلى أرقام ثابتة بلا سؤال</td></tr>
+      <tr><td>Inter أو Roboto مع خط عربي مختلف</td><td>Plex Sans Arabic وPlex Mono</td><td>عائلة واحدة تمنح اللغتين الوزن نفسه والإيقاع نفسه</td></tr>
+      <tr><td>وميض على كل تحديث</td><td>حركة عند تغير الحالة فقط</td><td>الانتباه مورد. يُصرف على ما يستحق</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ───────────────────────── plan ───────────────────────── -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">SHEET 08 · IMPLEMENTATION</span>
+    <h2>كيف تدخل خريطة إلى الكود</h2>
+    <p class="lead">المحرك والـAPI لا يتغيران. التغيير كله في <code>apps/web</code>: ملف رموز واحد، ثم استبدال المكونات واحدًا تلو الآخر دون توقف المنصة.</p>
+  </div>
+  <div class="steps">
+    <div class="step"><span class="ph">PHASE A</span><div><b>الرموز والخطوط</b><div class="muted">استبدال لوحة الألوان في <code>tailwind.config.ts</code> و<code>globals.css</code>، تحميل Plex Sans Arabic وPlex Mono، تفعيل المسح النهاري. كل الصفحات تتغير فورًا دون لمس مكوناتها.</div></div><span class="est">2 – 3 days</span></div>
+    <div class="step"><span class="ph">PHASE B</span><div><b>الهيكل</b><div class="muted">السكة والأطالس بدل الشريط الجانبي، الشريط العلوي كشريط ورقة، كتلة العنوان أسفل الشارت، ورقة الميدان اليومية بدل الرئيسية الحالية.</div></div><span class="est">4 – 5 days</span></div>
+    <div class="step"><span class="ph">PHASE C</span><div><b>الطبقة التحليلية</b><div class="muted">تهشير المناطق وكنتورها على الـCanvas، التعليق المساحي بخط دليل، كومة الأدلة، بوصلة الانحياز، قرص الجلسات، الختم، خطوط الأبعاد في الحاسبات وعلى الشارت.</div></div><span class="est">6 – 8 days</span></div>
+    <div class="step"><span class="ph">PHASE D</span><div><b>الباقي</b><div class="muted">أشرطة التضاريس في الأسواق والمتابعة، الأكاديمية والسجل والأدوات على الورقة نفسها، مراجعة الوصولية والتباين، ثم توثيق النظام في <code>docs/12-design-system-kharita.md</code> وتحديث <code>PROGRESS.md</code>.</div></div><span class="est">4 – 5 days</span></div>
+  </div>
+</section>
+
+<footer>
+  <span>خريطة · اقتراح لغة التصميم الأول · TradingWorld</span>
+  <span class="mono">ENGINE 1.0.0 · SCORING v1 · ANALYSIS, NOT ADVICE</span>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  root.setAttribute('lang', 'ar');
+  root.setAttribute('dir', 'rtl');
+
+  /* ---------- theme toggle (page-local) ---------- */
+  var btn = document.getElementById('themeToggle');
+  var icon = document.getElementById('themeIcon');
+  var label = document.getElementById('themeLabel');
+  function currentDark() {
+    var t = root.getAttribute('data-theme');
+    if (t === 'dark') return true;
+    if (t === 'light') return false;
+    return !window.matchMedia('(prefers-color-scheme: light)').matches;
+  }
+  function paint() {
+    var d = currentDark();
+    icon.textContent = d ? '☾' : '☼';
+    label.textContent = d ? 'مسح ليلي' : 'مسح نهاري';
+  }
+  btn.addEventListener('click', function () {
+    root.setAttribute('data-theme', currentDark() ? 'light' : 'dark');
+    paint();
+  });
+  paint();
+
+  /* ---------- deterministic candles ---------- */
+  function rng(seed) { var a = seed >>> 0; return function () { a = (a + 0x6d2b79f5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  var N = 86, r = rng(20261019);
+  var base = 2641.2, range = 24;
+  function shape(i) {
+    if (i < 34) return 0.62 - (i / 34) * 0.34;
+    if (i === 34) return 0.30;
+    if (i < 56) return 0.32 + ((i - 35) / 20) * 0.50;
+    if (i < 66) return 0.82 - ((i - 56) / 10) * 0.22;
+    return 0.60 + Math.sin((i - 66) / 3) * 0.04;
+  }
+  var candles = [], prev = base + shape(0) * range;
+  for (var i = 0; i < N; i++) {
+    var target = base + shape(i) * range;
+    var o = prev, c = target + (r() - 0.5) * 1.6;
+    var h = Math.max(o, c) + r() * 1.2, l = Math.min(o, c) - r() * 1.2;
+    if (i === 34) { l = base - 1.1; c = base + 3.4; h = c + 0.4; }
+    if (i === 35) { c = o + 6.2; h = c + 0.5; l = o - 0.3; }
+    if (i === 57) { h = base + range + 0.8; c = o - 3.2; l = c - 0.5; }
+    candles.push({ o: o, h: h, l: l, c: c });
+    prev = c;
+  }
+
+  /* ---------- field (chart) ---------- */
+  var svg = document.getElementById('field');
+  var W = 1000, H = 620, padR = 78, padB = 26, padT = 10;
+  var plotW = W - padR, plotH = H - padB - padT;
+  var minP = Infinity, maxP = -Infinity;
+  candles.forEach(function (k) { minP = Math.min(minP, k.l); maxP = Math.max(maxP, k.h); });
+  minP -= 2.5; maxP += 2.5;
+  var step = plotW / (N + 6);
+  function X(i) { return 8 + i * step; }
+  function Y(p) { return padT + (maxP - p) / (maxP - minP) * plotH; }
+  var ns = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs, parent) { var e = document.createElementNS(ns, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; }
+  function txt(x, y, s, attrs, parent) { var t = el('text', Object.assign({ x: x, y: y }, attrs), parent); t.textContent = s; return t; }
+
+  var defs = el('defs', {});
+  function hatch(id, color, angle) {
+    var p = el('pattern', { id: id, patternUnits: 'userSpaceOnUse', width: 7, height: 7, patternTransform: 'rotate(' + angle + ')' }, defs);
+    el('line', { x1: 0, y1: 0, x2: 0, y2: 7, stroke: color, 'stroke-width': 1.1, opacity: 0.55 }, p);
+  }
+  hatch('hUp', 'var(--up)', 45); hatch('hDown', 'var(--down)', -45); hatch('hUpWeak', 'var(--up)', 45);
+
+  // grid
+  for (var g = 0; g < 7; g++) { var gy = padT + g * plotH / 6; el('line', { x1: 0, y1: gy, x2: plotW, y2: gy, stroke: 'var(--hair)', 'stroke-width': 1 }); }
+  // time axis labels
+  var times = ['04:00', '05:00', '06:00', '07:00', '08:00', '09:00'];
+  times.forEach(function (t, k) { txt(X(2 + k * 15), H - 8, t, { 'font-family': 'IBM Plex Mono, monospace', 'font-size': 10, fill: 'var(--ink-3)', 'text-anchor': 'middle' }); });
+  // right axis
+  var axis = el('g', {});
+  for (var a = 0; a <= 6; a++) { var p = maxP - a * (maxP - minP) / 6; txt(plotW + 10, Y(p) + 4, p.toFixed(1), { 'font-family': 'IBM Plex Mono, monospace', 'font-size': 10.5, fill: 'var(--ink-3)' }, axis); }
+  el('line', { x1: plotW, y1: padT, x2: plotW, y2: padT + plotH, stroke: 'var(--rule)' });
+
+  // zones
+  function zone(dir, top, bottom, fromIdx, label, weak) {
+    var x = X(fromIdx) - step / 2, y = Y(top), hgt = Y(bottom) - Y(top);
+    var wash = dir === 'up' ? 'var(--up-wash)' : 'var(--down-wash)';
+    el('rect', { x: x, y: y, width: plotW - x, height: hgt, fill: wash });
+    el('rect', { x: x, y: y, width: plotW - x, height: hgt, fill: 'url(#' + (dir === 'up' ? (weak ? 'hUpWeak' : 'hUp') : 'hDown') + ')', opacity: weak ? 0.45 : 1 });
+    el('line', { x1: x, y1: y, x2: plotW, y2: y, stroke: dir === 'up' ? 'var(--up)' : 'var(--down)', 'stroke-width': 1.2 });
+    el('line', { x1: x, y1: y + hgt, x2: plotW, y2: y + hgt, stroke: dir === 'up' ? 'var(--up)' : 'var(--down)', 'stroke-width': 1.2, 'stroke-dasharray': weak ? '3 3' : 'none' });
+    txt(x + 6, y - 5, label, { 'font-family': 'IBM Plex Mono, monospace', 'font-size': 10.5, fill: dir === 'up' ? 'var(--up)' : 'var(--down)', 'letter-spacing': '.04em' });
+    return { x: x, y: y, h: hgt };
+  }
+  var zDemand = zone('up', base + 5.6, base, 36, '85 · DEMAND · CONFIRMED · TESTED x0');
+  var zSupply = zone('down', base + range + 0.8, base + range - 3.6, 61, '78 · SUPPLY · ACTIVE');
+  zone('up', base + 11.4, base + 8.6, 46, '61 · DEMAND · WEAKENED · TESTED x3', true);
+
+  // key levels + liquidity
+  function level(p, label, dashed, dotted, left) {
+    el('line', { x1: 0, y1: Y(p), x2: plotW, y2: Y(p), stroke: 'var(--ink-2)', 'stroke-width': 1, 'stroke-dasharray': dotted ? '1.5 4' : (dashed ? '6 4' : 'none'), opacity: dotted ? .9 : .7 });
+    txt(left ? 6 : plotW - 6, Y(p) - 4, label, { 'font-family': 'IBM Plex Mono, monospace', 'font-size': 10, fill: 'var(--ink-2)', 'text-anchor': left ? 'start' : 'end' });
+  }
+  level(base - 0.6, 'PDL  2640.60', true);
+  level(base + range + 1.9, '≈ EQH x3  BUY-SIDE LIQUIDITY', false, true, true);
+  level(base + 15.2, '1d OB  2656.40', true);
+
+  // candles
+  var cg = el('g', {});
+  candles.forEach(function (k, i) {
+    var up = k.c >= k.o, col = up ? 'var(--up)' : 'var(--down)';
+    el('line', { x1: X(i), y1: Y(k.h), x2: X(i), y2: Y(k.l), stroke: col, 'stroke-width': 1 }, cg);
+    var y1 = Y(Math.max(k.o, k.c)), y2 = Y(Math.min(k.o, k.c));
+    el('rect', { x: X(i) - step * 0.32, y: y1, width: step * 0.64, height: Math.max(1, y2 - y1), fill: up ? col : 'var(--field)', stroke: col, 'stroke-width': 1 }, cg);
+  });
+
+  // structure labels
+  function mark(i, p, label, dir) {
+    var y = dir === 'up' ? Y(p) + 14 : Y(p) - 8;
+    el('line', { x1: X(i), y1: Y(p), x2: X(i), y2: dir === 'up' ? Y(p) + 6 : Y(p) - 4, stroke: 'var(--ink)', 'stroke-width': 1 });
+    txt(X(i), y, label, { 'font-family': 'IBM Plex Mono, monospace', 'font-size': 9.5, fill: 'var(--ink)', 'text-anchor': 'middle', 'letter-spacing': '.06em' });
+  }
+  mark(34, candles[34].l, 'SWEEP', 'up');
+  mark(41, candles[41].l, 'BOS', 'up');
+  mark(57, candles[57].h, 'CHoCH', 'down');
+
+  // survey callout for demand zone
+  var cx = 40, cy = 28, cw = 330, ch = 128;
+  var callout = el('g', {});
+  el('rect', { x: cx, y: cy, width: cw, height: ch, fill: 'var(--sheet)', stroke: 'var(--rule)', rx: 3 }, callout);
+  var ax = zDemand.x + 70, ay = zDemand.y;
+  el('path', { d: 'M' + (cx + cw) + ' ' + (cy + ch) + ' L' + (cx + cw + 28) + ' ' + (cy + ch + 40) + ' L' + ax + ' ' + ay, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1 }, callout);
+  el('circle', { cx: ax, cy: ay, r: 3.5, fill: 'var(--ink)' }, callout);
+  var lines = [
+    ['طلب: مستوى 1d + سحب سيولة البيع + اندفاع صاعد', 13, 600, 'var(--ink)'],
+    ['85 / 100 · CONFIRMED · 2641.20 – 2646.80', 10.5, 400, 'var(--ink-3)', true],
+    ['١. تقاطع مع Order Block يومي غير مُخفَّف', 11.5, 400, 'var(--ink-2)'],
+    ['٢. سحب PDL بإغلاق فوق المستوى', 11.5, 400, 'var(--ink-2)'],
+    ['٣. اندفاع 2.3×ATR غادر المنطقة', 11.5, 400, 'var(--ink-2)'],
+    ['إغلاق 5m تحت 2641.20 يبطل المنطقة', 11.5, 500, 'var(--stamp)']
+  ];
+  var ly = cy + 22;
+  lines.forEach(function (L) {
+    var mono = !!L[4];
+    txt(cx + cw - 14, ly, L[0], { 'font-family': mono ? 'IBM Plex Mono, monospace' : 'IBM Plex Sans Arabic, sans-serif', 'font-size': L[1], 'font-weight': L[2], fill: L[3], 'text-anchor': mono ? 'end' : 'start', direction: mono ? 'ltr' : 'rtl' }, callout);
+    ly += 18;
+  });
+
+  /* ---------- live price tick (calm: no flash) ---------- */
+  var px = document.getElementById('pxLive'), live = 2650.34, tr = rng(99);
+  function tick() { live += (tr() - 0.5) * 0.3; var s = live.toFixed(2).split('.'); px.innerHTML = Number(s[0]).toLocaleString('en-US') + '.<small>' + s[1] + '</small>'; }
+  setInterval(tick, 1500);
+
+  /* ---------- bias compass ---------- */
+  function compass(id) {
+    var s = document.getElementById(id); if (!s) return;
+    var frames = [['1d', 'up', 1], ['4h', 'down', .85], ['1h', 'down', .7], ['15m', 'down', .55]];
+    var cxs = [40, 104, 168, 232];
+    frames.forEach(function (f, i) {
+      var cx = cxs[i], cy = 48, R = 30;
+      el('circle', { cx: cx, cy: cy, r: R, fill: 'none', stroke: 'var(--rule)' }, s);
+      el('line', { x1: cx - R, y1: cy, x2: cx + R, y2: cy, stroke: 'var(--hair)' }, s);
+      var len = R * f[2] - 2, col = f[1] === 'up' ? 'var(--up)' : 'var(--down)';
+      var y2 = f[1] === 'up' ? cy - len : cy + len;
+      el('line', { x1: cx, y1: cy, x2: cx, y2: y2, stroke: col, 'stroke-width': 2.2, 'stroke-linecap': 'round' }, s);
+      el('path', { d: f[1] === 'up' ? ('M' + (cx - 4) + ' ' + (y2 + 6) + ' L' + cx + ' ' + y2 + ' L' + (cx + 4) + ' ' + (y2 + 6)) : ('M' + (cx - 4) + ' ' + (y2 - 6) + ' L' + cx + ' ' + y2 + ' L' + (cx + 4) + ' ' + (y2 - 6)), fill: 'none', stroke: col, 'stroke-width': 2.2, 'stroke-linecap': 'round' }, s);
+      el('circle', { cx: cx, cy: cy, r: 2.2, fill: 'var(--ink)' }, s);
+      txt(cx, cy + R + 14, f[0], { 'font-family': 'IBM Plex Mono, monospace', 'font-size': 10, fill: 'var(--ink-2)', 'text-anchor': 'middle' }, s);
+    });
+  }
+  compass('compass'); compass('compassBig');
+
+  /* ---------- session dial ---------- */
+  function arc(cx, cy, r, a0, a1) { var s = (a0 - 90) * Math.PI / 180, e = (a1 - 90) * Math.PI / 180; var x0 = cx + r * Math.cos(s), y0 = cy + r * Math.sin(s), x1 = cx + r * Math.cos(e), y1 = cy + r * Math.sin(e); return 'M' + x0 + ' ' + y0 + ' A' + r + ' ' + r + ' 0 ' + ((a1 - a0) > 180 ? 1 : 0) + ' 1 ' + x1 + ' ' + y1; }
+  function dial(id, big) {
+    var s = document.getElementById(id); if (!s) return;
+    var cx = big ? 80 : 13, cy = cx, R = big ? 60 : 10, w = big ? 9 : 3;
+    el('circle', { cx: cx, cy: cy, r: R, fill: 'none', stroke: 'var(--hair)', 'stroke-width': w }, s);
+    [[0, 8, 'var(--ink-3)'], [7, 16, 'var(--ink-2)'], [12, 21, 'var(--ink-2)']].forEach(function (S) { el('path', { d: arc(cx, cy, R, S[0] * 15, S[1] * 15), fill: 'none', stroke: S[2], 'stroke-width': w, opacity: .55 }, s); });
+    el('path', { d: arc(cx, cy, R, 12 * 15, 16 * 15), fill: 'none', stroke: 'var(--up)', 'stroke-width': w }, s);
+    if (big) {
+      ['00', '06', '12', '18'].forEach(function (t, i) { var a = (i * 90 - 90) * Math.PI / 180; txt(cx + (R + 20) * Math.cos(a), cy + (R + 20) * Math.sin(a) + 4, t, { 'font-family': 'IBM Plex Mono, monospace', 'font-size': 10, fill: 'var(--ink-3)', 'text-anchor': 'middle' }, s); });
+      [['ASIA', 60, 'var(--ink-3)'], ['LDN', 172, 'var(--ink-2)'], ['NY', 248, 'var(--ink-2)']].forEach(function (t) { var a = (t[1] - 90) * Math.PI / 180; txt(cx + (R - 22) * Math.cos(a), cy + (R - 22) * Math.sin(a) + 4, t[0], { 'font-family': 'IBM Plex Mono, monospace', 'font-size': 9, fill: t[2], 'text-anchor': 'middle', 'letter-spacing': '.1em' }, s); });
+    }
+    var hand = el('line', { x1: cx, y1: cy, x2: cx, y2: cy - R - (big ? 4 : 2), stroke: 'var(--ink)', 'stroke-width': big ? 2 : 1.3, 'stroke-linecap': 'round' }, s);
+    el('circle', { cx: cx, cy: cy, r: big ? 3 : 1.5, fill: 'var(--ink)' }, s);
+    var lbl = big ? txt(cx, cy + 6, '', { 'font-family': 'IBM Plex Mono, monospace', 'font-size': 13, 'font-weight': 600, fill: 'var(--ink)', 'text-anchor': 'middle' }, s) : null;
+    function upd() { var d = new Date(); var h = d.getUTCHours() + d.getUTCMinutes() / 60; hand.setAttribute('transform', 'rotate(' + (h * 15) + ' ' + cx + ' ' + cy + ')'); if (lbl) lbl.textContent = String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0'); }
+    upd(); setInterval(upd, 30000);
+  }
+  dial('dialMini', false); dial('dialBig', true);
+  var utc = document.getElementById('utcMini');
+  function clock() { var d = new Date(); utc.textContent = [d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()].map(function (n) { return String(n).padStart(2, '0'); }).join(':'); }
+  clock(); setInterval(clock, 1000);
+
+  /* ---------- confluence stack ---------- */
+  var FACTORS = [
+    ['HTF_LEVEL', 'مستوى فريم أعلى', 18, true], ['LIQUIDITY_SWEEP', 'سحب سيولة', 16, true], ['STRUCTURE_SHIFT', 'تحول بنية', 15, true],
+    ['DISPLACEMENT', 'اندفاع', 13, true], ['FVG', 'فجوة قيمة عادلة', 10, true], ['ORDER_BLOCK', 'Order Block', 8, true],
+    ['HTF_BIAS_ALIGN', 'توافق الفريمات', 7, false], ['SESSION_RELEVANCE', 'جلسة نشطة', 5, false], ['FRESH', 'غير مختبرة', 5, true], ['VOLATILITY_CONDITION', 'تقلب مناسب', 3, false]
+  ];
+  function stack(id, scale, minH, offH) {
+    var host = document.getElementById(id); if (!host) return;
+    var state = FACTORS.map(function (f) { return f[3]; });
+    var layers = document.createElement('div'); layers.className = 'layers';
+    var dim = document.createElement('div'); dim.className = 'dim'; dim.innerHTML = '<div class="line"></div><div class="val"></div>';
+    host.appendChild(layers); host.appendChild(dim);
+    function render() {
+      layers.innerHTML = '';
+      var total = 0, idx = 0;
+      FACTORS.forEach(function (f, i) {
+        var on = state[i];
+        var d = document.createElement('div');
+        d.className = 'layer up ' + (on ? 'on' : 'off');
+        d.setAttribute('role', 'button'); d.setAttribute('tabindex', '0'); d.setAttribute('aria-pressed', on ? 'true' : 'false');
+        d.style.height = (on ? Math.max(minH, f[2] * scale) : offH) + 'px';
+        if (on) { d.style.transform = 'translateX(' + (-idx * 1.5) + 'px)'; idx++; total += f[2]; }
+        d.innerHTML = '<span>' + f[1] + '</span><span class="w">' + (on ? '+' + f[2] : '· ' + f[2]) + '</span>';
+        d.addEventListener('click', function () { state[i] = !state[i]; render(); });
+        d.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); state[i] = !state[i]; render(); } });
+        layers.appendChild(d);
+      });
+      dim.querySelector('.val').textContent = total + ' / 100';
+    }
+    render();
+  }
+  stack('stackMini', 1, 16, 12); stack('stackBig', 2.4, 22, 18);
+
+  /* ---------- terrain strips ---------- */
+  document.querySelectorAll('.tstrip').forEach(function (s) {
+    var seed = Number(s.getAttribute('data-seed') || 1), q = rng(seed * 7919), pts = [], v = 18;
+    for (var i = 0; i <= 40; i++) { v += (q() - 0.5) * 4 + (seed % 2 ? 0.12 : -0.08); v = Math.max(6, Math.min(30, v)); pts.push([i * 4, v]); }
+    function path(off) { return pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0] + ' ' + (36 - p[1] + off); }).join(' '); }
+    el('path', { d: path(0) + ' L160 36 L0 36 Z', fill: 'var(--raised)' }, s);
+    el('path', { d: path(6), fill: 'none', stroke: 'var(--hair)', 'stroke-width': 1 }, s);
+    el('path', { d: path(3), fill: 'none', stroke: 'var(--rule)', 'stroke-width': 1 }, s);
+    el('path', { d: path(0), fill: 'none', stroke: 'var(--ink-2)', 'stroke-width': 1.4 }, s);
+    var last = pts[pts.length - 1];
+    el('circle', { cx: last[0], cy: 36 - last[1], r: 2.6, fill: 'var(--ink)' }, s);
+  });
+})();
+</script>

@@ -23,7 +23,7 @@ export const api = {
   candles: (symbol: string, timeframe: Timeframe, limit = 500) => request<{ candles: Candle[]; provider: string; status: { live: boolean; message?: string } }>(`/candles?symbol=${symbol}&timeframe=${timeframe}&limit=${limit}`),
   analysis: (symbol: string, timeframe: Timeframe, includeLowQuality = false) => request<AnalysisResult>(`/analysis?symbol=${symbol}&timeframe=${timeframe}&includeLowQuality=${includeLowQuality}`),
   chat: (body: { symbol: string; timeframe: Timeframe; question: string; locale: "ar" | "en"; zoneId?: string }) => request<{ answer: string; provider: string }>("/ai/chat", { method: "POST", body: JSON.stringify(body) }),
-  overview: (symbols: string[]) => request<{ rows: OverviewRow[] }>(`/overview?symbols=${symbols.join(",")}`),
+  overview: (symbols: string[]) => request<{ rows: OverviewRow[]; generatedAt: number }>(`/overview?symbols=${symbols.join(",")}`),
   register: (b: { email: string; password: string; displayName: string }) => request<AuthResponse>("/auth/register", { method: "POST", body: JSON.stringify(b) }),
   login: (b: { email: string; password: string }) => request<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify(b) }),
   alerts: (token: string) => request<{ alerts: Alert[] }>("/alerts", {}, token),
@@ -39,5 +39,10 @@ export const api = {
 export interface AuthResponse { token: string; user: { id: string; email: string; displayName: string; role: string } }
 export interface Alert { id: string; symbol: string; kind: string; price?: number; zoneId?: string; note?: string; active: boolean; createdAt: number; triggeredAt?: number }
 export interface Trade { id: string; symbol: string; direction: "long" | "short"; entry: number; stopLoss: number; takeProfit?: number; exitPrice?: number; size: number; rMultiple?: number; openedAt: number; setup?: string; strategy?: string; notes?: string }
-export interface OverviewRow { symbol: string; price?: number; regime?: string; volatility?: string; htfBias?: string; zones?: number; topZone?: { name: string; nameAr: string; score: number; status: string } | null; error?: string }
+export interface OverviewRow {
+  symbol: string; price?: number; precision?: number; changePct?: number; regime?: string; volatility?: string; htfBias?: string; baseBias?: string; session?: string; zones?: number;
+  topZone?: { id: string; name: string; nameAr: string; score: number; status: string; direction: string; top: number; bottom: number } | null;
+  lastSweep?: { side: string; level: number; poolKind: string; displacementAfter: boolean; time: number } | null;
+  narrative?: { ar: string; en: string }; spark?: number[]; error?: string;
+}
 export interface AdminOverview { users: number; zonesLogged: number; providers: { id: string; live: boolean; message?: string }[]; engine: { version: string; scoring: string; weights: Record<string, number> }; ai: string; modules: { id: string; status: string; phase: string }[]; memory: number; uptime: number }

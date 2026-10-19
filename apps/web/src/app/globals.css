@@ -1,20 +1,98 @@
+@import "./fonts.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
+/* ─────────────────────────────────────────────────────────────
+   Kharita (خريطة) design tokens — docs/12-design-system-kharita.md
+   Night survey is the default. Day survey is a cool map paper.
+   Two colours belong to the engine (verdigris/amber), one to the
+   human (chalk/ink), one stamp for invalidation. Nothing else.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --field: #13181b;
+  --sheet: #191f23;
+  --raised: #1f262b;
+  --hair: #243036;
+  --rule: #2f3b42;
+  --ink: #e8ebe6;
+  --ink-2: #a3adae;
+  --ink-3: #6d7a80;
+  --up: #22a08a;
+  --down: #c0821a;
+  --stamp: #cf4266;
+  --up-wash: rgba(34, 160, 138, 0.16);
+  --down-wash: rgba(192, 130, 26, 0.16);
+  --flag: #e8ebe6;
+  --font-ui: "IBM Plex Sans Arabic", "IBM Plex Sans", system-ui, "Segoe UI", Tahoma, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --rail-w: 72px;
+  --bar-h: 48px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --field: #eef0ec; --sheet: #f6f7f4; --raised: #ffffff; --hair: #d8ded9; --rule: #bfc9c4;
+    --ink: #1a2124; --ink-2: #4f5c61; --ink-3: #8a979b;
+    --up: #0f9a82; --down: #b9781a; --stamp: #b83556;
+    --up-wash: rgba(15, 154, 130, 0.14); --down-wash: rgba(185, 120, 26, 0.14);
+    --flag: #1a2124;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --field: #eef0ec; --sheet: #f6f7f4; --raised: #ffffff; --hair: #d8ded9; --rule: #bfc9c4;
+  --ink: #1a2124; --ink-2: #4f5c61; --ink-3: #8a979b;
+  --up: #0f9a82; --down: #b9781a; --stamp: #b83556;
+  --up-wash: rgba(15, 154, 130, 0.14); --down-wash: rgba(185, 120, 26, 0.14);
+  --flag: #1a2124;
+  color-scheme: light;
+}
+
 html, body { height: 100%; }
-body { @apply bg-bg text-ink antialiased; }
-* { scrollbar-width: thin; scrollbar-color: #2d3038 transparent; }
+body { background: var(--field); color: var(--ink); font-family: var(--font-ui); font-size: 14.5px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+* { scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: #2d3038; border-radius: 8px; }
+::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 8px; }
+:focus-visible { outline: 2px solid var(--flag); outline-offset: 2px; }
+h1, h2, h3 { text-wrap: balance; }
 
 @layer components {
-  .card { @apply rounded-xl border border-line bg-bg-panel; }
-  .btn { @apply inline-flex items-center gap-2 rounded-lg border border-gold-dim bg-[#242019] px-3 py-1.5 text-sm text-gold-light transition hover:bg-[#342b19] disabled:opacity-50; }
-  .btn-ghost { @apply inline-flex items-center gap-2 rounded-lg border border-line bg-transparent px-3 py-1.5 text-sm text-ink-muted transition hover:bg-bg-hover hover:text-ink; }
-  .input { @apply w-full rounded-lg border border-line bg-bg-panel2 px-3 py-2 text-sm text-ink outline-none transition focus:border-gold; }
-  .label { @apply mb-1 block text-xs text-ink-muted; }
-  .chip { @apply rounded-full border border-line bg-bg-panel2 px-2.5 py-0.5 text-[11px] text-ink-muted; }
-  .kbd { @apply rounded border border-line bg-bg-panel2 px-1.5 py-0.5 font-mono text-[10px] text-ink-muted; }
+  /* surfaces */
+  .sheet { @apply rounded border border-hair bg-sheet; }
+  .raised { @apply rounded border border-hair bg-raised; }
+
+  /* type roles */
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+  .eyebrow { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); direction: ltr; unicode-bidi: isolate; display: inline-block; }
+  .label { @apply mb-1 block text-xs text-ink-2; }
+  .pip { font-weight: 300; color: var(--ink-2); }
+
+  /* controls — the human colour is chalk */
+  .btn { @apply inline-flex items-center gap-2 rounded border border-ink bg-ink px-3 py-1.5 text-sm font-medium text-field transition hover:opacity-90 disabled:opacity-40; }
+  .btn-ghost { @apply inline-flex items-center gap-2 rounded border border-hair bg-transparent px-3 py-1.5 text-sm text-ink-2 transition hover:border-rule hover:text-ink; }
+  .input { @apply w-full rounded border border-hair bg-raised px-3 py-2 text-sm text-ink outline-none transition focus:border-ink; }
+  .chip { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; direction: ltr; unicode-bidi: isolate; @apply inline-flex items-center gap-1 rounded-sm border border-hair bg-raised px-1.5 py-0.5 text-ink-2; }
+  .kbd { font-family: var(--font-mono); @apply rounded-sm border border-hair bg-raised px-1.5 py-0.5 text-[10px] text-ink-3; }
+
+  /* engine marks: hatch direction encodes direction even in greyscale */
+  .hatch-up { background: repeating-linear-gradient(45deg, var(--up) 0 1px, var(--up-wash) 1px 5px); }
+  .hatch-down { background: repeating-linear-gradient(-45deg, var(--down) 0 1px, var(--down-wash) 1px 5px); }
+  .sw { @apply inline-block h-4 w-3 rounded-sm; }
+  .stamp { border: 2px solid var(--stamp); color: var(--stamp); font-family: var(--font-mono); font-weight: 600; letter-spacing: 0.16em; padding: 2px 10px; transform: rotate(-8deg); border-radius: 3px; font-size: 11px; direction: ltr; display: inline-block; }
+
+  /* title block: the drawing stamp under every analysis */
+  .tblock { display: grid; grid-auto-flow: column; grid-auto-columns: max-content; font-family: var(--font-mono); font-size: 10.5px; direction: ltr; text-align: left; @apply overflow-x-auto border-t border-hair; }
+  .tblock > div { @apply border-e border-hair px-3 py-1.5; }
+  .tblock b { display: block; font-weight: 500; color: var(--ink-3); font-size: 9.5px; letter-spacing: 0.1em; }
+  .tblock span { color: var(--ink); white-space: nowrap; }
+
+  /* survey callout pin */
+  .pin { position: relative; }
+  .pin::before { content: ""; position: absolute; inset-inline-start: -18px; top: 18px; width: 18px; height: 1px; background: var(--ink); }
+  .pin::after { content: ""; position: absolute; inset-inline-start: -22px; top: 15px; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

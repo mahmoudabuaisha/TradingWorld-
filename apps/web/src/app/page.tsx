@@ -1,2 +1,2 @@
-import { Dashboard } from "@/components/Dashboard";
-export default function Page() { return <Dashboard />; }
+import { DailySheet } from "@/components/daily/DailySheet";
+export default function Page() { return <DailySheet />; }

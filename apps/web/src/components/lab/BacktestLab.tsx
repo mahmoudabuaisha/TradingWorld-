@@ -60,15 +60,15 @@ export function BacktestLab() {
     return Object.entries(g).map(([k, v]) => ({ k, n: v.length, reacted: v.filter((o) => o.outcome === "REACTED").length / v.length, invalid: v.filter((o) => o.outcome === "INVALIDATED").length / v.length, mfe: v.reduce((s, o) => s + o.mfeAtr, 0) / v.length, mae: v.reduce((s, o) => s + o.maeAtr, 0) / v.length }));
   };
   const Table = ({ title, rows }: { title: string; rows: ReturnType<typeof group> }) => (
-    <div className="card overflow-x-auto"><div className="border-b border-line px-3 py-2 text-xs font-bold tracking-wider text-gold">{title}</div>
-      <table className="w-full text-xs"><thead className="text-ink-muted"><tr>{["", "n", "Reacted", "Invalidated", "Avg MFE (ATR)", "Avg MAE (ATR)"].map((h) => <th key={h} className="px-3 py-1.5 text-start font-normal">{h}</th>)}</tr></thead>
-        <tbody>{rows.map((r) => <tr key={r.k} className="border-t border-line"><td className="px-3 py-1.5">{r.k}</td><td className="font-mono">{r.n}</td><td className="font-mono text-up">{Math.round(r.reacted * 100)}%</td><td className="font-mono text-down">{Math.round(r.invalid * 100)}%</td><td className="font-mono">{r.mfe.toFixed(2)}</td><td className="font-mono">{r.mae.toFixed(2)}</td></tr>)}</tbody></table></div>
+    <div className="sheet overflow-x-auto"><div className="border-b border-hair px-3 py-2 eyebrow">{title}</div>
+      <table className="w-full text-xs"><thead className="text-ink-2"><tr>{["", "n", "Reacted", "Invalidated", "Avg MFE (ATR)", "Avg MAE (ATR)"].map((h) => <th key={h} className="px-3 py-1.5 text-start font-normal">{h}</th>)}</tr></thead>
+        <tbody>{rows.map((r) => <tr key={r.k} className="border-t border-hair"><td className="px-3 py-1.5">{r.k}</td><td className="font-mono">{r.n}</td><td className="font-mono text-up">{Math.round(r.reacted * 100)}%</td><td className="font-mono text-down">{Math.round(r.invalid * 100)}%</td><td className="font-mono">{r.mfe.toFixed(2)}</td><td className="font-mono">{r.mae.toFixed(2)}</td></tr>)}</tbody></table></div>
   );
 
   return (
     <div className="space-y-4">
-      <div><h1 className="text-xl font-bold text-gold-light">🔬 {L("مختبر الاختبار التاريخي — المناطق", "Backtesting Lab — Zones")}</h1><p className="text-sm text-ink-muted">{L("يعمل بنفس محرك الإنتاج داخل المتصفح، دون تسريب بيانات مستقبلية: عند كل خطوة يرى المحرك الشموع السابقة فقط. النتائج التاريخية لا تضمن الأداء المستقبلي.", "Runs the production engine in the browser with no look-ahead: at each step the engine only sees past candles. Historical results do not guarantee future performance.")}</p></div>
-      <div className="card flex flex-wrap items-end gap-3 p-3">
+      <div><span className="eyebrow">ATLAS 04 · 19</span><h1 className="text-2xl font-semibold">{L("مختبر الاختبار التاريخي: المناطق", "Backtesting Lab: Zones")}</h1><p className="text-sm text-ink-2">{L("يعمل بنفس محرك الإنتاج داخل المتصفح، دون تسريب بيانات مستقبلية: عند كل خطوة يرى المحرك الشموع السابقة فقط. النتائج التاريخية لا تضمن الأداء المستقبلي.", "Runs the production engine in the browser with no look-ahead: at each step the engine only sees past candles. Historical results do not guarantee future performance.")}</p></div>
+      <div className="sheet flex flex-wrap items-end gap-3 p-3">
         <div><label className="label">Symbol</label><select className="input font-mono" value={symbol} onChange={(e) => setSymbol(e.target.value)}>{DEFAULT_INSTRUMENTS.map((i) => <option key={i.symbol}>{i.symbol}</option>)}</select></div>
         <div><label className="label">TF</label><select className="input font-mono" value={timeframe} onChange={(e) => setTimeframe(e.target.value as Timeframe)}>{TIMEFRAMES.map((t) => <option key={t}>{t}</option>)}</select></div>
         <div><label className="label">Bars</label><input type="number" className="input w-24 font-mono" value={bars} onChange={(e) => setBars(+e.target.value)} /></div>
@@ -78,7 +78,7 @@ export function BacktestLab() {
       </div>
       {res && (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[["Zones", res.length], ["Reacted", `${Math.round((res.filter((o) => o.outcome === "REACTED").length / Math.max(1, res.length)) * 100)}%`], ["Invalidated", `${Math.round((res.filter((o) => o.outcome === "INVALIDATED").length / Math.max(1, res.length)) * 100)}%`], ["Untouched", res.filter((o) => o.outcome === "UNTOUCHED").length]].map(([k, v]) => <div key={String(k)} className="card p-3"><div className="text-[11px] text-ink-muted">{k}</div><div className="font-mono text-xl">{v}</div></div>)}</div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[["Zones", res.length], ["Reacted", `${Math.round((res.filter((o) => o.outcome === "REACTED").length / Math.max(1, res.length)) * 100)}%`], ["Invalidated", `${Math.round((res.filter((o) => o.outcome === "INVALIDATED").length / Math.max(1, res.length)) * 100)}%`], ["Untouched", res.filter((o) => o.outcome === "UNTOUCHED").length]].map(([k, v]) => <div key={String(k)} className="sheet p-3"><div className="text-[11px] text-ink-2">{k}</div><div className="font-mono text-xl">{v}</div></div>)}</div>
           <Table title={L("حسب الجودة", "By quality")} rows={group((o) => o.zone.quality)} />
           <Table title={L("حسب الأصل (Origin)", "By origin")} rows={group((o) => o.zone.origin)} />
           <Table title={L("حسب العامل (موجود)", "By factor (present)")} rows={group((o) => o.zone.factors.filter((f) => f.present).map((f) => f.key).sort().slice(0, 3).join("+") || "none")} />
