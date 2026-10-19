@@ -43,6 +43,14 @@ describe("api", () => {
     expect(body.htf.length).toBeGreaterThan(0);
   });
 
+  it("query booleans: 'false' stays false, invalidated zones only on request", async () => {
+    const plain = await app.inject({ method: "GET", url: "/api/v1/analysis?symbol=XAUUSD&timeframe=5m&includeLowQuality=false&includeInvalidated=false" });
+    expect(plain.statusCode).toBe(200);
+    expect(plain.json().zones.every((z: { quality: string; status: string }) => z.quality !== "LOW" && z.status !== "INVALIDATED")).toBe(true);
+    const full = await app.inject({ method: "GET", url: "/api/v1/analysis?symbol=XAUUSD&timeframe=5m&includeLowQuality=true&includeInvalidated=true" });
+    expect(full.json().zones.length).toBeGreaterThanOrEqual(plain.json().zones.length);
+  });
+
   it("ai chat answers deterministically without a key", async () => {
     const r = await app.inject({ method: "POST", url: "/api/v1/ai/chat", payload: { symbol: "XAUUSD", timeframe: "5m", question: "ماذا يحدث على الفريمات الأعلى؟", locale: "ar" } });
     expect(r.statusCode).toBe(200);

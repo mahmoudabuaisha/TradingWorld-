@@ -5,7 +5,7 @@ import type { Candle, Zone, ZoneStatus } from "../types.js";
  * DETECTED → CONFIRMED → ACTIVE → TESTED → REACTED → WEAKENED → INVALIDATED
  * Invalidation = a candle CLOSE beyond the far boundary (wicks through are a test, not an invalidation).
  */
-export function evaluateLifecycle(zone: Zone, candles: Candle[], atr: number): { status: ZoneStatus; tests: number; lastTestIndex?: number } {
+export function evaluateLifecycle(zone: Zone, candles: Candle[], atr: number): { status: ZoneStatus; tests: number; lastTestIndex?: number; invalidatedIndex?: number } {
   const confirmed = zone.factors.some((f) => f.present && (f.key === "STRUCTURE_SHIFT" || f.key === "DISPLACEMENT"));
   let status: ZoneStatus = confirmed ? "CONFIRMED" : "DETECTED";
   let tests = 0;
@@ -19,7 +19,7 @@ export function evaluateLifecycle(zone: Zone, candles: Candle[], atr: number): {
     const overlaps = c.low <= zone.top && c.high >= zone.bottom;
     const closedThrough = zone.direction === "bullish" ? c.close < zone.bottom : c.close > zone.top;
     if (closedThrough) {
-      return { status: "INVALIDATED", tests, lastTestIndex };
+      return { status: "INVALIDATED", tests, lastTestIndex, invalidatedIndex: i };
     }
     if (overlaps) {
       if (!inside) { tests++; lastTestIndex = i; inside = true; }

@@ -21,7 +21,7 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
 export const api = {
   health: () => request<{ ok: boolean; engineVersion: string; providers: { id: string; live: boolean; message?: string }[]; ai: string }>("/health"),
   candles: (symbol: string, timeframe: Timeframe, limit = 500) => request<{ candles: Candle[]; provider: string; status: { live: boolean; message?: string } }>(`/candles?symbol=${symbol}&timeframe=${timeframe}&limit=${limit}`),
-  analysis: (symbol: string, timeframe: Timeframe, includeLowQuality = false) => request<AnalysisResult>(`/analysis?symbol=${symbol}&timeframe=${timeframe}&includeLowQuality=${includeLowQuality}`),
+  analysis: (symbol: string, timeframe: Timeframe, includeLowQuality = false, includeInvalidated = false) => request<AnalysisResult>(`/analysis?symbol=${symbol}&timeframe=${timeframe}&includeLowQuality=${includeLowQuality}&includeInvalidated=${includeInvalidated}`),
   chat: (body: { symbol: string; timeframe: Timeframe; question: string; locale: "ar" | "en"; zoneId?: string }) => request<{ answer: string; provider: string }>("/ai/chat", { method: "POST", body: JSON.stringify(body) }),
   overview: (symbols: string[]) => request<{ rows: OverviewRow[]; generatedAt: number }>(`/overview?symbols=${symbols.join(",")}`),
   register: (b: { email: string; password: string; displayName: string }) => request<AuthResponse>("/auth/register", { method: "POST", body: JSON.stringify(b) }),

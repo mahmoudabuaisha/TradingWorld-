@@ -4,10 +4,10 @@ import { findInstrument, isTimeframe, type Timeframe } from "@tradingworld/share
 import type { AppContext } from "../context.js";
 import type { CandleUpdate } from "../providers/types.js";
 
-type ClientMsg = { type: "subscribe"; symbol: string; timeframe: string } | { type: "unsubscribe" } | { type: "ping" };
+type ClientMsg = { type: "subscribe"; symbol: string; timeframe: string; includeLowQuality?: boolean; includeInvalidated?: boolean } | { type: "unsubscribe" } | { type: "ping" };
 
 /**
- * /ws — one subscription per socket: {type:"subscribe", symbol, timeframe}.
+ * /ws — one subscription per socket: {type:"subscribe", symbol, timeframe, includeLowQuality?, includeInvalidated?}.
  * Server pushes: candle (every tick), analysis (on candle close or every ~15s), alert (when triggered), status.
  */
 export default async function realtime(app: FastifyInstance, ctx: AppContext) {
@@ -16,7 +16,7 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
   app.get("/ws", { websocket: true }, (socket) => {
     let unsub: (() => void) | undefined;
     let analysisTimer: NodeJS.Timeout | undefined;
-    let current: { symbol: string; timeframe: Timeframe } | undefined;
+    let current: { symbol: string; timeframe: Timeframe; includeLowQuality: boolean; includeInvalidated: boolean } | undefined;
     const send = (o: unknown) => { if (socket.readyState === 1) socket.send(JSON.stringify(o)); };
 
     const offAlert = ctx.alerts.onTrigger((e) => { if (current && e.alert.symbol === current.symbol) send({ type: "alert", event: e }); });
@@ -24,7 +24,7 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
     const pushAnalysis = async () => {
       if (!current) return;
       try {
-        const r = await ctx.analysis.run(current.symbol, current.timeframe, { force: true });
+        const r = await ctx.analysis.run(current.symbol, current.timeframe, { force: true, includeLowQuality: current.includeLowQuality, includeInvalidated: current.includeInvalidated });
         send({ type: "analysis", result: r });
         await ctx.alerts.evaluate(current.symbol, r.lastPrice, r);
       } catch (e) { send({ type: "error", message: (e as Error).message }); }
@@ -41,7 +41,7 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
         const instrument = findInstrument(msg.symbol);
         if (!instrument || !isTimeframe(msg.timeframe)) return send({ type: "error", message: "BAD_SUBSCRIPTION" });
         cleanup();
-        current = { symbol: instrument.symbol, timeframe: msg.timeframe };
+        current = { symbol: instrument.symbol, timeframe: msg.timeframe, includeLowQuality: msg.includeLowQuality === true, includeInvalidated: msg.includeInvalidated === true };
         const provider = ctx.providers.for(instrument);
         send({ type: "status", provider: provider.status() });
         unsub = provider.subscribe(instrument, msg.timeframe, (u: CandleUpdate) => {

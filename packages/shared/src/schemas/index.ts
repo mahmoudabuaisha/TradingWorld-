@@ -3,6 +3,9 @@ import { TIMEFRAMES } from "../timeframes.js";
 
 export const timeframeSchema = z.enum(TIMEFRAMES);
 
+/** Query-string boolean: "true"/"1" → true, anything else → false. (z.coerce.boolean() would turn "false" into true.) */
+export const queryBool = z.preprocess((v) => v === true || v === "true" || v === "1", z.boolean());
+
 export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(128),
@@ -25,7 +28,8 @@ export const analysisQuerySchema = z.object({
   symbol: z.string().min(3).max(20),
   timeframe: timeframeSchema,
   limit: z.coerce.number().int().min(100).max(5000).default(600),
-  includeLowQuality: z.coerce.boolean().default(false),
+  includeLowQuality: queryBool.default(false),
+  includeInvalidated: queryBool.default(false),
   locale: z.enum(["ar", "en"]).default("ar"),
 });
 

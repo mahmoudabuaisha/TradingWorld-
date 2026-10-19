@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { calculateRisk, DEFAULT_INSTRUMENTS, findInstrument } from "@tradingworld/shared";
 import { useApp } from "@/store/useApp";
+import { Dimension } from "../marks/Dimension";
 
 const WARN = {
   RISK_ABOVE_LIMIT: { ar: "المخاطرة تتجاوز الحد الذي حددته.", en: "Risk exceeds your configured limit." },
@@ -38,7 +39,8 @@ export function RiskCalculator({ mode = "risk" }: { mode?: "risk" | "position" }
         <p className="text-[11px] text-ink-3">{L(`حجم النقطة للأداة: ${inst.pipSize} · حجم العقد: ${inst.contractSize}. تحقق من مواصفات وسيطك.`, `Pip size: ${inst.pipSize} · contract size: ${inst.contractSize}. Verify with your broker's specs.`)}</p>
       </div>
       <div className="sheet p-4">
-        <h3 className="mb-3 eyebrow">{L("النتائج", "Results")}</h3>
+        <span className="eyebrow">{L("النتائج", "Results")} · DIMENSION</span>
+        <div className="my-2 rounded border border-hair bg-field p-2"><Dimension entry={f.entry} stop={f.stopLoss} target={f.takeProfit || undefined} direction={f.direction} precision={inst.pricePrecision} /></div>
         <dl className="grid grid-cols-2 gap-2 text-sm">
           {([
             ["Risk $", r.riskAmount], ["Risk %", f.riskPercent + "%"], ["Stop distance", `${r.stopDistance} (${r.stopDistancePips} pips)`], ["Position size (lots)", r.positionSizeLots],

@@ -15,6 +15,7 @@ interface AppState {
   timeframe: Timeframe;
   mode: "manual" | "ai";
   showLowQuality: boolean;
+  showInvalidated: boolean;
   watchlist: string[];
   /** routine checklist completion per day: dateKey → task ids */
   routineDone: Record<string, string[]>;
@@ -25,6 +26,7 @@ interface AppState {
   setTimeframe: (t: Timeframe) => void;
   setMode: (m: "manual" | "ai") => void;
   toggleLowQuality: () => void;
+  toggleInvalidated: () => void;
   setWatchlist: (w: string[]) => void;
   toggleRoutine: (dateKey: string, taskId: string) => void;
 }
@@ -47,6 +49,7 @@ export const useApp = create<AppState>()(
       timeframe: "5m",
       mode: "ai",
       showLowQuality: false,
+      showInvalidated: false,
       watchlist: ["XAUUSD", "EURUSD", "BTCUSD", "US100"],
       routineDone: {},
       setLocale: (locale) => set({ locale }),
@@ -56,6 +59,7 @@ export const useApp = create<AppState>()(
       setTimeframe: (timeframe) => set({ timeframe }),
       setMode: (mode) => set({ mode }),
       toggleLowQuality: () => set((s) => ({ showLowQuality: !s.showLowQuality })),
+      toggleInvalidated: () => set((s) => ({ showInvalidated: !s.showInvalidated })),
       setWatchlist: (watchlist) => set({ watchlist }),
       toggleRoutine: (dateKey, taskId) => set((s) => {
         const cur = s.routineDone[dateKey] ?? [];

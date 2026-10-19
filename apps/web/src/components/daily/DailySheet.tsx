@@ -8,6 +8,7 @@ import { useClock, fmtMinutes, sessionLabel } from "@/hooks/useClock";
 import { t } from "@/i18n/dictionary";
 import { Terrain } from "../marks/Terrain";
 import { Dimension } from "../marks/Dimension";
+import { SessionDial } from "../marks/SessionDial";
 import { Icon } from "../Icon";
 
 const ROUTINE = [
@@ -157,8 +158,8 @@ export function DailySheet() {
           <section className="sheet p-5">
             <span className="eyebrow">SURVEY CLOCK</span>
             {clock && (
-              <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-                <div><div className="mono text-3xl font-medium leading-none">{clock.utc}<span className="text-base text-ink-3"> UTC</span></div><div className="mono mt-1 text-xs text-ink-3">LOCAL {clock.local}</div></div>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-4"><SessionDial size={108} labels={false} /><div><div className="mono text-3xl font-medium leading-none">{clock.utc}<span className="text-base text-ink-3"> UTC</span></div><div className="mono mt-1 text-xs text-ink-3">LOCAL {clock.local}</div></div></div>
                 <div className="text-end text-xs">
                   <div className="flex flex-wrap justify-end gap-1">{clock.sessions.map((s) => <span key={s} className={`chip ${s === "OFF" ? "" : "text-up"}`}>{sessionLabel(s)}</span>)}</div>
                   {clock.next && <div className="mono mt-1 text-ink-3">{t(locale, "shell", "nextSession")} {sessionLabel(clock.next.name)} · {fmtMinutes(clock.next.minutes)}</div>}

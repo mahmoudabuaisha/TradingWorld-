@@ -18,7 +18,7 @@ Base URL: `http://localhost:4000/api/v1` · JSON · `Authorization: Bearer <jwt>
 | GET | `/instruments` | — | `{ instruments[], timeframes[] }` |
 | GET | `/modules` | — | `{ modules[] }` (الـ60 وحدة) |
 | GET | `/candles` | `symbol, timeframe, limit≤5000, to?` | `{ candles[], provider, status }` |
-| GET | `/analysis` | `symbol, timeframe, limit, includeLowQuality, locale` | `AnalysisResult` (انظر أدناه) |
+| GET | `/analysis` | `symbol, timeframe, limit, includeLowQuality, includeInvalidated, locale` | `AnalysisResult` (انظر أدناه). `includeInvalidated=true` يُبقي المناطق المبطلة خلال آخر 120 شمعة بحالة `INVALIDATED` للتعلم منها |
 | GET | `/overview` | `symbols=A,B,C` | `{ rows[] }` لكل رمز: price/regime/volatility/htfBias/zones/topZone |
 | POST | `/ai/chat` | `{ symbol, timeframe, question, locale, zoneId? }` | `{ answer, provider: "anthropic"|"deterministic", grounded: true }` |
 
@@ -48,7 +48,7 @@ Base URL: `http://localhost:4000/api/v1` · JSON · `Authorization: Bearer <jwt>
 `GET /admin/overview` · `GET /admin/users` · `PATCH /admin/users/:id/role {role}` · `GET /admin/zones?limit` · `GET /admin/audit` · `GET /admin/research/factors`
 
 ## WebSocket `/ws`
-Client → `{"type":"subscribe","symbol":"XAUUSD","timeframe":"5m"}` | `{"type":"unsubscribe"}` | `{"type":"ping"}`
+Client → `{"type":"subscribe","symbol":"XAUUSD","timeframe":"5m","includeLowQuality":false,"includeInvalidated":false}` | `{"type":"unsubscribe"}` | `{"type":"ping"}`
 Server →
 - `{"type":"status","provider":{id,live,message}}`
 - `{"type":"candle","update":{symbol,timeframe,candle,closed,receivedAt}}` (كل tick)

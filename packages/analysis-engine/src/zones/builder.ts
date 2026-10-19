@@ -87,6 +87,7 @@ export function buildZones(
     zone.status = life.status;
     zone.tests = life.tests;
     zone.lastTestIndex = life.lastTestIndex;
+    zone.invalidatedIndex = life.invalidatedIndex;
     // FRESH factor depends on lifecycle → recompute after replay
     const fresh = zone.factors.find((f) => f.key === "FRESH")!;
     fresh.present = zone.tests === 0;
@@ -111,7 +112,12 @@ export function buildZones(
   const medium = merged.filter((z) => z.quality === "MEDIUM").slice(0, opts.maxMedium);
   const low = merged.filter((z) => z.quality === "LOW");
   const shown = [...high, ...medium, ...(opts.includeLowQuality ? low.slice(0, 5) : [])];
-  return { zones: shown, hiddenLowQuality: opts.includeLowQuality ? Math.max(0, low.length - 5) : low.length };
+  // recently invalidated zones are kept (stamped) so the trader can learn from them; never merged, never counted
+  const recentlyInvalidated = opts.keepInvalidatedBars > 0
+    ? zones.filter((z) => z.status === "INVALIDATED" && z.invalidatedIndex !== undefined && n - 1 - z.invalidatedIndex <= opts.keepInvalidatedBars && z.quality !== "LOW")
+        .sort((a, b) => (b.invalidatedIndex ?? 0) - (a.invalidatedIndex ?? 0)).slice(0, 4)
+    : [];
+  return { zones: [...shown, ...recentlyInvalidated], hiddenLowQuality: opts.includeLowQuality ? Math.max(0, low.length - 5) : low.length };
 }
 
 function evaluateFactors(c: Candidate, base: TimeframeAnalysis, htf: HtfContext[], htfBias: Bias, keyLevels: KeyLevel[], session: SessionInfo, atr: number, precision: number): Factor[] {

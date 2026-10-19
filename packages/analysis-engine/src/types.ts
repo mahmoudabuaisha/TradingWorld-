@@ -161,6 +161,8 @@ export interface Zone {
   status: ZoneStatus;
   tests: number;
   lastTestIndex?: number;
+  /** candle index whose close invalidated the zone (only when status is INVALIDATED) */
+  invalidatedIndex?: number;
   invalidation: { price: number; ar: string; en: string };
   htfContext: string[];
   sourceIds: string[];
@@ -241,6 +243,8 @@ export interface EngineOptions {
   maxHigh: number;
   maxMedium: number;
   includeLowQuality: boolean;
+  /** keep zones invalidated within the last N candles in the output (stamped INVALIDATED); 0 = drop them */
+  keepInvalidatedBars: number;
 }
 
 export const DEFAULT_ENGINE_OPTIONS: EngineOptions = {
@@ -253,4 +257,5 @@ export const DEFAULT_ENGINE_OPTIONS: EngineOptions = {
   maxHigh: 3,
   maxMedium: 5,
   includeLowQuality: false,
+  keepInvalidatedBars: 0,
 };

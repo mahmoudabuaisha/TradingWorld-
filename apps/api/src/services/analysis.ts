@@ -15,10 +15,10 @@ export class AnalysisService {
 
   constructor(private providers: ProviderRegistry, private repos: Repositories, private ttlMs = 5_000) {}
 
-  async run(symbol: string, timeframe: Timeframe, opts: { limit?: number; includeLowQuality?: boolean; force?: boolean } = {}): Promise<AnalysisResult> {
+  async run(symbol: string, timeframe: Timeframe, opts: { limit?: number; includeLowQuality?: boolean; includeInvalidated?: boolean; force?: boolean } = {}): Promise<AnalysisResult> {
     const instrument = findInstrument(symbol);
     if (!instrument) throw new Error(`Unknown instrument ${symbol}`);
-    const key = `${instrument.symbol}:${timeframe}:${opts.includeLowQuality ? 1 : 0}`;
+    const key = `${instrument.symbol}:${timeframe}:${opts.includeLowQuality ? 1 : 0}:${opts.includeInvalidated ? 1 : 0}`;
     const cached = this.cache.get(key);
     if (!opts.force && cached && Date.now() - cached.at < this.ttlMs) return cached.result;
     const existing = this.inflight.get(key);
@@ -31,7 +31,7 @@ export class AnalysisService {
       await Promise.all(MTF_CONTEXT[timeframe].map(async (tf) => {
         try { htfCandles[tf] = await provider.getCandles(instrument, tf, HTF_LIMITS[tf] ?? 300); } catch { /* aggregated fallback inside engine */ }
       }));
-      const result = analyze({ symbol: instrument.symbol, timeframe, candles: base, htfCandles, pricePrecision: instrument.pricePrecision, options: { includeLowQuality: opts.includeLowQuality ?? false } });
+      const result = analyze({ symbol: instrument.symbol, timeframe, candles: base, htfCandles, pricePrecision: instrument.pricePrecision, options: { includeLowQuality: opts.includeLowQuality ?? false, keepInvalidatedBars: opts.includeInvalidated ? 120 : 0 } });
       this.cache.set(key, { at: Date.now(), result });
       await this.logZones(result);
       return result;

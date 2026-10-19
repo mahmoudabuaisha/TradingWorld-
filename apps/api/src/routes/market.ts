@@ -21,7 +21,7 @@ export default async function marketRoutes(app: FastifyInstance, ctx: AppContext
     const q = analysisQuerySchema.safeParse(req.query);
     if (!q.success) return reply.code(400).send({ error: "VALIDATION", issues: q.error.issues });
     try {
-      const result = await ctx.analysis.run(q.data.symbol, q.data.timeframe, { limit: q.data.limit, includeLowQuality: q.data.includeLowQuality });
+      const result = await ctx.analysis.run(q.data.symbol, q.data.timeframe, { limit: q.data.limit, includeLowQuality: q.data.includeLowQuality, includeInvalidated: q.data.includeInvalidated });
       return result;
     } catch (e) {
       return reply.code(400).send({ error: "ANALYSIS_FAILED", message: (e as Error).message });

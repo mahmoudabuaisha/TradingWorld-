@@ -58,6 +58,21 @@ describe("engine", () => {
     expect(g.engineVersion).toBe(r.engineVersion);
   });
 
+  it("keeps recently invalidated zones only when asked, stamped INVALIDATED", () => {
+    const base5 = market.candles("XAUUSD", "5m", 2350, 0.0006, 1500);
+    const def = analyze({ symbol: "XAUUSD", timeframe: "5m", candles: base5, htfCandles: htf, now: 1 });
+    expect(def.zones.some((z) => z.status === "INVALIDATED")).toBe(false);
+    const kept = analyze({ symbol: "XAUUSD", timeframe: "5m", candles: base5, htfCandles: htf, now: 1, options: { keepInvalidatedBars: 250 } });
+    const inv = kept.zones.filter((z) => z.status === "INVALIDATED");
+    expect(kept.zones.length).toBeGreaterThanOrEqual(def.zones.length);
+    for (const z of inv) {
+      expect(z.invalidatedIndex).toBeDefined();
+      expect(base5.length - 1 - (z.invalidatedIndex ?? 0)).toBeLessThanOrEqual(250);
+    }
+    // the live part of the output is unchanged by the option
+    expect(kept.zones.filter((z) => z.status !== "INVALIDATED").map((z) => z.id)).toEqual(def.zones.map((z) => z.id));
+  });
+
   it("rejects too little data", () => {
     expect(() => analyze({ symbol: "X", timeframe: "5m", candles: base.slice(0, 10) })).toThrow();
   });

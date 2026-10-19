@@ -11,13 +11,13 @@ export type ServerMessage =
   | { type: "pong"; at: number };
 
 /** Minimal auto-reconnecting subscription client for /ws. */
-export function subscribeMarket(symbol: string, timeframe: Timeframe, onMessage: (m: ServerMessage) => void): () => void {
+export function subscribeMarket(symbol: string, timeframe: Timeframe, onMessage: (m: ServerMessage) => void, flags: { includeLowQuality?: boolean; includeInvalidated?: boolean } = {}): () => void {
   let ws: WebSocket | undefined;
   let closed = false;
   let retry = 1000;
   const connect = () => {
     ws = new WebSocket(WS_URL);
-    ws.onopen = () => { retry = 1000; ws?.send(JSON.stringify({ type: "subscribe", symbol, timeframe })); };
+    ws.onopen = () => { retry = 1000; ws?.send(JSON.stringify({ type: "subscribe", symbol, timeframe, ...flags })); };
     ws.onmessage = (ev) => { try { onMessage(JSON.parse(ev.data) as ServerMessage); } catch { /* ignore */ } };
     ws.onclose = () => { if (!closed) { setTimeout(connect, retry); retry = Math.min(retry * 2, 15_000); } };
     ws.onerror = () => ws?.close();

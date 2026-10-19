@@ -131,7 +131,7 @@ Swings (fractal, no repaint) · Structure BOS/CHoCH (closes only) · FVG + mitig
 HIGH ≥ 72 · MEDIUM ≥ 52 · LOW مخفي افتراضيًا. **Confidence = Analysis Confluence، ليس احتمال ربح.**
 
 ### 4.4 دورة حياة المنطقة
-`DETECTED → CONFIRMED → ACTIVE → TESTED → REACTED → WEAKENED → INVALIDATED` — الإبطال بإغلاق شمعة خلف الحد البعيد فقط (الفتائل اختبارات).
+`DETECTED → CONFIRMED → ACTIVE → TESTED → REACTED → WEAKENED → INVALIDATED` — الإبطال بإغلاق شمعة خلف الحد البعيد فقط (الفتائل اختبارات). المناطق المبطلة حديثًا يمكن إبقاؤها في المخرجات بختم للتعلم منها (`keepInvalidatedBars`).
 
 ### 4.5 التعلم بلا تهور
 - **التسجيل:** كل منطقة تُسجَّل مع عواملها وسياقها (`zoneLog` → جدول `Zone` + `ZoneOutcome`).

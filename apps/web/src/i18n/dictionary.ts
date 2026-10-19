@@ -41,6 +41,10 @@ const dict = {
     ai: { ar: "تحليل AI", en: "AI Analysis" },
     setAlert: { ar: "تنبيه عند الدخول", en: "Alert on entry" },
     provider: { ar: "مصدر البيانات", en: "Data source" },
+    showInvalidated: { ar: "إظهار المناطق المبطلة حديثًا", en: "Show recently invalidated zones" },
+    recentlyInvalidated: { ar: "أُبطلت مؤخرًا", en: "Recently invalidated" },
+    dominant: { ar: "الغالب", en: "Dominant" },
+    distance: { ar: "المسافة إلى المنطقة", en: "Distance to zone" },
   },
   shell: {
     search: { ar: "ابحث عن ورقة أو أصل", en: "Find a sheet or instrument" },
