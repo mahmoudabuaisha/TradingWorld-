@@ -8,7 +8,8 @@
 | `User` | الحسابات، الدور، الإعدادات JSON، سر 2FA | أدوار: user/student/coach/moderator/admin/developer |
 | `Session` | جلسات/أجهزة قابلة للإلغاء | tokenHash فريد |
 | `Instrument` | Instrument Master | رموز المزودين JSON، دقة السعر، pip، حجم العقد |
-| `Candle` | **hypertable** (symbol, timeframe, time) | ضغط بعد 30 يومًا؛ `provider` لكل صف |
+| `market_candles` | **hypertable** (symbol, timeframe, time) — **خارج Prisma**، مملوك للـSQL ومكتوب من مخزن الشموع في الـAPI (DATA-02) | قطع 7 أيام، ضغط بعد 30 يومًا؛ `provider` لكل صف (`aggregate:1m` للمشتق) |
+| `market_backfills` | سجل دورات التعبئة/اللحاق/الفجوات/الاشتقاق | خارج Prisma |
 | `EngineVersion` | سجل إصدارات المحرك/التقييم + الأوزان | واحد `active` |
 | `Zone` | كل منطقة أُنتجت + عواملها (JSON) + حالتها | مفهرس بالرمز/الفريم/الوقت والإصدار |
 | `ZoneOutcome` | نتيجة السوق النهائية (label للـML) | MFE/MAE بالـATR، retests، session، regime |
@@ -28,7 +29,8 @@
 ## قواعد
 - كل كيان تحليلي يحمل `engineVersion`/`scoringVersion`.
 - لا حذف فعلي للمناطق (تاريخ التدريب)؛ `status` فقط.
-- الشموع تُكتب مرة واحدة (append-only)؛ التصحيحات عبر صف جديد بـ`provider` مختلف إن لزم.
+- الشموع upsert بالمفتاح (symbol, timeframe, time)؛ الصف الأصلي من مزود يغلب المشتق محليًا، والمشتق لا يكتب فوق أصلي أبدًا.
+- جداول السوق (`market_*`) خارج Prisma: hypertables والضغط والاحتفاظ تُدار بالـSQL؛ الـAPI ينشئ الجداول العادية إن غابت فيعمل على Postgres بلا الامتداد أيضًا.
 - النسخ الاحتياطي: pg_dump يومي + WAL archiving؛ اختبار استرجاع شهري (OPS-02).
 
 ## تشغيل
@@ -36,5 +38,6 @@
 docker compose up -d db
 export DATABASE_URL=postgresql://tradingworld:tradingworld@localhost:5432/tradingworld?schema=public
 pnpm --filter @tradingworld/db generate && pnpm --filter @tradingworld/db migrate:dev
-psql $DATABASE_URL -f packages/db/prisma/sql/0001_timescale.sql
+psql $DATABASE_URL -f packages/db/prisma/sql/0001_timescale.sql   # الامتداد + market_* + hypertable
+BACKFILL_ENABLED=true pnpm --filter @tradingworld/api backfill all   # أول تعبئة (أو تلقائيًا مع تشغيل الـAPI)
 ```

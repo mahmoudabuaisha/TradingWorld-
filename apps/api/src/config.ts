@@ -14,6 +14,17 @@ const schema = z.object({
   RATE_LIMIT_WINDOW: z.string().default("1 minute"),
   DATABASE_URL: z.string().optional(),
   REDIS_URL: z.string().optional(),
+  /** where candles live: memory (default without DATABASE_URL) or the Timescale/PostgreSQL store */
+  CANDLE_STORE: z.enum(["auto", "memory", "timescale"]).default("auto"),
+  /** DATA-02 maintenance job: backfill, catch-up, gap repair and timeframe aggregation into the store */
+  BACKFILL_ENABLED: envBool.default(false),
+  BACKFILL_BASE_TIMEFRAME: z.enum(["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "12h", "1d", "1w", "1M"]).default("1m"),
+  BACKFILL_BARS: z.coerce.number().int().min(100).default(20000),
+  BACKFILL_PAGE_SIZE: z.coerce.number().int().min(100).max(5000).default(5000),
+  BACKFILL_INTERVAL_MINUTES: z.coerce.number().int().min(1).default(15),
+  BACKFILL_AGGREGATE_SECONDS: z.coerce.number().int().min(10).default(60),
+  BACKFILL_INCLUDE_DEMO: envBool.default(false),
+  BACKFILL_SYMBOLS: z.string().optional(),
   /** legacy single-provider switch; MARKET_DATA_ROUTES wins when set */
   MARKET_DATA_PROVIDER: z.enum(["demo", "binance", "twelvedata", "polygon"]).default("demo"),
   /** per-asset-class routing, e.g. "forex=twelvedata,metal=twelvedata,index=twelvedata,commodity=twelvedata,crypto=binance,stock=polygon" */

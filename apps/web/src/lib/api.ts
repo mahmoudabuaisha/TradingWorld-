@@ -34,6 +34,8 @@ export const api = {
   addTrade: (token: string, b: Record<string, unknown>) => request<{ trade: Trade }>("/journal", { method: "POST", body: JSON.stringify(b) }, token),
   deleteTrade: (token: string, id: string) => request<{ ok: true }>(`/journal/${id}`, { method: "DELETE" }, token),
   adminOverview: (token: string) => request<AdminOverview>("/admin/overview", {}, token),
+  adminBackfill: (token: string) => request<AdminBackfill>("/admin/backfill", {}, token),
+  triggerBackfill: (token: string, b: { kind?: "cycle" | "backfill" | "catchup" | "gaps" | "aggregate"; symbol?: string; bars?: number }) => request<{ accepted: boolean }>("/admin/backfill", { method: "POST", body: JSON.stringify(b) }, token),
   adminFactors: (token: string) => request<{ sample: number; factors: Record<string, { present: number; total: number; avgScoreWhenPresent: number }>; byStatus: Record<string, number> }>("/admin/research/factors", {}, token),
 };
 
@@ -48,5 +50,11 @@ export interface OverviewRow {
   lastSweep?: { side: string; level: number; poolKind: string; displacementAfter: boolean; time: number } | null;
   narrative?: { ar: string; en: string }; spark?: number[]; error?: string;
   feed?: { provider: ProviderId; state: FeedState; licensed: boolean };
+}
+export interface BackfillRun { symbol: string; timeframe: string; kind: "backfill" | "catchup" | "gaps" | "aggregate"; from?: number; to?: number; bars: number; status: "running" | "done" | "failed"; error?: string; startedAt: number; finishedAt?: number }
+export interface AdminBackfill {
+  store: "memory" | "timescale"; enabled: boolean;
+  job: { running: boolean; started: boolean; baseTimeframe: string; bars: number; symbols: string[]; lastRunAt?: number; nextRunAt?: number; runs: BackfillRun[] };
+  series: { symbol: string; timeframe: string; first: number; last: number; count: number }[];
 }
 export interface AdminOverview { users: number; zonesLogged: number; providers: ProviderStatus[]; engine: { version: string; scoring: string; weights: Record<string, number> }; ai: string; modules: { id: string; status: string; phase: string }[]; memory: number; uptime: number }

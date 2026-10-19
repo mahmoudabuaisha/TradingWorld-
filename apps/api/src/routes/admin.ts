@@ -38,6 +38,29 @@ export default async function adminRoutes(app: FastifyInstance, ctx: AppContext)
 
   app.get("/admin/audit", { preHandler: admin }, async () => ({ entries: await ctx.repos.audit.recent(200) }));
 
+  /** DATA-02: candle store coverage and the maintenance job's status. */
+  app.get("/admin/backfill", { preHandler: admin }, async () => ({
+    store: ctx.store.kind,
+    enabled: ctx.config.BACKFILL_ENABLED,
+    job: ctx.backfill.status(),
+    series: await ctx.store.series(),
+  }));
+
+  /** Trigger maintenance now: a full cycle, or one step for one symbol. Runs in the background; poll GET for progress. */
+  app.post("/admin/backfill", { preHandler: admin }, async (req, reply) => {
+    const body = (req.body ?? {}) as { kind?: "cycle" | "backfill" | "catchup" | "gaps" | "aggregate"; symbol?: string; bars?: number };
+    const kind = body.kind ?? "cycle";
+    if (kind !== "cycle" && !body.symbol) return reply.code(400).send({ error: "SYMBOL_REQUIRED" });
+    await ctx.repos.audit.append({ actorId: req.user.id, action: "backfill.trigger", target: body.symbol, meta: { kind, bars: body.bars } });
+    const work = kind === "cycle" ? ctx.backfill.runOnce()
+      : kind === "backfill" ? ctx.backfill.backfill(body.symbol!, undefined, body.bars)
+      : kind === "catchup" ? ctx.backfill.catchUp(body.symbol!)
+      : kind === "gaps" ? ctx.backfill.repairGaps(body.symbol!)
+      : ctx.backfill.aggregateDerived(body.symbol!, "full");
+    void work.catch((e) => app.log.warn(`[backfill] ${(e as Error).message}`));
+    return { accepted: true, kind, symbol: body.symbol };
+  });
+
   /** Research: factor frequency across logged zones — first step of the AI Research Dashboard. */
   app.get("/admin/research/factors", { preHandler: admin }, async () => {
     const entries = await ctx.repos.zoneLog.recent(5000);

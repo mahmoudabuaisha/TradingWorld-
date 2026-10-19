@@ -105,27 +105,13 @@ model Instrument {
   sessionTimezone String     @default("UTC")
   providerSymbols Json       @default("{}")
   active          Boolean    @default(true)
-
-  candles Candle[]
   zones   Zone[]
   alerts  Alert[]
 }
 
-/// Hypertable (see sql/0001_timescale.sql). Primary key = (symbol, timeframe, time).
-model Candle {
-  symbol     String
-  instrument Instrument @relation(fields: [symbol], references: [symbol])
-  timeframe  String
-  time       DateTime
-  open       Float
-  high       Float
-  low        Float
-  close      Float
-  volume     Float?
-  provider   String
-  @@id([symbol, timeframe, time])
-  @@index([symbol, timeframe, time(sort: Desc)])
-}
+/// Candles are NOT a Prisma model: `market_candles` (+ `market_backfills`) is a TimescaleDB hypertable owned by SQL
+/// (prisma/sql/0001_timescale.sql) and written by the API's candle store (apps/api/src/store/timescale.ts).
+/// Hypertables, compression and retention policies do not fit Prisma migrations — see docs/05.
 
 // ── Analysis artefacts ────────────────────────────────────────
 model EngineVersion {

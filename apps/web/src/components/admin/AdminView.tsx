@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api, type AdminOverview, type FeedsResponse } from "@/lib/api";
+import { TIMEFRAMES } from "@tradingworld/shared";
+import { api, type AdminOverview, type FeedsResponse, type AdminBackfill } from "@/lib/api";
 import { useApp } from "@/store/useApp";
 import { FeedMark } from "../marks/FeedMark";
 
@@ -10,16 +11,25 @@ export function AdminView() {
   const [o, setO] = useState<AdminOverview>();
   const [factors, setFactors] = useState<Awaited<ReturnType<typeof api.adminFactors>>>();
   const [feeds, setFeeds] = useState<FeedsResponse>();
+  const [backfill, setBackfill] = useState<AdminBackfill>();
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string>();
   useEffect(() => {
     if (!token) return;
     api.adminOverview(token).then(setO).catch((e) => setErr(e.message));
     api.adminFactors(token).then(setFactors).catch(() => {});
-    const loadFeeds = () => api.feeds().then(setFeeds).catch(() => {});
+    const loadFeeds = () => { api.feeds().then(setFeeds).catch(() => {}); api.adminBackfill(token).then(setBackfill).catch(() => {}); };
     void loadFeeds();
     const timer = setInterval(loadFeeds, 15_000);
     return () => clearInterval(timer);
   }, [token]);
+  const runBackfill = async () => {
+    if (!token) return;
+    setBusy(true);
+    try { await api.triggerBackfill(token, { kind: "cycle" }); setTimeout(() => api.adminBackfill(token).then(setBackfill).catch(() => {}), 1500); } finally { setBusy(false); }
+  };
+  const stamp = (s?: number) => (s ? new Date(s * 1000).toISOString().slice(5, 16).replace("T", " ") : "—");
+  const ago = (ms?: number) => (ms ? `${Math.max(0, Math.round((Date.now() - ms) / 60000))} MIN AGO` : "—");
   const L = (ar: string, en: string) => (locale === "ar" ? ar : en);
   if (!token || user?.role !== "admin") return <div className="sheet mx-auto mt-6 max-w-lg p-6 text-center text-ink-2">{L("هذه الورقة للمشرفين فقط.", "Admins only.")}</div>;
   if (err) return <div className="sheet mx-auto mt-6 max-w-lg p-6 text-stamp">{err}</div>;
@@ -69,6 +79,41 @@ export function AdminView() {
             </div>
           )}
           <p className="mt-2 text-xs text-ink-3">{L("المصدر ووقت الاستلام وحالة التدفق لكل أداة. CLOSED يعني أن السوق مغلق لا أن البيانات متوقفة. التفاصيل والخطط في docs/03.", "Source, receipt time and flow state per instrument. CLOSED means the market is closed, not that data stopped. Plans and details in docs/03.")}</p>
+        </section>
+        <section className="sheet p-4 md:col-span-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="eyebrow">CANDLE STORE · {L("مخزن الشموع", "Candle store")} · {(backfill?.store ?? "…").toUpperCase()}</span>
+            <span className="mono text-2xs text-ink-3">{backfill ? `JOB ${backfill.enabled ? "ON" : "OFF"} · BASE ${backfill.job.baseTimeframe} × ${backfill.job.bars} · ${backfill.job.symbols.length} SYMBOLS · LAST ${ago(backfill.job.lastRunAt)}${backfill.job.running ? " · RUNNING" : ""}` : ""}</span>
+          </div>
+          {backfill && (
+            <>
+              <div className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                {backfill.series.length ? [...backfill.series].sort((a, b) => a.symbol.localeCompare(b.symbol) || (TIMEFRAMES as readonly string[]).indexOf(a.timeframe) - (TIMEFRAMES as readonly string[]).indexOf(b.timeframe)).map((s) => (
+                  <div key={`${s.symbol}:${s.timeframe}`} className="grid grid-cols-[72px_36px_1fr_auto] items-center gap-2 border-t border-hair py-1 text-xs">
+                    <span className="mono font-semibold">{s.symbol}</span><span className="mono text-ink-2">{s.timeframe}</span>
+                    <span dir="ltr" className="mono text-2xs text-ink-3">{stamp(s.first)} → {stamp(s.last)}</span>
+                    <span className="mono text-end">{s.count.toLocaleString("en-US")}</span>
+                  </div>
+                )) : <p className="text-xs text-ink-3">{L("لا سلاسل مخزنة بعد. شغّل دورة التعبئة أو فعّل BACKFILL_ENABLED.", "No series stored yet. Run a maintenance cycle or enable BACKFILL_ENABLED.")}</p>}
+              </div>
+              {backfill.job.runs.length > 0 && (
+                <ul className="mt-3 space-y-0.5 border-t border-hair pt-2 text-2xs">
+                  {backfill.job.runs.slice(0, 8).map((r, idx) => (
+                    <li key={idx} className="mono flex flex-wrap items-center gap-2 text-ink-2">
+                      <span className={`chip ${r.status === "failed" ? "text-down-ink" : r.status === "running" ? "" : "text-up-ink"}`}>{r.status.toUpperCase()}</span>
+                      <span>{r.kind.toUpperCase()} · {r.symbol} {r.timeframe} · {r.bars} BARS</span>
+                      <span dir="ltr" className="text-ink-3">{new Date(r.startedAt).toISOString().slice(11, 19)}Z{r.finishedAt ? ` · ${Math.round((r.finishedAt - r.startedAt) / 100) / 10}S` : ""}</span>
+                      {r.error && <span className="text-down-ink">{r.error}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button type="button" className="btn" disabled={busy || backfill.job.running} onClick={runBackfill}>{L("تشغيل دورة صيانة الآن", "Run a maintenance cycle now")}</button>
+                <span className="text-xs text-ink-3">{L("تعبئة/لحاق → إصلاح الفجوات → اشتقاق الفريمات الأعلى. كل طلب يمر عبر ميزانية المزود.", "Backfill/catch-up → gap repair → derive higher timeframes. Every request goes through the provider's budget.")}</span>
+              </div>
+            </>
+          )}
         </section>
         <section className="sheet p-4">
           <span className="eyebrow">SHEETS · {o.modules.length}</span>

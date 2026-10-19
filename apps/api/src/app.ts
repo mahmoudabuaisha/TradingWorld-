@@ -8,6 +8,8 @@ import { ProviderRegistry } from "./providers/registry.js";
 import { AnalysisService } from "./services/analysis.js";
 import { AiService } from "./services/ai.js";
 import { AlertService } from "./services/alerts.js";
+import { BackfillService } from "./services/backfill.js";
+import { createCandleStore } from "./store/index.js";
 import authPlugin from "./plugins/auth.js";
 import healthRoutes from "./routes/health.js";
 import authRoutes from "./routes/auth.js";
@@ -22,13 +24,20 @@ export interface BuildOptions { config?: Config; repos?: Repositories; logger?: 
 export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance & { ctx: AppContext }> {
   const config = opts.config ?? loadConfig();
   const repos = opts.repos ?? createMemoryRepositories();
-  const providers = new ProviderRegistry(config);
+  const store = createCandleStore(config);
+  const providers = new ProviderRegistry(config, { store });
   const analysis = new AnalysisService(providers, repos);
   const ai = new AiService(config);
   const alerts = new AlertService(repos);
-  const ctx: AppContext = { config, repos, providers, analysis, ai, alerts };
-
   const app = Fastify({ logger: opts.logger ?? config.NODE_ENV !== "test", trustProxy: true });
+  const backfill = new BackfillService(providers, store, {
+    baseTimeframe: config.BACKFILL_BASE_TIMEFRAME, bars: config.BACKFILL_BARS, pageSize: config.BACKFILL_PAGE_SIZE, intervalMinutes: config.BACKFILL_INTERVAL_MINUTES,
+    aggregateSeconds: config.BACKFILL_AGGREGATE_SECONDS, includeDemo: config.BACKFILL_INCLUDE_DEMO, symbols: config.BACKFILL_SYMBOLS?.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean),
+    log: (m) => app.log.info(`[backfill] ${m}`),
+  });
+  const ctx: AppContext = { config, repos, providers, analysis, ai, alerts, store, backfill };
+  if (config.BACKFILL_ENABLED && config.NODE_ENV !== "test") backfill.start();
+  app.addHook("onClose", async () => { backfill.stop(); providers.close(); await store.close(); });
   await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(cors, { origin: config.CORS_ORIGIN.split(",").map((s) => s.trim()), credentials: true });
   await app.register(rateLimit, { max: config.RATE_LIMIT_MAX, timeWindow: config.RATE_LIMIT_WINDOW });

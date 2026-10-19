@@ -7,6 +7,7 @@ import { TwelveDataProvider } from "./twelvedata.js";
 import { PolygonProvider } from "./polygon.js";
 import { CachedProvider } from "./support/cached.js";
 import { staleAfterMs } from "./support/status.js";
+import type { CandleStore } from "../store/candleStore.js";
 
 export type Routes = Partial<Record<AssetClass, ProviderId>>;
 
@@ -30,6 +31,8 @@ export function parseRoutes(spec: string | undefined): { routes: Routes; errors:
 export interface RegistryDeps {
   /** test seam: pre-built providers by id */
   providers?: Partial<Record<ProviderId, MarketDataProvider>>;
+  /** candle store shared by every budgeted provider (memory when omitted) */
+  store?: CandleStore;
   now?: () => number;
 }
 
@@ -50,11 +53,12 @@ export class ProviderRegistry {
     const pre = deps.providers ?? {};
     this.demo = pre.demo ?? new DemoProvider();
     this.byId.set("demo", this.demo);
-    this.byId.set("binance", pre.binance ?? new CachedProvider(new BinanceProvider({ baseUrl: cfg.BINANCE_BASE_URL })));
+    const cached = (p: MarketDataProvider) => new CachedProvider(p, { store: deps.store, now: this.now });
+    this.byId.set("binance", pre.binance ?? cached(new BinanceProvider({ baseUrl: cfg.BINANCE_BASE_URL })));
     if (pre.twelvedata) this.byId.set("twelvedata", pre.twelvedata);
-    else if (cfg.TWELVEDATA_API_KEY) this.byId.set("twelvedata", new CachedProvider(new TwelveDataProvider({ apiKey: cfg.TWELVEDATA_API_KEY, creditsPerMinute: cfg.TWELVEDATA_CREDITS_PER_MINUTE, useWebSocket: cfg.TWELVEDATA_WS, pollSeconds: cfg.TWELVEDATA_POLL_SECONDS, plan: cfg.TWELVEDATA_PLAN })));
+    else if (cfg.TWELVEDATA_API_KEY) this.byId.set("twelvedata", cached(new TwelveDataProvider({ apiKey: cfg.TWELVEDATA_API_KEY, creditsPerMinute: cfg.TWELVEDATA_CREDITS_PER_MINUTE, useWebSocket: cfg.TWELVEDATA_WS, pollSeconds: cfg.TWELVEDATA_POLL_SECONDS, plan: cfg.TWELVEDATA_PLAN })));
     if (pre.polygon) this.byId.set("polygon", pre.polygon);
-    else if (cfg.POLYGON_API_KEY) this.byId.set("polygon", new CachedProvider(new PolygonProvider({ apiKey: cfg.POLYGON_API_KEY, requestsPerMinute: cfg.POLYGON_REQUESTS_PER_MINUTE, useWebSocket: cfg.POLYGON_WS, pollSeconds: cfg.POLYGON_POLL_SECONDS, plan: cfg.POLYGON_PLAN })));
+    else if (cfg.POLYGON_API_KEY) this.byId.set("polygon", cached(new PolygonProvider({ apiKey: cfg.POLYGON_API_KEY, requestsPerMinute: cfg.POLYGON_REQUESTS_PER_MINUTE, useWebSocket: cfg.POLYGON_WS, pollSeconds: cfg.POLYGON_POLL_SECONDS, plan: cfg.POLYGON_PLAN })));
 
     const parsed = parseRoutes(cfg.MARKET_DATA_ROUTES);
     this.warnings.push(...parsed.errors);

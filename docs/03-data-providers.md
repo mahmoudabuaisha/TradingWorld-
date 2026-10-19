@@ -108,14 +108,34 @@ pnpm --filter @tradingworld/api feed:check XAUUSD 5m 30
 # 4) عند تفعيل البث في الخطة: TWELVEDATA_WS=true ثم أعد feed:check.
 ```
 
+## المخزن الدائم والتعبئة التاريخية (DATA-02)
+المخزن الذاكري من DATA-01 أصبح واجهة `CandleStore` بتطبيقين: `MemoryCandleStore` (الافتراضي بلا قاعدة بيانات) و`TimescaleCandleStore` (PostgreSQL/TimescaleDB، `CANDLE_STORE=auto|memory|timescale`). الجداول `market_candles` و`market_backfills` مملوكة للـSQL لا لـPrisma (`packages/db/prisma/sql/0001_timescale.sql`): الـAPI ينشئ الجداول العادية إن غابت، والملف يضيف طبقة Timescale (hypertable بقطع 7 أيام، ضغط بعد 30 يومًا).
+
+**قراءة المزود عبر المخزن** (`CachedProvider`): السلسلة تُجلب كاملة مرة واحدة، وبعدها يُجلب فقط ما حدث منذ آخر شمعة مخزنة (لا «3 شموع» ثابتة: بعد انقطاع لساعات يُجلب ما يغطيه حتى 5000 شمعة، وما بعده يتولاه إصلاح الفجوات). تحديثات البث تُكتب في المخزن (المكتملة فورًا، الجارية كل 5 ثوانٍ)، فإعادة التشغيل تستأنف من حيث توقف البث.
+
+**وظيفة الصيانة** (`BackfillService`، تفعيل صريح `BACKFILL_ENABLED=true`):
+| الخطوة | ماذا تفعل | التكلفة |
+|---|---|---|
+| backfill | صفحات إلى الخلف بمؤشر `to` حتى `BACKFILL_BARS` من الفريم الأساسي (`1m`) | طلب لكل 5000 شمعة |
+| catch-up | كل ما بعد آخر شمعة مخزنة (بعد توقف الخادم) | طلب لكل 5000 شمعة ناقصة |
+| gaps | `findGaps` يجد الدلاء الناقصة داخل السلسلة متجاهلًا ساعات الإغلاق، ويجلب كل فجوة بطلب واحد (≤ 20 لكل دورة) | طلب لكل فجوة |
+| aggregate | اشتقاق كل فريم أعلى من الفريم الأساسي بنفس دلاء المحرك (`aggregate`/`bucketStart`): كامل بعد التعبئة، وكل 60 ثانية للدلو الحالي والسابق فقط | صفر طلبات |
+الدورة الكاملة كل `BACKFILL_INTERVAL_MINUTES`. كل طلب يمر عبر `to` فيتجاوز الكاش ويخضع لميزانية المزود. الصفوف المشتقة تُوسم `provider = aggregate:1m` و**لا تكتب فوق صف أصلي من مزود أبدًا**؛ الصف الأصلي يكتب فوق المشتق دائمًا. الدلو الذي يبدأ قبل بداية التاريخ المخزن ناقص فلا يُكتب (يوم من 1m يحتاج يومًا كاملًا)؛ الفريمات التي لا يغطيها التاريخ (1w/1M مع 14 يومًا) تُجلب أصلية من المزود عند الطلب.
+
+**الأثر على الميزانية**: مع `1m` مخزنًا، سلاسل HTF للتحليل تُقرأ من المخزن بلا طلبات؛ المزود يُسأل عن الفريم الأساسي فقط (استطلاع/بث) وعن الفريمات العميقة (1d/1w/1M) عند أول طلب.
+
+**الأدوات**: `pnpm --filter @tradingworld/api backfill [SYMBOL|all] [BARS] [--cycle]`، ولوحة الإدارة (تغطية كل سلسلة، آخر الدورات، زر تشغيل دورة)، و`GET/POST /admin/backfill`. الاختبارات تعمل على Postgres حقيقي عندما يُضبط `TEST_DATABASE_URL` (في CI خدمة postgres:16)، وإلا على المخزن الذاكري فقط.
+
+**حدود معروفة**: العطل الرسمية غير مُنمذجة في تقويم السوق فقد تُفحص كفجوات (الجلب يعود فارغًا بلا ضرر)؛ إعادة التعبئة داخل نطاق مضغوط في Timescale تحتاج فك الضغط أولًا (تعليق في SQL).
+
 ## الحدود والتعامل مع الأخطاء
 - إعادة اتصال WS أسية مع إعادة الاشتراك/التوثيق (`support/socket.ts`).
 - الميزانية تمنع 429 استباقيًا؛ وإن حدث يُعرض ولا يُعاد الطلب بعنف.
-- اكتشاف الفجوات وإعادة الملء التاريخي إلى Timescale (DATA-02).
+- اكتشاف الفجوات وإعادة الملء التاريخي إلى Timescale: مُنفَّذ (القسم أعلاه).
 - Timestamp بالثواني UTC؛ التوقيت الصيفي يُعالج عند طبقة العرض وتقويم السوق فقط.
 
 ## اختلاف الأسعار بين المصادر
 لا سعر مركزي للفوركس الفوري. الفرق مع البروكر ينتج عن السيولة/السبريد/نوع السعر (Bid/Ask/Mid/Last)/التوقيت. لوحة مقارنة المصادر مخططة (المواصفة §12 للشارت).
 
 ## الملفات
-`apps/api/src/providers/{registry,twelvedata,polygon,binance,demo}.ts` · `providers/support/*` · `apps/api/src/tools/feed-check.ts` · `packages/shared/src/{feeds,marketHours,instruments}.ts` · اختبارات `apps/api/src/__tests__/providers.test.ts` (20) — بدون شبكة: fetch وWebSocket مزيفان بحمولات حقيقية الشكل.
+`apps/api/src/providers/{registry,twelvedata,polygon,binance,demo}.ts` · `providers/support/*` · `apps/api/src/store/{candleStore,timescale,gaps}.ts` · `apps/api/src/services/backfill.ts` · `apps/api/src/tools/{feed-check,backfill}.ts` · `packages/shared/src/{feeds,marketHours,instruments}.ts` · اختبارات `apps/api/src/__tests__/{providers,store}.test.ts` (20 + 16) — بدون شبكة: fetch وWebSocket مزيفان بحمولات حقيقية الشكل.

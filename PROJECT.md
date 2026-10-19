@@ -147,7 +147,7 @@ HIGH ≥ 72 · MEDIUM ≥ 52 · LOW مخفي افتراضيًا. **Confidence = 
 
 `User · Session · Instrument · Candle(hypertable) · EngineVersion · Zone · ZoneOutcome · ZoneFeedback · BacktestRun · Watchlist · Alert · Trade · Note · Goal · AuditLog · FeatureFlag`
 
-المخطط الكامل: [`packages/db/prisma/schema.prisma`](./packages/db/prisma/schema.prisma) — الشرح: [`docs/05-database-schema.md`](./docs/05-database-schema.md)
+المخطط الكامل: [`packages/db/prisma/schema.prisma`](./packages/db/prisma/schema.prisma) — الشرح: [`docs/05-database-schema.md`](./docs/05-database-schema.md). جداول السوق (`market_candles` hypertable + `market_backfills`) خارج Prisma: يملكها SQL ويكتبها مخزن الشموع في الـAPI مع وظيفة تعبئة/لحاق/فجوات/اشتقاق (DATA-02، docs/03).
 
 ---
 
