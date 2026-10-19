@@ -10,6 +10,7 @@ import { Terrain } from "../marks/Terrain";
 import { Dimension } from "../marks/Dimension";
 import { SessionDial } from "../marks/SessionDial";
 import { Icon } from "../Icon";
+import { FeedMark } from "../marks/FeedMark";
 
 const ROUTINE = [
   { id: "calendar", ar: "فحص التقويم الاقتصادي", en: "Check the economic calendar" },
@@ -34,7 +35,7 @@ function fmtPrice(p: number | undefined, precision: number) {
 function line(r: OverviewRow, locale: "ar" | "en"): { glyph: string; text: string; tone: string } {
   const inst = findInstrument(r.symbol);
   const name = locale === "ar" ? inst?.nameAr ?? r.symbol : r.symbol;
-  if (r.error) return { glyph: "!", text: `${name}: ${r.error}`, tone: "text-stamp" };
+  if (r.error) return { glyph: "!", text: `${name}: ${locale === "ar" ? "مصدر البيانات غير متاح" : "data source unavailable"}${r.feed ? ` (${r.feed.provider.toUpperCase()} · ${r.feed.state})` : ""} — ${r.error}`, tone: "text-stamp" };
   const regime = { TRENDING_UP: ["اتجاه صاعد", "trending up"], TRENDING_DOWN: ["اتجاه هابط", "trending down"], RANGING: ["نطاق عرضي", "ranging"] }[r.regime ?? "RANGING"] ?? ["", ""];
   const vol = { HIGH: ["بتقلب مرتفع", "high volatility"], NORMAL: ["بتقلب طبيعي", "normal volatility"], LOW: ["بتقلب منخفض", "low volatility"] }[r.volatility ?? "NORMAL"] ?? ["", ""];
   const p = r.precision ?? 2;
@@ -58,16 +59,27 @@ export function DailySheet() {
   const [rows, setRows] = useState<OverviewRow[]>();
   const [err, setErr] = useState<string>();
   const [health, setHealth] = useState<Awaited<ReturnType<typeof api.health>>>();
+  const [feeds, setFeeds] = useState<Awaited<ReturnType<typeof api.feeds>>>();
   const [trades, setTrades] = useState<Trade[]>();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => {
     api.overview(watchlist).then((r) => setRows(r.rows)).catch((e) => setErr((e as Error).message));
     api.health().then(setHealth).catch(() => {});
+    api.feeds().then(setFeeds).catch(() => {});
   }, [watchlist]);
   useEffect(() => { if (token) api.journal(token).then((j) => setTrades(j.trades.filter((x) => x.exitPrice === undefined))).catch(() => setTrades([])); else setTrades(undefined); }, [token]);
 
   const dateKey = clock?.dateKey ?? "";
+  // one line for the watchlist's sources: "DEMO ×3 · BINANCE OFFLINE ×1" — synthetic data is named, never shown as live
+  const feedSummary = useMemo(() => {
+    if (!feeds) return undefined;
+    const mine = feeds.feeds.filter((f) => watchlist.includes(f.symbol));
+    const counts = new Map<string, number>();
+    for (const f of mine) { const k = f.transport === "synthetic" ? "DEMO" : `${f.provider.toUpperCase()} ${f.state}`; counts.set(k, (counts.get(k) ?? 0) + 1); }
+    return [...counts.entries()].map(([k, n]) => `${k} ×${n}`).join(" · ");
+  }, [feeds, watchlist]);
+  const feedTrouble = feeds?.feeds.some((f) => watchlist.includes(f.symbol) && (f.state === "OFFLINE" || f.state === "STALE"));
   const done = routineDone[dateKey] ?? [];
   const header = useMemo(() => {
     if (!clock) return "";
@@ -171,7 +183,7 @@ export function DailySheet() {
 
           <div className="tblock sheet">
             <div><b>ENGINE</b><span>{health?.engineVersion ?? "…"}</span></div>
-            <div><b>FEED</b><span className={health?.providers[0]?.live ? "text-up-ink" : "text-down-ink"}>{health?.providers[0]?.id?.toUpperCase() ?? "OFFLINE"} · {health?.providers[0]?.live ? "LIVE" : "STALE"}</span></div>
+            <div><b>FEED</b><span className={`mono ${feedTrouble ? "text-down-ink" : ""}`} title={feeds?.warnings.join("\n")}>{feedSummary ?? "…"}</span></div>
             <div><b>AI</b><span>{health?.ai?.toUpperCase() ?? "…"}</span></div>
             <div><b>SHEETS</b><span>{watchlist.length} WATCHED</span></div>
           </div>

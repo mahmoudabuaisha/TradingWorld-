@@ -1,5 +1,7 @@
 export * from "./timeframes.js";
+export * from "./feeds.js";
 export * from "./instruments.js";
+export * from "./marketHours.js";
 export * from "./sessions.js";
 export * from "./modules.js";
 export * from "./roles.js";

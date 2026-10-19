@@ -99,7 +99,7 @@
 | 2 | شارت احترافي | 🟨 | ☐ | شموع · zoom/pan · crosshair · فريمات · مستويات · markers · مناطق مهشّرة بكنتور وختم · تعليق مساحي بخط دليل · أبعاد المسافة والصفقات المفتوحة. يلزم: أدوات الرسم، أنواع الشارت، Multi-chart |
 | 3 | Real-Time Data | 🟩 (demo/binance) | ☐ | WS تحديث الشمعة الحالية دون إعادة تحميل |
 | 4 | Historical Data | 🟩 | ☐ | `/candles` مع `to` للتحميل التدريجي |
-| 5 | Multi-Timeframe | 🟩 | ☐ | HTF candles من المزود أو تجميع داخلي؛ سياق 1w→1d→4h→1h→15m حسب الفريم |
+| 5 | Multi-Timeframe | 🟩 | ☐ | HTF candles من المزود أو تجميع داخلي؛ سياق 1w→1d→4h→1h→15m حسب الفريم؛ سلاسل HTF تُخدم من مخزن الشموع فلا تستهلك رصيد المزود مع كل تحليل |
 | 6 | Liquidity Detection | 🟩 | ☐ | EQH/EQL · Swing · PDH/PDL/PWH/PWL · Session H/L · Sweeps + reclaim |
 | 7 | Market Structure | 🟩 | ☐ | Swings fractal بلا repaint · BOS/CHoCH بالإغلاق فقط · bias |
 | 8 | FVG | 🟩 | ☐ | 3-candle + mitigation + fill ratio + حد أدنى بالـATR |
@@ -122,7 +122,7 @@
 
 | المعرف | المهمة | الأولوية | الحالة |
 |---|---|---|---|
-| DATA-01 | اعتماد مزود بيانات مرخص (Twelve Data / Polygon) وتوقيع العقد | 🔴 عالية | ⬜ |
+| DATA-01 | اعتماد مزود بيانات مرخص (Twelve Data / Polygon) وتوقيع العقد | 🔴 عالية | 🟩 الهندسة (توجيه حسب الفئة، Twelve Data + Polygon بميزانية ومخزن وبث، حالة التدفق، feed:check، ADR-0006) · ⬜ توقيع العقد — قائمة التحقق في docs/03 |
 | DATA-02 | Backfill تاريخي إلى Timescale + job تجميع الشموع | 🔴 | ⬜ |
 | DB-01 | تشغيل `prisma generate` + migrations + seed للـInstrument Master | 🔴 | ⬜ |
 | DB-02 | Prisma repositories تطبق نفس واجهة `Repositories` | 🔴 | ⬜ |
@@ -150,6 +150,8 @@
 
 | التاريخ | النطاق | التغيير | الحالة | معتمد |
 |---|---|---|---|---|
+| 2026-10-19 | apps/api · packages/shared (DATA-01) | طبقة البيانات المرخصة: توجيه حسب فئة الأصل `MARKET_DATA_ROUTES` مع احتياط demo مُعلَن؛ Twelve Data (REST + ميزانية credits + فريمات مشتقة + WebSocket/polling) وPolygon (REST aggregates + ميزانية + WS للعناقيد) مُنفَّذان؛ `support/`: RateBudget، CachedProvider (مخزن شموع في الذاكرة)، TickAggregator، ReconnectingSocket؛ حالة التدفق لكل أداة `LIVE/DELAYED/STALE/CLOSED/OFFLINE` من صحة المزود × تقويم السوق (`marketHours.ts`)؛ `/feeds` و`feed` في `/candles` و`/overview` و`/health.routes+warnings` ورسالة `status` في WS؛ أداة `feed:check`؛ 21 اختبارًا جديدًا بلا شبكة (27 في الـAPI)؛ docs/03 أُعيدت كتابتها + ADR-0006 + .env.example | 🟩 | ☐ |
+| 2026-10-19 | apps/web (DATA-01) | علامة المصدر `FeedMark` في كتلة العنوان (المصدر · الحالة · النقل/التأخير)، الورقة اليومية، ورقة الأسواق (مصدر كل فئة وشارة DELAYED/STALE/CLOSED/OFFLINE)، ولوحة الإدارة (المزودون، الميزانية، الخطة، الترخيص، التحذيرات، جدول الأدوات) | 🟩 | ☐ |
 | 2026-10-19 | packages/analysis-engine 1.1.1 · apps/web (المختبر) | إصلاح خلل في مختبر الاختبار التاريخي: كانت نسبة REACTED صفرًا دائمًا لأن دورة الحياة تُرجع الحالة النهائية فقط (منطقة تفاعلت ثم كُسرت لاحقًا تُحسب INVALIDATED). الآن `evaluateLifecycle` يرجع أيضًا `reacted/reactedIndex/firstTestIndex`؛ المختبر يحسب REACTED عند أول تفاعل، وINVALIDATED كنسبة كسر مستقلة، وMFE/MAE من أول لمسة وللمناطق الملموسة فقط؛ عمود Touched وسطر توضيح؛ اختبار جديد (15). مخرجات التحليل الحية لم تتغير | 🟩 | ☐ |
 | 2026-10-19 | apps/web (السجل) · docs/06 | توثيق أن `openedAt/closedAt` بثواني Unix؛ عرض التاريخ في السجل يتحمّل القيم بالميلي ثانية من عملاء أقدم | 🟩 | ☐ |
 | 2026-10-19 | docs | إصلاح: README الجذري كان مكتوبًا بالخطأ في `packages/analysis-engine/README.md` (روابطه النسبية معطّلة)؛ نُقل إلى الجذر مع قسم التصميم وصف docs/12 وشارة المحرك 1.1.0 وعدد الاختبارات؛ README خاص بحزمة المحرك | 🟩 | ☐ |

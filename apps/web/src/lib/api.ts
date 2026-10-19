@@ -1,5 +1,5 @@
 import type { AnalysisResult, Candle } from "@tradingworld/analysis-engine";
-import type { Timeframe } from "@tradingworld/shared";
+import type { Timeframe, ProviderStatus, FeedStatus, FeedState, ProviderId, AssetClass } from "@tradingworld/shared";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:4000/ws";
@@ -19,8 +19,9 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
 }
 
 export const api = {
-  health: () => request<{ ok: boolean; engineVersion: string; providers: { id: string; live: boolean; message?: string }[]; ai: string }>("/health"),
-  candles: (symbol: string, timeframe: Timeframe, limit = 500) => request<{ candles: Candle[]; provider: string; status: { live: boolean; message?: string } }>(`/candles?symbol=${symbol}&timeframe=${timeframe}&limit=${limit}`),
+  health: () => request<{ ok: boolean; engineVersion: string; providers: ProviderStatus[]; routes: Routes; warnings: string[]; ai: string }>("/health"),
+  feeds: () => request<FeedsResponse>("/feeds"),
+  candles: (symbol: string, timeframe: Timeframe, limit = 500) => request<{ candles: Candle[]; provider: string; status: ProviderStatus; feed: FeedStatus }>(`/candles?symbol=${symbol}&timeframe=${timeframe}&limit=${limit}`),
   analysis: (symbol: string, timeframe: Timeframe, includeLowQuality = false, includeInvalidated = false) => request<AnalysisResult>(`/analysis?symbol=${symbol}&timeframe=${timeframe}&includeLowQuality=${includeLowQuality}&includeInvalidated=${includeInvalidated}`),
   chat: (body: { symbol: string; timeframe: Timeframe; question: string; locale: "ar" | "en"; zoneId?: string }) => request<{ answer: string; provider: string }>("/ai/chat", { method: "POST", body: JSON.stringify(body) }),
   overview: (symbols: string[]) => request<{ rows: OverviewRow[]; generatedAt: number }>(`/overview?symbols=${symbols.join(",")}`),
@@ -36,6 +37,8 @@ export const api = {
   adminFactors: (token: string) => request<{ sample: number; factors: Record<string, { present: number; total: number; avgScoreWhenPresent: number }>; byStatus: Record<string, number> }>("/admin/research/factors", {}, token),
 };
 
+export type Routes = Partial<Record<AssetClass, ProviderId>>;
+export interface FeedsResponse { routes: Routes; warnings: string[]; providers: ProviderStatus[]; feeds: FeedStatus[]; generatedAt: number }
 export interface AuthResponse { token: string; user: { id: string; email: string; displayName: string; role: string } }
 export interface Alert { id: string; symbol: string; kind: string; price?: number; zoneId?: string; note?: string; active: boolean; createdAt: number; triggeredAt?: number }
 export interface Trade { id: string; symbol: string; direction: "long" | "short"; entry: number; stopLoss: number; takeProfit?: number; exitPrice?: number; size: number; rMultiple?: number; openedAt: number; setup?: string; strategy?: string; notes?: string }
@@ -44,5 +47,6 @@ export interface OverviewRow {
   topZone?: { id: string; name: string; nameAr: string; score: number; status: string; direction: string; top: number; bottom: number } | null;
   lastSweep?: { side: string; level: number; poolKind: string; displacementAfter: boolean; time: number } | null;
   narrative?: { ar: string; en: string }; spark?: number[]; error?: string;
+  feed?: { provider: ProviderId; state: FeedState; licensed: boolean };
 }
-export interface AdminOverview { users: number; zonesLogged: number; providers: { id: string; live: boolean; message?: string }[]; engine: { version: string; scoring: string; weights: Record<string, number> }; ai: string; modules: { id: string; status: string; phase: string }[]; memory: number; uptime: number }
+export interface AdminOverview { users: number; zonesLogged: number; providers: ProviderStatus[]; engine: { version: string; scoring: string; weights: Record<string, number> }; ai: string; modules: { id: string; status: string; phase: string }[]; memory: number; uptime: number }

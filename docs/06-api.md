@@ -3,7 +3,7 @@
 Base URL: `http://localhost:4000/api/v1` · JSON · `Authorization: Bearer <jwt>` · Rate limit 300/min (عام) وأقل للمسارات الحساسة. الأخطاء: `{ error: CODE, message?, issues? }`.
 
 ## Health
-`GET /health` → `{ ok, uptime, engineVersion, scoringVersion, providers[], ai }`
+`GET /health` → `{ ok, uptime, engineVersion, scoringVersion, providers[] (ProviderStatus: state/transport/licensed/plan/budget), routes, warnings[], ai }`
 
 ## Auth
 | Method | Path | Body | Response |
@@ -17,9 +17,10 @@ Base URL: `http://localhost:4000/api/v1` · JSON · `Authorization: Bearer <jwt>
 |---|---|---|---|
 | GET | `/instruments` | — | `{ instruments[], timeframes[] }` |
 | GET | `/modules` | — | `{ modules[] }` (الـ60 وحدة) |
-| GET | `/candles` | `symbol, timeframe, limit≤5000, to?` | `{ candles[], provider, status }` |
+| GET | `/candles` | `symbol, timeframe, limit≤5000, to?` | `{ candles[], provider, status, feed }` — `feed` حالة التدفق لهذه الأداة (`LIVE/DELAYED/STALE/CLOSED/OFFLINE`) |
+| GET | `/feeds` | — | `{ routes, warnings[], providers[], feeds[] }` — مصدر كل أداة وحالتها (docs/03) |
 | GET | `/analysis` | `symbol, timeframe, limit, includeLowQuality, includeInvalidated, locale` | `AnalysisResult` (انظر أدناه). `includeInvalidated=true` يُبقي المناطق المبطلة خلال آخر 120 شمعة بحالة `INVALIDATED` للتعلم منها |
-| GET | `/overview` | `symbols=A,B,C` | `{ rows[] }` لكل رمز: price/regime/volatility/htfBias/zones/topZone |
+| GET | `/overview` | `symbols=A,B,C` | `{ rows[] }` لكل رمز: price/regime/volatility/htfBias/zones/topZone/feed |
 | POST | `/ai/chat` | `{ symbol, timeframe, question, locale, zoneId? }` | `{ answer, provider: "anthropic"|"deterministic", grounded: true }` |
 
 ### `AnalysisResult` (مختصر)
@@ -50,8 +51,8 @@ Base URL: `http://localhost:4000/api/v1` · JSON · `Authorization: Bearer <jwt>
 ## WebSocket `/ws`
 Client → `{"type":"subscribe","symbol":"XAUUSD","timeframe":"5m","includeLowQuality":false,"includeInvalidated":false}` | `{"type":"unsubscribe"}` | `{"type":"ping"}`
 Server →
-- `{"type":"status","provider":{id,live,message}}`
-- `{"type":"candle","update":{symbol,timeframe,candle,closed,receivedAt}}` (كل tick)
+- `{"type":"status","provider":ProviderStatus,"feed":FeedStatus}` (عند الاشتراك ومع كل دفعة تحليل — المصدر وحالة التدفق لهذه الأداة)
+- `{"type":"candle","update":{symbol,timeframe,candle,closed,receivedAt,eventTime}}` (كل tick؛ `closed: true` = الشمعة في هذه الرسالة نهائية)
 - `{"type":"analysis","result":AnalysisResult}` (عند إغلاق شمعة أو كل 15s)
 - `{"type":"alert","event":{alert,price,message{ar,en},at}}`
 - `{"type":"error","message"}`

@@ -94,13 +94,13 @@
 | المزود | التغطية | Real-time | التاريخ | الترخيص التجاري | التكلفة التقريبية | الحالة في الكود |
 |---|---|---|---|---|---|---|
 | **demo** (داخلي) | كل الرموز | محاكاة | 60k شمعة 1m اصطناعية | — | 0 | ✅ مُنفَّذ |
-| **Binance** (public) | Crypto | WS kline | REST klines | شروط الاستخدام تقيّد إعادة التوزيع التجاري — مراجعة قانونية قبل الإنتاج | 0 | ✅ مُنفَّذ |
-| **Twelve Data** | Forex, Metals, Indices, Stocks, Crypto | WS (خطط مدفوعة) / polling | نعم | نعم (خطط Pro/Enterprise) | $29–$229+/شهر | ✅ REST + polling |
-| **Polygon.io** | US Stocks, Options, Forex, Crypto | WS | عميق | نعم | $29–$199+/شهر | 🔲 adapter مخطط |
+| **Binance** (public) | Crypto | WS kline | REST klines | شروط الاستخدام تقيّد إعادة التوزيع التجاري — للتطوير فقط (`licensed: false`) | 0 | ✅ مُنفَّذ |
+| **Twelve Data** | Forex, Metals, Indices, Commodities, Stocks, Crypto | WS (خطط مدفوعة) / polling | نعم | نعم (خطط مدفوعة) | $29–$229+/شهر (تحقق) | ✅ REST + ميزانية + مخزن + WS/polling (**الأساسي المقترح**) |
+| **Polygon.io** | US Stocks, Indices, Forex, Crypto | WS | عميق | نعم | $29–$199+/شهر (تحقق) | ✅ REST + ميزانية + مخزن + WS/polling |
 | **Databento / dxFeed / CQG** | Futures, Tick, Order flow | نعم | نعم | نعم (مؤسسي) | $100s–$1000s/شهر | 🔲 لاحقًا (Order Flow/Footprint) |
 | **Economic Calendar / News** (Trading Economics, FMP, Finnhub) | أحداث اقتصادية، أخبار | polling/WS | نعم | نعم | $0–$100+/شهر | 🔲 P2 |
 
-قواعد: لا scraping مخالف، إظهار **المصدر ووقت التحديث وحالة Live/Delayed/Stale** دائمًا، `Instrument Master` مركزي يربط كل رمز بمزوده.
+قواعد: لا scraping مخالف، إظهار **المصدر ووقت التحديث وحالة التدفق** (`LIVE/DELAYED/STALE/CLOSED/OFFLINE`) دائمًا، `Instrument Master` مركزي يربط كل رمز بمزوده، والتوجيه **حسب فئة الأصل** (`MARKET_DATA_ROUTES`) مع احتياط `demo` مُعلَن لا صامت. فحص المسار قبل الإنتاج: `pnpm --filter @tradingworld/api feed:check XAUUSD 5m 30`. القرار: ADR-0006.
 
 ➡ [`docs/03-data-providers.md`](./docs/03-data-providers.md)
 
@@ -234,3 +234,4 @@ JWT + scrypt · RBAC بست أدوار · Rate limiting (عام + حساس) · H
 - [ADR-0003](./docs/adr/0003-lightweight-charts-plus-overlay.md) — lightweight-charts + overlay خاص
 - [ADR-0004](./docs/adr/0004-versioned-scoring.md) — أوزان التقييم المُنسَّخة
 - [ADR-0005](./docs/adr/0005-kharita-design-language.md) — اعتماد لغة التصميم «خريطة»
+- [ADR-0006](./docs/adr/0006-licensed-market-data.md) — مصدر بيانات مرخص مع توجيه حسب فئة الأصل

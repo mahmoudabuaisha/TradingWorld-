@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { AnalysisResult, Candle, Zone } from "@tradingworld/analysis-engine";
-import { DEFAULT_INSTRUMENTS, TIMEFRAMES, findInstrument, type Timeframe } from "@tradingworld/shared";
+import { DEFAULT_INSTRUMENTS, TIMEFRAMES, findInstrument, type Timeframe, type ProviderStatus, type FeedStatus } from "@tradingworld/shared";
 import { api } from "@/lib/api";
 import { subscribeMarket } from "@/lib/ws";
 import { useApp } from "@/store/useApp";
@@ -28,7 +28,8 @@ export function ChartWorkspace() {
   const [candles, setCandles] = useState<Candle[]>([]);
   const [live, setLive] = useState<Candle>();
   const [analysis, setAnalysis] = useState<AnalysisResult>();
-  const [provider, setProvider] = useState<{ id: string; live: boolean; message?: string }>();
+  const [provider, setProvider] = useState<ProviderStatus>();
+  const [feed, setFeed] = useState<FeedStatus>();
   const [selected, setSelected] = useState<Zone>();
   const [trades, setTrades] = useState<ChartTrade[]>([]);
   const [anchor, setAnchor] = useState<{ x: number; y: number }>();
@@ -43,7 +44,7 @@ export function ChartWorkspace() {
     setError(undefined);
     try {
       const [c, a] = await Promise.all([api.candles(symbol, timeframe, 600), api.analysis(symbol, timeframe, showLowQuality, showInvalidated)]);
-      setCandles(c.candles); setLive(undefined); setProvider({ id: c.provider, ...c.status }); setAnalysis(a); setSelected(undefined);
+      setCandles(c.candles); setLive(undefined); setProvider(c.status); setFeed(c.feed); setAnalysis(a); setSelected(undefined);
     } catch (e) { setError((e as Error).message); }
   }, [symbol, timeframe, showLowQuality, showInvalidated]);
   useEffect(() => { void load(); }, [load]);
@@ -54,7 +55,7 @@ export function ChartWorkspace() {
         setLive(m.update.candle);
         if (m.update.closed) setCandles((prev) => (prev.length && prev[prev.length - 1]!.time < m.update.candle.time ? [...prev, m.update.candle] : prev));
       } else if (m.type === "analysis") { if (mode === "ai") setAnalysis(m.result); }
-      else if (m.type === "status") setProvider(m.provider);
+      else if (m.type === "status") { setProvider(m.provider); if (m.feed) setFeed(m.feed); }
       else if (m.type === "alert") { setToast(m.event.message[locale]); setTimeout(() => setToast(undefined), 8000); }
     }, { includeLowQuality: showLowQuality, includeInvalidated: showInvalidated });
     return off;
@@ -126,7 +127,7 @@ export function ChartWorkspace() {
           <AiChat zoneId={selected?.id} />
         </div>
       </div>
-      <TitleBlock analysis={mode === "ai" ? analysis : undefined} provider={provider} symbol={symbol} timeframe={timeframe} />
+      <TitleBlock analysis={mode === "ai" ? analysis : undefined} provider={provider} feed={feed} symbol={symbol} timeframe={timeframe} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import websocket from "@fastify/websocket";
-import { findInstrument, isTimeframe, type Timeframe } from "@tradingworld/shared";
+import { findInstrument, isTimeframe, type Instrument, type Timeframe } from "@tradingworld/shared";
 import type { AppContext } from "../context.js";
 import type { CandleUpdate } from "../providers/types.js";
 
@@ -8,7 +8,8 @@ type ClientMsg = { type: "subscribe"; symbol: string; timeframe: string; include
 
 /**
  * /ws — one subscription per socket: {type:"subscribe", symbol, timeframe, includeLowQuality?, includeInvalidated?}.
- * Server pushes: candle (every tick), analysis (on candle close or every ~15s), alert (when triggered), status.
+ * Server pushes: candle (every tick), analysis (on candle close or every ~15s), alert (when triggered),
+ * status (provider health + this instrument's feed state, on subscribe and with every analysis push).
  */
 export default async function realtime(app: FastifyInstance, ctx: AppContext) {
   await app.register(websocket);
@@ -16,13 +17,20 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
   app.get("/ws", { websocket: true }, (socket) => {
     let unsub: (() => void) | undefined;
     let analysisTimer: NodeJS.Timeout | undefined;
-    let current: { symbol: string; timeframe: Timeframe; includeLowQuality: boolean; includeInvalidated: boolean } | undefined;
+    let current: { symbol: string; instrument: Instrument; timeframe: Timeframe; includeLowQuality: boolean; includeInvalidated: boolean } | undefined;
     const send = (o: unknown) => { if (socket.readyState === 1) socket.send(JSON.stringify(o)); };
 
     const offAlert = ctx.alerts.onTrigger((e) => { if (current && e.alert.symbol === current.symbol) send({ type: "alert", event: e }); });
 
+    const pushStatus = () => {
+      if (!current) return;
+      const provider = ctx.providers.for(current.instrument);
+      send({ type: "status", provider: provider.status(), feed: ctx.providers.feed(current.instrument) });
+    };
+
     const pushAnalysis = async () => {
       if (!current) return;
+      pushStatus();
       try {
         const r = await ctx.analysis.run(current.symbol, current.timeframe, { force: true, includeLowQuality: current.includeLowQuality, includeInvalidated: current.includeInvalidated });
         send({ type: "analysis", result: r });
@@ -41,9 +49,9 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
         const instrument = findInstrument(msg.symbol);
         if (!instrument || !isTimeframe(msg.timeframe)) return send({ type: "error", message: "BAD_SUBSCRIPTION" });
         cleanup();
-        current = { symbol: instrument.symbol, timeframe: msg.timeframe, includeLowQuality: msg.includeLowQuality === true, includeInvalidated: msg.includeInvalidated === true };
+        current = { symbol: instrument.symbol, instrument, timeframe: msg.timeframe, includeLowQuality: msg.includeLowQuality === true, includeInvalidated: msg.includeInvalidated === true };
         const provider = ctx.providers.for(instrument);
-        send({ type: "status", provider: provider.status() });
+        pushStatus();
         unsub = provider.subscribe(instrument, msg.timeframe, (u: CandleUpdate) => {
           send({ type: "candle", update: u });
           if (u.closed) void pushAnalysis();

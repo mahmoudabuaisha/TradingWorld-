@@ -1,12 +1,12 @@
 import { WS_URL } from "./api";
 import type { AnalysisResult, Candle } from "@tradingworld/analysis-engine";
-import type { Timeframe } from "@tradingworld/shared";
+import type { Timeframe, ProviderStatus, FeedStatus } from "@tradingworld/shared";
 
 export type ServerMessage =
   | { type: "candle"; update: { symbol: string; timeframe: Timeframe; candle: Candle; closed: boolean; receivedAt: number } }
   | { type: "analysis"; result: AnalysisResult }
   | { type: "alert"; event: { message: { ar: string; en: string }; price: number } }
-  | { type: "status"; provider: { id: string; live: boolean; message?: string } }
+  | { type: "status"; provider: ProviderStatus; feed?: FeedStatus }
   | { type: "error"; message: string }
   | { type: "pong"; at: number };
 

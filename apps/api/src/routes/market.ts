@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { DEFAULT_INSTRUMENTS, findInstrument, candlesQuerySchema, analysisQuerySchema, aiChatSchema, TIMEFRAMES, PLATFORM_MODULES } from "@tradingworld/shared";
 import type { AppContext } from "../context.js";
+import { describeError } from "../providers/support/status.js";
 
 export default async function marketRoutes(app: FastifyInstance, ctx: AppContext) {
   app.get("/instruments", async () => ({ instruments: DEFAULT_INSTRUMENTS, timeframes: TIMEFRAMES }));
@@ -13,9 +14,23 @@ export default async function marketRoutes(app: FastifyInstance, ctx: AppContext
     const instrument = findInstrument(q.data.symbol);
     if (!instrument) return reply.code(404).send({ error: "UNKNOWN_INSTRUMENT" });
     const provider = ctx.providers.for(instrument);
-    const candles = await provider.getCandles(instrument, q.data.timeframe, q.data.limit, q.data.to);
-    return { symbol: instrument.symbol, timeframe: q.data.timeframe, provider: provider.id, status: provider.status(), candles };
+    try {
+      const candles = await provider.getCandles(instrument, q.data.timeframe, q.data.limit, q.data.to);
+      return { symbol: instrument.symbol, timeframe: q.data.timeframe, provider: provider.id, status: provider.status(), feed: ctx.providers.feed(instrument), candles };
+    } catch (e) {
+      // the source failed: say so with its state instead of a bare 500 (and never swap in demo data silently)
+      return reply.code(503).send({ error: "FEED_UNAVAILABLE", message: describeError(e), provider: provider.id, feed: ctx.providers.feed(instrument) });
+    }
   });
+
+  /** Where every instrument's data comes from and how fresh it is — the survey's legend of sources. */
+  app.get("/feeds", async () => ({
+    routes: ctx.providers.routes,
+    warnings: ctx.providers.warnings,
+    providers: ctx.providers.statuses(),
+    feeds: ctx.providers.feeds(),
+    generatedAt: Math.floor(Date.now() / 1000),
+  }));
 
   app.get("/analysis", async (req, reply) => {
     const q = analysisQuerySchema.safeParse(req.query);
@@ -44,6 +59,7 @@ export default async function marketRoutes(app: FastifyInstance, ctx: AppContext
         const r = await ctx.analysis.run(s, "15m");
         const instrument = findInstrument(s);
         const spark = instrument ? (await ctx.providers.for(instrument).getCandles(instrument, "15m", 48)).map((c) => c.close) : [];
+        const feed = instrument ? ctx.providers.feed(instrument) : undefined;
         const sweep = r.base.sweeps.filter((x) => x.reclaimed).slice(-1)[0];
         const first = spark[0] ?? r.lastPrice;
         return {
@@ -61,9 +77,13 @@ export default async function marketRoutes(app: FastifyInstance, ctx: AppContext
           lastSweep: sweep ? { side: sweep.side, level: sweep.level, poolKind: sweep.poolKind, displacementAfter: sweep.displacementAfter, time: sweep.time } : null,
           narrative: r.narrative,
           spark,
+          feed: feed ? { provider: feed.provider, state: feed.state, licensed: feed.licensed } : undefined,
         };
       } catch (e) {
-        return { symbol: s, error: (e as Error).message };
+        // keep the source and its state on a failed row so the sheet can say "binance · OFFLINE", not just "error"
+        const instrument = findInstrument(s);
+        const feed = instrument ? ctx.providers.feed(instrument) : undefined;
+        return { symbol: s, error: describeError(e), feed: feed ? { provider: feed.provider, state: feed.state, licensed: feed.licensed } : undefined };
       }
     }));
     return { rows, generatedAt: Math.floor(Date.now() / 1000) };

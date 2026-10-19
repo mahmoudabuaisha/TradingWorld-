@@ -51,6 +51,19 @@ describe("api", () => {
     expect(full.json().zones.length).toBeGreaterThanOrEqual(plain.json().zones.length);
   });
 
+  it("feeds: every instrument reports its source and state; candles carry the feed", async () => {
+    const f = await app.inject({ method: "GET", url: "/api/v1/feeds" });
+    expect(f.statusCode).toBe(200);
+    const body = f.json();
+    expect(body.feeds.length).toBe(10);
+    expect(body.feeds.every((x: { provider: string; state: string }) => x.provider === "demo" && x.state === "LIVE")).toBe(true);
+    expect(body.providers[0]).toMatchObject({ id: "demo", transport: "synthetic", licensed: false });
+    const c = await app.inject({ method: "GET", url: "/api/v1/candles?symbol=EURUSD&timeframe=15m&limit=60" });
+    expect(c.json().feed).toMatchObject({ symbol: "EURUSD", provider: "demo", state: "LIVE" });
+    const h = await app.inject({ method: "GET", url: "/api/v1/health" });
+    expect(h.json().routes).toEqual({});
+  });
+
   it("ai chat answers deterministically without a key", async () => {
     const r = await app.inject({ method: "POST", url: "/api/v1/ai/chat", payload: { symbol: "XAUUSD", timeframe: "5m", question: "ماذا يحدث على الفريمات الأعلى؟", locale: "ar" } });
     expect(r.statusCode).toBe(200);

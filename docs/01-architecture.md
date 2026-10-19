@@ -4,7 +4,7 @@
 TradingWorld نظام واحد مترابط وليس 60 صفحة منفصلة. الربط يتم عبر **IDs** مشتركة: `Instrument.symbol` · `Zone.id` · `Trade.id` · `Strategy/Setup.id` · `Snapshot.id`، وكل كيان يحمل `engineVersion/scoringVersion` إن كان تحليليًا.
 
 ```
-User ─► Web (Next.js) ─► API (Fastify) ─► Engine (TS) ─► Providers (demo/binance/twelvedata/…)
+User ─► Web (Next.js) ─► API (Fastify) ─► Engine (TS) ─► Providers (demo/binance/twelvedata/polygon — موجَّهة حسب فئة الأصل)
                                    │                └─► Repositories ─► Postgres/Timescale · Redis
                                    └─► WS /ws (candle · analysis · alert · status)
 Offline: Zone log + Outcomes ─► services/ml (walk-forward) ─► weight proposal ─► human approval ─► new SCORING_VERSION
@@ -23,7 +23,7 @@ Offline: Zone log + Outcomes ─► services/ml (walk-forward) ─► weight pro
 - `app.ts` يبني التطبيق ويحقن `AppContext` (config, repos, providers, analysis, ai, alerts).
 - Plugins: helmet · cors · rate-limit · jwt (`authenticate`, `requireRole`).
 - Routes تحت `/api/v1` (health, auth, market, user, admin). Realtime في `/ws`.
-- **ProviderRegistry**: يختار المزود لكل أداة ويرجع إلى `demo` دائمًا.
+- **ProviderRegistry**: يوجّه كل أداة إلى مزودها حسب فئة الأصل (`MARKET_DATA_ROUTES`)، يلفّ المزودين المرخصين بميزانية ومخزن شموع، يحسب حالة التدفق لكل أداة (`LIVE/DELAYED/STALE/CLOSED/OFFLINE`)، ويرجع إلى `demo` مع تحذير مرئي.
 - **AnalysisService**: يجلب الشموع الأساسية + شموع HTF الصريحة، يشغّل المحرك، يخزّن مؤقتًا (TTL 5s)، يسجل المناطق (`zoneLog`).
 - **AlertService**: تقييم لحظي للتنبيهات على كل tick/تحليل.
 - **AiService**: Claude عبر SDK الرسمي (system prompt مثبت + prompt caching) أو مُفسِّر حتمي.
@@ -61,7 +61,7 @@ Postgres + TimescaleDB. الشموع hypertable مضغوطة بعد 30 يومً�
 6. المستخدم يضغط منطقة → `ZoneDetails` (أسباب/عوامل/ضعف/إبطال) → يسأل الـAI → `/ai/chat` مؤسَّس على نفس JSON.
 
 ## 4. قابلية التوسع
-- **مزود جديد**: ملف واحد يطبق `MarketDataProvider` + سطر في `ProviderRegistry`.
+- **مزود جديد**: ملف واحد يطبق `MarketDataProvider` (يستفيد من `providers/support`: ميزانية، مخزن، مجمّع تكّات، socket) + سطر في `ProviderRegistry` + رموزه في `Instrument Master`.
 - **عامل تحليلي جديد**: detector + factor key + وزن (مع bump للإصدار) + نص دليل ar/en.
 - **وحدة منتج جديدة**: سطر في `modules.ts` + مسار في `apps/web/src/app`.
 - **أفقيًا**: API stateless (JWT) → عدة instances خلف load balancer + Redis pub/sub للـWS.

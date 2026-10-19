@@ -23,7 +23,7 @@ TradingWorld هي بيئة متكاملة للمتداول: **شارت + محر�
 |---|---|
 | **[PROJECT.md](./PROJECT.md)** | فهم بنية وتخطيط المشروع بالكامل: المعمارية، التقنيات، مزودو البيانات، معمارية الـAI، قاعدة البيانات، الـAPI، خارطة الطريق، التقديرات الزمنية والتكلفة، خطة الأمان |
 | **[PROGRESS.md](./PROGRESS.md)** | سجل التقدم: حالة كل وحدة من الـ60 وحدة + سجل التعديلات والإضافات + خانة الاعتماد لكل جزئية |
-| [docs/](./docs) | الوثائق التفصيلية (12 وثيقة + 5 قرارات معمارية ADR) |
+| [docs/](./docs) | الوثائق التفصيلية (12 وثيقة + 6 قرارات معمارية ADR) |
 | [docs/12-design-system-kharita.md](./docs/12-design-system-kharita.md) | نظام التصميم «خريطة»: الرموز، المكوّنات، الأوراق، الوصولية، ولوحة الألوان الكلاسيكية |
 
 ## 🏗️ هيكل المستودع
@@ -60,14 +60,14 @@ pnpm dev:web                   # http://localhost:3000
 ```
 
 - أول حساب يُسجَّل يصبح **Admin** تلقائيًا (بيئة التطوير).
-- لبيانات حقيقية: اضبط `MARKET_DATA_PROVIDER=binance` (كريبتو، بدون مفتاح) أو `twelvedata` مع `TWELVEDATA_API_KEY`.
+- لبيانات حقيقية: وجّه كل فئة أصول إلى مزودها، مثل `MARKET_DATA_ROUTES=forex=twelvedata,metal=twelvedata,crypto=binance` مع `TWELVEDATA_API_KEY` (و`POLYGON_API_KEY` للأسهم)، ثم افحص المسار: `pnpm --filter @tradingworld/api feed:check XAUUSD 5m 30`. ما لم يُوجَّه يُخدَم من `demo` ويظهر تحذير في `/health` ولوحة الإدارة. التفاصيل والخطط وقائمة ما قبل التوقيع في `docs/03-data-providers.md`.
 - لتفعيل شرح الـLLM: `AI_PROVIDER=anthropic` و `ANTHROPIC_API_KEY=...` — وبدونه يعمل **المُفسِّر الحتمي** (مؤسَّس على البيانات، بلا تكلفة).
 
 ### الاختبارات والفحص
 
 ```bash
 pnpm typecheck      # كل الحزم
-pnpm test           # engine (14) + api (6)
+pnpm test           # engine (15) + api (27)
 cd services/ml && pip install -e ".[dev]" && pytest -q   # ml (3)
 ```
 

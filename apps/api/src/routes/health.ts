@@ -8,7 +8,9 @@ export default async function healthRoutes(app: FastifyInstance, ctx: AppContext
     uptime: process.uptime(),
     engineVersion: ENGINE_VERSION,
     scoringVersion: SCORING_VERSION,
-    providers: ctx.providers.all().map((p) => p.status()),
+    providers: ctx.providers.statuses(),
+    routes: ctx.providers.routes,
+    warnings: ctx.providers.warnings,
     ai: ctx.ai.enabled ? "anthropic" : "deterministic",
   }));
 }

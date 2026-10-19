@@ -1,6 +1,6 @@
 import { SyntheticMarket, mulberry32, hashSeed, type Candle } from "@tradingworld/analysis-engine";
 import { TIMEFRAME_SECONDS, type Timeframe, type Instrument } from "@tradingworld/shared";
-import type { MarketDataProvider, CandleUpdate, ProviderStatus } from "./types.js";
+import type { MarketDataProvider, CandleUpdate, ProviderStatus, LastSeen } from "./types.js";
 
 const START_PRICES: Record<string, { price: number; vol: number }> = {
   XAUUSD: { price: 2650, vol: 0.00045 },
@@ -15,6 +15,8 @@ const START_PRICES: Record<string, { price: number; vol: number }> = {
   USOIL: { price: 72.5, vol: 0.0008 },
 };
 
+export const DEMO_MESSAGE = "Synthetic demo data — not real market prices";
+
 /**
  * Deterministic synthetic market: 60k 1-minute bars per symbol resampled to any timeframe,
  * plus a simulated live tick stream that mutates the current candle. No network, no key.
@@ -23,8 +25,10 @@ export class DemoProvider implements MarketDataProvider {
   readonly id = "demo" as const;
   private market = new SyntheticMarket(60_000);
   private lastUpdate = Date.now();
+  private lastEventTime = Math.floor(Date.now() / 1000);
   /** live overlay: symbol → in-progress candle per timeframe */
   private live = new Map<string, Candle>();
+  private seen = new Map<string, LastSeen>();
   private rnd = mulberry32(hashSeed("demo-live"));
 
   supports(): boolean { return true; }
@@ -38,7 +42,9 @@ export class DemoProvider implements MarketDataProvider {
     const series = this.market.candles(i.symbol, tf, price, vol, limit, to);
     const key = `${i.symbol}:${tf}`;
     const overlay = this.live.get(key);
-    if (!to && overlay && series.length && overlay.time === series[series.length - 1]!.time) {
+    const last = series[series.length - 1];
+    if (last) this.seen.set(i.symbol, { receivedAt: Date.now(), eventTime: last.time });
+    if (!to && overlay && last && overlay.time === last.time) {
       return [...series.slice(0, -1), overlay];
     }
     return series;
@@ -51,26 +57,31 @@ export class DemoProvider implements MarketDataProvider {
       const series = await this.getCandles(i, tf, 2);
       const last = series[series.length - 1]!;
       const now = Math.floor(Date.now() / 1000);
+      const receivedAt = Date.now();
       const bucket = Math.floor(now / step) * step;
       const sigma = last.close * this.params(i).vol * 0.35;
       const delta = (this.rnd() - 0.5) * 2 * sigma;
       let candle: Candle;
-      let closed = false;
       if (bucket > last.time) {
+        // the previous candle is final: emit it closed, then open the new bucket
+        onUpdate({ symbol: i.symbol, timeframe: tf, candle: last, closed: true, receivedAt, eventTime: now });
         candle = { time: bucket, open: last.close, high: Math.max(last.close, last.close + delta), low: Math.min(last.close, last.close + delta), close: last.close + delta, volume: 10 };
-        closed = true; // previous candle closed
       } else {
         const close = last.close + delta;
         candle = { ...last, close, high: Math.max(last.high, close), low: Math.min(last.low, close), volume: (last.volume ?? 0) + 5 };
       }
       this.live.set(key, candle);
-      this.lastUpdate = Date.now();
-      onUpdate({ symbol: i.symbol, timeframe: tf, candle, closed, receivedAt: Date.now() });
+      this.lastUpdate = receivedAt;
+      this.lastEventTime = now;
+      this.seen.set(i.symbol, { receivedAt, eventTime: now });
+      onUpdate({ symbol: i.symbol, timeframe: tf, candle, closed: false, receivedAt, eventTime: now });
     }, 1000);
     return () => clearInterval(timer);
   }
 
+  lastSeen(symbol: string): LastSeen | undefined { return this.seen.get(symbol); }
+
   status(): ProviderStatus {
-    return { id: this.id, live: true, lastUpdate: this.lastUpdate, message: "Synthetic demo data — not real market prices" };
+    return { id: this.id, live: true, state: "LIVE", transport: "synthetic", licensed: false, lastUpdate: this.lastUpdate, lastEventTime: this.lastEventTime, message: DEMO_MESSAGE };
   }
 }
