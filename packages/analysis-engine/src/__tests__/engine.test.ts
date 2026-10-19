@@ -1,0 +1,64 @@
+import { describe, it, expect } from "vitest";
+import { analyze } from "../engine.js";
+import { SyntheticMarket } from "../data/synthetic.js";
+import { FACTOR_WEIGHTS } from "../scoring/weights.js";
+import { answerDeterministic, buildGrounding } from "../explain/llm.js";
+
+const market = new SyntheticMarket(20_000, 1_720_000_000);
+const base = market.candles("XAUUSD", "5m", 2350, 0.0006, 1500);
+const htf = {
+  "1h": market.candles("XAUUSD", "1h", 2350, 0.0006, 300),
+  "4h": market.candles("XAUUSD", "4h", 2350, 0.0006, 120),
+  "1d": market.candles("XAUUSD", "1d", 2350, 0.0006, 40),
+};
+
+describe("engine", () => {
+  it("scoring weights sum to 100", () => {
+    expect(Object.values(FACTOR_WEIGHTS).reduce((a, b) => a + b, 0)).toBe(100);
+  });
+
+  it("is deterministic", () => {
+    const a = analyze({ symbol: "XAUUSD", timeframe: "5m", candles: base, htfCandles: htf, now: 1 });
+    const b = analyze({ symbol: "XAUUSD", timeframe: "5m", candles: base, htfCandles: htf, now: 1 });
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+
+  it("produces explainable zones with factor breakdown, lifecycle and invalidation", () => {
+    const r = analyze({ symbol: "XAUUSD", timeframe: "5m", candles: base, htfCandles: htf, now: 1, options: { includeLowQuality: true } });
+    expect(r.engineVersion).toBeTruthy();
+    expect(r.htf.length).toBeGreaterThan(0);
+    expect(r.zones.length).toBeGreaterThan(0);
+    for (const z of r.zones) {
+      expect(z.top).toBeGreaterThan(z.bottom);
+      expect(z.factors.length).toBe(10);
+      expect(z.score).toBe(z.factors.reduce((s, f) => s + f.contribution, 0));
+      expect(z.name).not.toMatch(/Zone \d/);
+      expect(z.status).not.toBe("INVALIDATED");
+      expect(z.explanation.invalidation.en).toContain("invalidates");
+      expect(z.explanation.summary.ar.length).toBeGreaterThan(10);
+    }
+    // sorted by score desc within tiers and limited
+    const highs = r.zones.filter((z) => z.quality === "HIGH");
+    expect(highs.length).toBeLessThanOrEqual(3);
+  });
+
+  it("hides low quality zones by default", () => {
+    const r = analyze({ symbol: "XAUUSD", timeframe: "5m", candles: base, htfCandles: htf, now: 1 });
+    expect(r.zones.every((z) => z.quality !== "LOW")).toBe(true);
+  });
+
+  it("deterministic explainer answers from structured data only", () => {
+    const r = analyze({ symbol: "XAUUSD", timeframe: "5m", candles: base, htfCandles: htf, now: 1, options: { includeLowQuality: true } });
+    const why = answerDeterministic(r, "لماذا وضعت هذه المنطقة؟", "ar");
+    expect(why).toContain("/100");
+    const htfAnswer = answerDeterministic(r, "What happens on higher timeframes?", "en");
+    expect(htfAnswer).toContain("1h");
+    const g = buildGrounding(r, "en");
+    expect(g.zones.length).toBe(r.zones.length);
+    expect(g.engineVersion).toBe(r.engineVersion);
+  });
+
+  it("rejects too little data", () => {
+    expect(() => analyze({ symbol: "X", timeframe: "5m", candles: base.slice(0, 10) })).toThrow();
+  });
+});

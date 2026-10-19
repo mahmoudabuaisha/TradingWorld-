@@ -1,0 +1,315 @@
+// TradingWorld — database schema (PostgreSQL 16 + TimescaleDB)
+// Candles live in a Timescale hypertable created by prisma/sql/0001_timescale.sql.
+// Every analytical artefact is versioned (engineVersion / scoringVersion) so results are reproducible.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  user
+  student
+  coach
+  moderator
+  admin
+  developer
+}
+
+enum AssetClass {
+  forex
+  metal
+  crypto
+  index
+  stock
+  commodity
+}
+
+enum ZoneStatus {
+  DETECTED
+  CONFIRMED
+  ACTIVE
+  TESTED
+  REACTED
+  WEAKENED
+  INVALIDATED
+}
+
+enum ZoneQuality {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum AlertKind {
+  price_above
+  price_below
+  zone_enter
+}
+
+enum TradeDirection {
+  long
+  short
+}
+
+// ── Identity & access ─────────────────────────────────────────
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  role         Role     @default(user)
+  settings     Json     @default("{}")
+  twoFactorSecret String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions   Session[]
+  watchlists Watchlist[]
+  alerts     Alert[]
+  trades     Trade[]
+  notes      Note[]
+  feedback   ZoneFeedback[]
+  audit      AuditLog[]
+  goals      Goal[]
+}
+
+model Session {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  device     String?
+  ip         String?
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  @@index([userId])
+}
+
+// ── Instruments & market data ─────────────────────────────────
+model Instrument {
+  symbol          String     @id
+  name            String
+  nameAr          String
+  assetClass      AssetClass
+  base            String
+  quote           String
+  pricePrecision  Int
+  pipSize         Float
+  contractSize    Float
+  sessionTimezone String     @default("UTC")
+  providerSymbols Json       @default("{}")
+  active          Boolean    @default(true)
+
+  candles Candle[]
+  zones   Zone[]
+  alerts  Alert[]
+}
+
+/// Hypertable (see sql/0001_timescale.sql). Primary key = (symbol, timeframe, time).
+model Candle {
+  symbol     String
+  instrument Instrument @relation(fields: [symbol], references: [symbol])
+  timeframe  String
+  time       DateTime
+  open       Float
+  high       Float
+  low        Float
+  close      Float
+  volume     Float?
+  provider   String
+  @@id([symbol, timeframe, time])
+  @@index([symbol, timeframe, time(sort: Desc)])
+}
+
+// ── Analysis artefacts ────────────────────────────────────────
+model EngineVersion {
+  id             String   @id @default(uuid())
+  engineVersion  String
+  scoringVersion String
+  weights        Json
+  notes          String?
+  active         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  @@unique([engineVersion, scoringVersion])
+}
+
+model Zone {
+  id             String      @id
+  symbol         String
+  instrument     Instrument  @relation(fields: [symbol], references: [symbol])
+  timeframe      String
+  engineVersion  String
+  scoringVersion String
+  origin         String
+  direction      String
+  name           String
+  nameAr         String
+  top            Float
+  bottom         Float
+  score          Int
+  quality        ZoneQuality
+  status         ZoneStatus
+  tests          Int         @default(0)
+  factors        Json        // Factor[] with evidence — the explainability record
+  htfContext     Json
+  invalidation   Float
+  createdTime    DateTime
+  detectedAt     DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  outcome        ZoneOutcome?
+  feedback       ZoneFeedback[]
+  alerts         Alert[]
+  @@index([symbol, timeframe, detectedAt(sort: Desc)])
+  @@index([engineVersion, scoringVersion])
+}
+
+/// Market outcome, filled by the outcome tracker when the zone's lifecycle ends — ML training label.
+model ZoneOutcome {
+  zoneId        String     @id
+  zone          Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  finalStatus   ZoneStatus
+  mfeAtr        Float
+  maeAtr        Float
+  barsToOutcome Int
+  retests       Int
+  reactionAtr   Float
+  regime        Json
+  session       String
+  resolvedAt    DateTime   @default(now())
+}
+
+/// User preference feedback — deliberately separate from market outcome data.
+model ZoneFeedback {
+  id        String   @id @default(uuid())
+  zoneId    String
+  zone      Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  useful    Boolean
+  bestFactor String?
+  comment   String?
+  createdAt DateTime @default(now())
+  @@unique([zoneId, userId])
+}
+
+model BacktestRun {
+  id             String   @id @default(uuid())
+  symbol         String
+  timeframe      String
+  fromTime       DateTime
+  toTime         DateTime
+  engineVersion  String
+  scoringVersion String
+  params         Json
+  results        Json
+  createdAt      DateTime @default(now())
+}
+
+// ── User workspace ────────────────────────────────────────────
+model Watchlist {
+  id      String   @id @default(uuid())
+  userId  String
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name    String   @default("default")
+  symbols String[]
+  @@unique([userId, name])
+}
+
+model Alert {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol      String
+  instrument  Instrument @relation(fields: [symbol], references: [symbol])
+  kind        AlertKind
+  price       Float?
+  zoneId      String?
+  zone        Zone?     @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  note        String?
+  active      Boolean   @default(true)
+  triggeredAt DateTime?
+  createdAt   DateTime  @default(now())
+  @@index([userId, active])
+  @@index([symbol, active])
+}
+
+model Trade {
+  id         String         @id @default(uuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol     String
+  direction  TradeDirection
+  entry      Float
+  stopLoss   Float
+  takeProfit Float?
+  exitPrice  Float?
+  size       Float
+  riskAmount Float?
+  rMultiple  Float?
+  openedAt   DateTime
+  closedAt   DateTime?
+  setup      String?
+  strategy   String?
+  reason     String?
+  emotion    String?
+  notes      String?
+  zoneId     String?        // Trade-to-Chart linking
+  snapshotId String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  @@index([userId, openedAt(sort: Desc)])
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  tags      String[]
+  linkedType String?   // instrument | trade | zone | strategy
+  linkedId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId])
+}
+
+model Goal {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  period    String   // daily | weekly | monthly | yearly
+  target    Int
+  progress  Int      @default(0)
+  dueAt     DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, period])
+}
+
+// ── Platform ──────────────────────────────────────────────────
+model AuditLog {
+  id      String   @id @default(uuid())
+  at      DateTime @default(now())
+  actorId String?
+  actor   User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action  String
+  target  String?
+  meta    Json?
+  ip      String?
+  @@index([at(sort: Desc)])
+  @@index([actorId])
+}
+
+model FeatureFlag {
+  key       String  @id
+  enabled   Boolean @default(false)
+  rollout   Int     @default(100)
+  note      String?
+}

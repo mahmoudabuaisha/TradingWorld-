@@ -1,0 +1,35 @@
+# dependencies
+node_modules/
+.pnpm-store/
+# builds
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+coverage/
+# env & secrets
+.env
+.env.*
+!.env.example
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+# prisma
+packages/db/generated/
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+# data caches
+data/cache/

@@ -1,0 +1,24 @@
+{
+  "name": "tradingworld",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TradingWorld — AI Market Intelligence platform for traders (analysis engine, chart, journal, academy, community).",
+  "packageManager": "pnpm@10.34.7",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter ./apps/* dev",
+    "dev:web": "pnpm --filter @tradingworld/web dev",
+    "dev:api": "pnpm --filter @tradingworld/api dev",
+    "build": "pnpm -r build",
+    "build:packages": "pnpm -r --filter ./packages/* build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "clean": "pnpm -r exec rm -rf dist .next node_modules && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

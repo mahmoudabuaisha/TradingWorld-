@@ -1,0 +1,14 @@
+import type { FastifyInstance } from "fastify";
+import { ENGINE_VERSION, SCORING_VERSION } from "@tradingworld/analysis-engine";
+import type { AppContext } from "../context.js";
+
+export default async function healthRoutes(app: FastifyInstance, ctx: AppContext) {
+  app.get("/health", async () => ({
+    ok: true,
+    uptime: process.uptime(),
+    engineVersion: ENGINE_VERSION,
+    scoringVersion: SCORING_VERSION,
+    providers: ctx.providers.all().map((p) => p.status()),
+    ai: ctx.ai.enabled ? "anthropic" : "deterministic",
+  }));
+}

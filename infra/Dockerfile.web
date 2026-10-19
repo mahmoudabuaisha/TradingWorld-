@@ -1,0 +1,16 @@
+FROM node:22-alpine AS build
+RUN corepack enable
+WORKDIR /repo
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* .npmrc tsconfig.base.json ./
+COPY packages ./packages
+COPY apps/web ./apps/web
+RUN pnpm install --frozen-lockfile || pnpm install
+RUN pnpm --filter ./packages/* build && pnpm --filter @tradingworld/web build
+
+FROM node:22-alpine
+RUN corepack enable
+WORKDIR /repo
+ENV NODE_ENV=production
+COPY --from=build /repo ./
+EXPOSE 3000
+CMD ["pnpm", "--filter", "@tradingworld/web", "start"]

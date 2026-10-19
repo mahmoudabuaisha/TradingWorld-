@@ -1,0 +1,79 @@
+version: "3.9"
+
+# Local infrastructure for TradingWorld.
+#   docker compose up -d        → Postgres(Timescale) + Redis
+#   docker compose --profile app up → also builds api + web images
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: tw-db
+    environment:
+      POSTGRES_USER: tradingworld
+      POSTGRES_PASSWORD: tradingworld
+      POSTGRES_DB: tradingworld
+    ports:
+      - "5432:5432"
+    volumes:
+      - tw-db-data:/var/lib/postgresql/data
+      - ./packages/db/prisma/sql/0001_timescale.sql:/docker-entrypoint-initdb.d/0001_timescale.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tradingworld"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: tw-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - tw-redis-data:/data
+
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    container_name: tw-api
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://tradingworld:tradingworld@db:5432/tradingworld?schema=public
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.web
+    container_name: tw-web
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXT_PUBLIC_WS_URL: ws://localhost:4000/ws
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+  ml:
+    profiles: ["ml"]
+    build:
+      context: ./services/ml
+    container_name: tw-ml
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  tw-db-data:
+  tw-redis-data:
