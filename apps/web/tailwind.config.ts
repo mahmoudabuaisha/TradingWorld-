@@ -18,6 +18,8 @@ const config: Config = {
         ink: { DEFAULT: "var(--ink)", 2: "var(--ink-2)", 3: "var(--ink-3)" },
         up: "var(--up)",
         down: "var(--down)",
+        "up-ink": "var(--up-ink)",
+        "down-ink": "var(--down-ink)",
         stamp: "var(--stamp)",
         "up-wash": "var(--up-wash)",
         "down-wash": "var(--down-wash)",

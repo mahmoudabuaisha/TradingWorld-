@@ -47,7 +47,7 @@ export function RiskCalculator({ mode = "risk" }: { mode?: "risk" | "position" }
             ["Potential loss", r.potentialLoss], ["Potential profit", r.potentialProfit ?? "—"], ["R multiple", r.rMultiple ?? "—"], ["R:R", r.riskReward ?? "—"],
           ] as [string, string | number][]).map(([k, v]) => <div key={k} className="rounded border border-hair p-2"><dt className="text-[11px] text-ink-2">{k}</dt><dd className="font-mono text-base text-ink">{v}</dd></div>)}
         </dl>
-        {r.warnings.length > 0 && <ul className="mt-3 space-y-1 text-xs text-down">{r.warnings.map((w) => <li key={w}>⚠ {WARN[w as keyof typeof WARN]?.[locale] ?? w}</li>)}</ul>}
+        {r.warnings.length > 0 && <ul className="mt-3 space-y-1 text-xs text-down-ink">{r.warnings.map((w) => <li key={w}>⚠ {WARN[w as keyof typeof WARN]?.[locale] ?? w}</li>)}</ul>}
       </div>
     </div>
   );

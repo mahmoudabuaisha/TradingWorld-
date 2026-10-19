@@ -41,7 +41,7 @@ Base URL: `http://localhost:4000/api/v1` · JSON · `Authorization: Bearer <jwt>
 |---|---|---|
 | GET/PUT | `/watchlist` | `{ symbols[] }` |
 | GET/POST/DELETE | `/alerts`, `/alerts/:id` | `{ symbol, kind: price_above|price_below|zone_enter, price?, zoneId?, note? }` |
-| GET/POST/PATCH/DELETE | `/journal`, `/journal/:id` | `{ symbol, direction, entry, stopLoss, takeProfit?, exitPrice?, size, openedAt, setup?, strategy?, reason?, emotion?, notes?, zoneId? }` → يحسب `rMultiple` |
+| GET/POST/PATCH/DELETE | `/journal`, `/journal/:id` | `{ symbol, direction, entry, stopLoss, takeProfit?, exitPrice?, size, openedAt, closedAt?, setup?, strategy?, reason?, emotion?, notes?, zoneId? }` → يحسب `rMultiple` · `openedAt/closedAt` بثواني Unix (UTC) |
 | PATCH | `/settings` | أي JSON يُدمج في `user.settings` |
 
 ## Admin 🔒 (role ≥ admin)

@@ -1,97 +1,40 @@
-<div align="center">
+# @tradingworld/analysis-engine
 
-# TradingWorld
-
-**AI Market Intelligence Platform — منصة ذكاء الأسواق القابل للتفسير**
-
-> «Detect → Analyze → Connect → Score → Explain → Learn → Improve»
-
-[![CI](https://github.com/mahmoudabuaisha/TradingWorld-/actions/workflows/ci.yml/badge.svg)](https://github.com/mahmoudabuaisha/TradingWorld-/actions/workflows/ci.yml)
-![Engine](https://img.shields.io/badge/engine-v1.0.0-d5b15d) ![Scoring](https://img.shields.io/badge/scoring-v1-d5b15d) ![Status](https://img.shields.io/badge/status-MVP%20scaffold-37c7a0)
-
-</div>
-
-TradingWorld هي بيئة متكاملة للمتداول: **شارت + محرك تحليل حتمي قابل للتفسير + مساعد AI مؤسَّس على البيانات + سجل تداول + أدوات + أكاديمية + مجتمع** — في مكان واحد وبنظام قابل للتوسع من اليوم الأول.
-
-المنصة **ليست** بروكرًا، ولا تنفذ صفقات، ولا تعطي إشارات شراء/بيع، ولا تعد بالربح. المنتج الحقيقي هو **محرك التحليل خلف الشارت**.
-
----
-
-## 📚 ابدأ من هنا
-
-| الملف | الغرض |
-|---|---|
-| **[PROJECT.md](./PROJECT.md)** | فهم بنية وتخطيط المشروع بالكامل: المعمارية، التقنيات، مزودو البيانات، معمارية الـAI، قاعدة البيانات، الـAPI، خارطة الطريق، التقديرات الزمنية والتكلفة، خطة الأمان |
-| **[PROGRESS.md](./PROGRESS.md)** | سجل التقدم: حالة كل وحدة من الـ60 وحدة + سجل التعديلات والإضافات + خانة الاعتماد لكل جزئية |
-| [docs/](./docs) | الوثائق التفصيلية (11 وثيقة + قرارات معمارية ADR) |
-
-## 🏗️ هيكل المستودع
+المحرك الحتمي خلف الشارت — **المنتج الحقيقي** في TradingWorld. لا شبكات عصبية هنا، ولا LLM: كل منطقة ودرجة وشرح قابل لإعادة الإنتاج من نفس الشموع.
 
 ```
-TradingWorld-/
-├── apps/
-│   ├── web/                 # Next.js 15 — واجهة Premium داكنة، RTL/LTR، شارت + AI Zones + Chat + أدوات
-│   └── api/                 # Fastify 5 — Auth/JWT، مزودو بيانات، خدمة التحليل، تنبيهات، سجل، WebSocket، Admin
-├── packages/
-│   ├── analysis-engine/     # ⭐ المحرك: Swings · Structure (BOS/CHoCH) · FVG · OB · Liquidity · Sweeps ·
-│   │                        #   Sessions · PDH/PDL/PWH/PWL · Regime · MTF · Confluence Scoring · Zone Lifecycle ·
-│   │                        #   Explainer · LLM grounding — حتمي 100% ومختبَر
-│   ├── shared/              # الأنواع، الـschemas (zod)، سجل الـ60 وحدة، الأدوات، الحاسبات، الجلسات
-│   └── db/                  # Prisma schema (PostgreSQL + TimescaleDB) + SQL للـhypertable
-├── services/
-│   └── ml/                  # Python/FastAPI — Walk-forward validation، سجل نماذج، اقتراح أوزان (بدون نشر تلقائي)
-├── docs/                    # الوثائق التفصيلية + ADRs
-├── infra/                   # Dockerfiles
-├── docker-compose.yml       # Postgres(Timescale) + Redis (+ api/web/ml بـprofiles)
-└── .github/workflows/ci.yml # Typecheck · Test · Build (Node + Python)
+Candles ─► Detectors ─► Structured Factors ─► Confluence Scoring (versioned) ─► Zone Lifecycle ─► Explainer
 ```
 
-## 🚀 التشغيل محليًا (بدون أي مفاتيح أو قواعد بيانات)
+| الطبقة | الملفات | ماذا تفعل |
+|---|---|---|
+| الكشف | `src/detectors/*` | Swings · Structure (BOS/CHoCH) · FVG · Order Blocks · Liquidity pools & sweeps · Displacement · Key levels (PDH/PDL/PWH/PWL) · Regime |
+| متعدد الأطر | `src/mtf/aggregate.ts` | تجميع الإطارات الأعلى وربط المناطق بسياقها |
+| التقييم | `src/scoring/*` | 10 عوامل مجموعها 100 بأوزان مُنسَّخة (`SCORING_VERSION`) |
+| المناطق | `src/zones/*` | البناء، التسمية التحليلية، دورة الحياة `DETECTED → … → INVALIDATED` مع `invalidatedIndex` |
+| الشرح | `src/explain/*` | مُفسِّر حتمي + تأريض الـLLM (يستلم JSON ولا يخترع عوامل) |
+| الإصدار | `src/version.ts` | `ENGINE_VERSION` و `SCORING_VERSION` يُختمان على كل نتيجة |
+
+## الاستخدام
+
+```ts
+import { analyze } from "@tradingworld/analysis-engine";
+
+const result = analyze({
+  symbol: "BTCUSDT",
+  timeframe: "1h",
+  candles,                              // ≥ 50 شمعة
+  htfCandles: { "4h": candles4h },      // اختياري؛ ما ينقص يُجمَّع من السلسلة الأساسية
+  options: { keepInvalidatedBars: 120 } // اختياري: إبقاء المناطق المُبطلة حديثًا للعرض
+});
+result.zones[0].score;   // 0–100
+result.zones[0].factors; // كل عامل ووزنه ومساهمته في الدرجة
+```
+
+## الاختبارات
 
 ```bash
-# المتطلبات: Node 20+ و pnpm 10+
-pnpm install
-pnpm build:packages            # يبني shared + analysis-engine
-cp .env.example .env           # المزود الافتراضي demo (بيانات اصطناعية حتمية)
-
-pnpm dev:api                   # http://localhost:4000/api/v1  +  ws://localhost:4000/ws
-pnpm dev:web                   # http://localhost:3000
+pnpm --filter @tradingworld/analysis-engine test   # vitest — الكواشف + المحرك الكامل على بيانات اصطناعية حتمية
 ```
 
-- أول حساب يُسجَّل يصبح **Admin** تلقائيًا (بيئة التطوير).
-- لبيانات حقيقية: اضبط `MARKET_DATA_PROVIDER=binance` (كريبتو، بدون مفتاح) أو `twelvedata` مع `TWELVEDATA_API_KEY`.
-- لتفعيل شرح الـLLM: `AI_PROVIDER=anthropic` و `ANTHROPIC_API_KEY=...` — وبدونه يعمل **المُفسِّر الحتمي** (مؤسَّس على البيانات، بلا تكلفة).
-
-### الاختبارات والفحص
-
-```bash
-pnpm typecheck      # كل الحزم
-pnpm test           # engine (13) + api (5)
-cd services/ml && pip install -e ".[dev]" && pytest -q   # ml (3)
-```
-
-### البنية التحتية (اختياري)
-
-```bash
-docker compose up -d                 # TimescaleDB + Redis
-docker compose --profile app up      # + api + web
-```
-
-## 🧠 كيف يعمل المحرك؟
-
-```
-Market Data ─► Detection (deterministic) ─► Structured Factors ─► Scoring (versioned weights)
-            ─► Zone Lifecycle ─► Deterministic Explainer ─► (optional) LLM rephrase/Q&A grounded on JSON
-```
-
-- كل منطقة لها **اسم تحليلي** (مثل `1d Key Level + Sell-Side Liquidity Sweep + Bullish Displacement Demand Zone`)، درجة من 100 مع **تفصيل كل عامل**، حالة (`DETECTED → … → INVALIDATED`)، وشرط إبطال صريح.
-- الـLLM **لا يكتشف شيئًا**؛ يستلم JSON مُهيكلًا ويُمنع من اختراع عوامل. وبدونه تعمل الإجابات الحتمية.
-- كل نتيجة موسومة بـ`engineVersion` و`scoringVersion` لقابلية التتبع والرجوع.
-
-## ⚖️ إخلاء المسؤولية
-
-هذه المنصة أداة تحليل تعليمية وليست ضمانًا للربح أو توصية استثمارية. الأسواق المالية تنطوي على مخاطر، وأي قرار تداول مسؤولية المستخدم وحده.
-
----
-
-جميع الحقوق محفوظة © TradingWorld. الكود خاص بالمشروع وغير مرخص للاستخدام العام.
+القواعد الثابتة: لا نظرة مستقبلية (no look-ahead)، لا عشوائية، كل تغيير في الأوزان يرفع `SCORING_VERSION` (انظر ADR-0004).

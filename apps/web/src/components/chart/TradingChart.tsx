@@ -125,7 +125,7 @@ export function TradingChart({ candles, analysis, liveCandle, precision, selecte
       s.setMarkers(analysis.base.structure.events.slice(-12).map((e) => ({
         time: e.time as UTCTimestamp,
         position: e.direction === "bullish" ? "belowBar" : "aboveBar",
-        color: e.direction === "bullish" ? tk.up : tk.down,
+        color: e.direction === "bullish" ? tk.upInk : tk.downInk,
         shape: "circle",
         size: 0.4,
         text: e.kind,
@@ -237,7 +237,8 @@ export function TradingChart({ candles, analysis, liveCandle, precision, selecte
       const tall = yBot - yTop >= 18;
       const lx = x1 + 6 + tw + 6 > right ? Math.max(6, right - tw - 6) : x1 + 6;
       const ly = tall ? yTop + 12 : Math.max(yTop - 5, 12);
-      if (tall) labelBox(ctx, label, lx, ly, dead ? tk.ink3 : col); else { ctx.fillStyle = dead ? tk.ink3 : col; ctx.fillText(label, lx, ly); }
+      const textCol = dead ? tk.ink3 : dir === "up" ? tk.upInk : tk.downInk;
+      if (tall) labelBox(ctx, label, lx, ly, textCol); else { ctx.fillStyle = textCol; ctx.fillText(label, lx, ly); }
       // the stamp
       if (dead) {
         const bw = right - x1, bh = yBot - yTop;
@@ -266,8 +267,8 @@ export function TradingChart({ candles, analysis, liveCandle, precision, selecte
         labelBox(ctx, text, 8, y - 4, color);
       };
       line(yE, tk.ink, [], `ENTRY ${tr.entry.toFixed(precision)} · ${tr.direction.toUpperCase()}`);
-      line(yS, tk.down, [5, 4], `SL ${tr.stopLoss.toFixed(precision)}`);
-      if (yT !== null && tr.takeProfit !== undefined) line(yT, tk.up, [5, 4], `TP ${tr.takeProfit.toFixed(precision)}`);
+      line(yS, tk.downInk, [5, 4], `SL ${tr.stopLoss.toFixed(precision)}`);
+      if (yT !== null && tr.takeProfit !== undefined) line(yT, tk.upInk, [5, 4], `TP ${tr.takeProfit.toFixed(precision)}`);
       const risk = Math.abs(tr.entry - tr.stopLoss) || 1;
       const dx = 150;
       ctx.strokeStyle = tk.ink; ctx.lineWidth = 1;

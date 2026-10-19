@@ -11,7 +11,7 @@ export function TitleBlock({ analysis, provider, symbol, timeframe }: { analysis
       <div><b>HTF</b><span>{htf || "—"}</span></div>
       <div><b>REGIME</b><span>{analysis ? `${analysis.base.regime.trend} · ${analysis.base.regime.volatility} VOL` : "—"}</span></div>
       <div><b>SESSION</b><span>{analysis ? `${analysis.session.current}${analysis.session.overlap ? " / NY OVERLAP" : ""}` : "—"}</span></div>
-      <div><b>FEED</b><span className={provider?.live ? "text-up" : "text-down"}>{provider ? `${provider.id.toUpperCase()} · ${provider.live ? "LIVE" : "STALE"}` : "—"}</span></div>
+      <div><b>FEED</b><span className={provider?.live ? "text-up-ink" : "text-down-ink"}>{provider ? `${provider.id.toUpperCase()} · ${provider.live ? "LIVE" : "STALE"}` : "—"}</span></div>
       <div><b>ANALYSIS, NOT ADVICE</b><span>{analysis ? `${analysis.zones.length} ZONES · ${analysis.hiddenLowQuality} HIDDEN` : "—"}</span></div>
     </div>
   );

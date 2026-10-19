@@ -47,7 +47,7 @@ function line(r: OverviewRow, locale: "ar" | "en"): { glyph: string; text: strin
     ? locale === "ar" ? ` أقوى منطقة ${r.topZone.score}/100 · ${r.topZone.status}.` : ` Strongest zone ${r.topZone.score}/100 · ${r.topZone.status}.`
     : locale === "ar" ? " لا منطقة تتجاوز حد الجودة." : " No zone above the quality threshold.";
   const glyph = r.htfBias === "bullish" ? "▲" : r.htfBias === "bearish" ? "▼" : "≈";
-  const tone = r.htfBias === "bullish" ? "text-up" : r.htfBias === "bearish" ? "text-down" : "text-ink-3";
+  const tone = r.htfBias === "bullish" ? "text-up-ink" : r.htfBias === "bearish" ? "text-down-ink" : "text-ink-3";
   return { glyph, text: locale === "ar" ? `${name}: ${regime[0]} ${vol[0]}.${sweep}${zone}` : `${name}: ${regime[1]}, ${vol[1]}.${sweep}${zone}`, tone };
 }
 
@@ -117,7 +117,7 @@ export function DailySheet() {
                   <Link key={r.symbol} href="/chart" onClick={() => setSymbol(r.symbol)} className="grid grid-cols-[80px_1fr_auto_auto] items-center gap-3 px-5 py-2 hover:bg-raised">
                     <span className="mono text-sm font-semibold">{r.symbol}</span>
                     <Terrain values={r.spark ?? []} height={34} />
-                    <span className="mono text-end text-sm">{p.main}<span className="pip">{p.pip}</span><span className={`ms-2 text-xs ${(r.changePct ?? 0) >= 0 ? "text-up" : "text-down"}`}>{r.changePct !== undefined ? `${r.changePct >= 0 ? "+" : ""}${r.changePct.toFixed(2)}%` : ""}</span></span>
+                    <span className="mono text-end text-sm">{p.main}<span className="pip">{p.pip}</span><span className={`ms-2 text-xs ${(r.changePct ?? 0) >= 0 ? "text-up-ink" : "text-down-ink"}`}>{r.changePct !== undefined ? `${r.changePct >= 0 ? "+" : ""}${r.changePct.toFixed(2)}%` : ""}</span></span>
                     <span className={`sw ${r.htfBias === "bearish" ? "hatch-down" : "hatch-up"}`} title={r.htfBias} />
                   </Link>
                 );
@@ -131,7 +131,7 @@ export function DailySheet() {
             {token && open.length === 0 && <p className="mt-2 text-sm text-ink-3">{t(locale, "daily", "noOpen")}</p>}
             {open.map((tr) => (
               <div key={tr.id} className="mt-3 border-t border-hair pt-3">
-                <div className="flex flex-wrap items-center gap-2 text-xs"><span className="mono font-semibold">{tr.symbol}</span><span className={`chip ${tr.direction === "long" ? "text-up" : "text-down"}`}>{tr.direction}</span><span className="mono text-ink-3">{tr.size} lot</span>{tr.setup && <span className="chip">{tr.setup}</span>}</div>
+                <div className="flex flex-wrap items-center gap-2 text-xs"><span className="mono font-semibold">{tr.symbol}</span><span className={`chip ${tr.direction === "long" ? "text-up-ink" : "text-down-ink"}`}>{tr.direction}</span><span className="mono text-ink-3">{tr.size} lot</span>{tr.setup && <span className="chip">{tr.setup}</span>}</div>
                 <Dimension entry={tr.entry} stop={tr.stopLoss} target={tr.takeProfit} current={priceOf(tr.symbol)} direction={tr.direction} precision={findInstrument(tr.symbol)?.pricePrecision ?? 2} />
               </div>
             ))}
@@ -161,7 +161,7 @@ export function DailySheet() {
               <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-4"><SessionDial size={108} labels={false} /><div><div className="mono text-3xl font-medium leading-none">{clock.utc}<span className="text-base text-ink-3"> UTC</span></div><div className="mono mt-1 text-xs text-ink-3">LOCAL {clock.local}</div></div></div>
                 <div className="text-end text-xs">
-                  <div className="flex flex-wrap justify-end gap-1">{clock.sessions.map((s) => <span key={s} className={`chip ${s === "OFF" ? "" : "text-up"}`}>{sessionLabel(s)}</span>)}</div>
+                  <div className="flex flex-wrap justify-end gap-1">{clock.sessions.map((s) => <span key={s} className={`chip ${s === "OFF" ? "" : "text-up-ink"}`}>{sessionLabel(s)}</span>)}</div>
                   {clock.next && <div className="mono mt-1 text-ink-3">{t(locale, "shell", "nextSession")} {sessionLabel(clock.next.name)} · {fmtMinutes(clock.next.minutes)}</div>}
                 </div>
               </div>
@@ -171,7 +171,7 @@ export function DailySheet() {
 
           <div className="tblock sheet">
             <div><b>ENGINE</b><span>{health?.engineVersion ?? "…"}</span></div>
-            <div><b>FEED</b><span className={health?.providers[0]?.live ? "text-up" : "text-down"}>{health?.providers[0]?.id?.toUpperCase() ?? "OFFLINE"} · {health?.providers[0]?.live ? "LIVE" : "STALE"}</span></div>
+            <div><b>FEED</b><span className={health?.providers[0]?.live ? "text-up-ink" : "text-down-ink"}>{health?.providers[0]?.id?.toUpperCase() ?? "OFFLINE"} · {health?.providers[0]?.live ? "LIVE" : "STALE"}</span></div>
             <div><b>AI</b><span>{health?.ai?.toUpperCase() ?? "…"}</span></div>
             <div><b>SHEETS</b><span>{watchlist.length} WATCHED</span></div>
           </div>

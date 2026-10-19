@@ -39,13 +39,13 @@ export function SidePanel({ analysis, precision, selected, onSelect, provider }:
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto border-s border-hair">
       <div className="border-b border-hair px-3 py-2.5">
-        <div className="flex items-center justify-between"><span className="eyebrow">CONTEXT</span><span className={`chip ${provider?.live ? "text-up" : "text-down"}`} title={provider?.message}>{provider?.id ?? "?"} · {provider?.live ? "LIVE" : "STALE"}</span></div>
+        <div className="flex items-center justify-between"><span className="eyebrow">CONTEXT</span><span className={`chip ${provider?.live ? "text-up-ink" : "text-down-ink"}`} title={provider?.message}>{provider?.id ?? "?"} · {provider?.live ? "LIVE" : "STALE"}</span></div>
         <dl className="mt-2 space-y-1 text-xs">
           {rows.map(([k, v]) => <div key={k} className="flex justify-between gap-2 border-b border-dashed border-hair pb-1"><dt className="text-ink-3">{k}</dt><dd className="text-end">{v}</dd></div>)}
         </dl>
       </div>
       <div className="border-b border-hair px-3 py-2.5">
-        <div className="flex items-center justify-between"><span className="eyebrow">BIAS COMPASS</span><span className={`chip ${analysis.htfBias === "bullish" ? "text-up" : analysis.htfBias === "bearish" ? "text-down" : ""}`}>{t(locale, "chart", "dominant")} · {biasLabel(analysis.htfBias)[locale]}</span></div>
+        <div className="flex items-center justify-between"><span className="eyebrow">BIAS COMPASS</span><span className={`chip ${analysis.htfBias === "bullish" ? "text-up-ink" : analysis.htfBias === "bearish" ? "text-down-ink" : ""}`}>{t(locale, "chart", "dominant")} · {biasLabel(analysis.htfBias)[locale]}</span></div>
         <div className="mt-2"><BiasCompass frames={analysis.htf.map((h) => ({ timeframe: h.timeframe, bias: h.bias }))} size={50} /></div>
       </div>
       <div className="border-b border-hair px-3 py-2.5">

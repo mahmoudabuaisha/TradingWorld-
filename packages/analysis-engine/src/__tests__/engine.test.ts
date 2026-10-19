@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { analyze } from "../engine.js";
+import { evaluateLifecycle } from "../zones/lifecycle.js";
+import { candlesFrom } from "./helpers.js";
+import type { Zone } from "../types.js";
 import { SyntheticMarket } from "../data/synthetic.js";
 import { FACTOR_WEIGHTS } from "../scoring/weights.js";
 import { answerDeterministic, buildGrounding } from "../explain/llm.js";
@@ -71,6 +74,28 @@ describe("engine", () => {
     }
     // the live part of the output is unchanged by the option
     expect(kept.zones.filter((z) => z.status !== "INVALIDATED").map((z) => z.id)).toEqual(def.zones.map((z) => z.id));
+  });
+
+  it("lifecycle remembers a reaction even when the zone is invalidated later", () => {
+    // Demand zone 100–102. Price tests it (bar 1), closes 1 ATR away (bars 2–3), then closes through the bottom (bar 5).
+    const zone = { direction: "bullish", top: 102, bottom: 100, createdIndex: -1, factors: [] } as unknown as Zone;
+    const candles = candlesFrom([
+      [104, 105, 103, 104],
+      [104, 104.5, 100.5, 101.5], // test
+      [102.5, 104, 102.3, 103.5], // clear of the zone, close 1.5 ≥ ATR 1 above the top → reaction
+      [103.5, 105, 103, 104.5],
+      [104.5, 104.6, 101, 101.2],
+      [101.2, 101.5, 98, 99],     // close < bottom → invalidated
+    ]);
+    const life = evaluateLifecycle(zone, candles, 1);
+    expect(life.status).toBe("INVALIDATED");
+    expect(life.invalidatedIndex).toBe(5);
+    expect(life.firstTestIndex).toBe(1);
+    expect(life.reacted).toBe(true);
+    expect(life.reactedIndex).toBe(2);
+    const untouched = evaluateLifecycle(zone, candlesFrom([[104, 105, 103, 104], [104, 106, 103.5, 105.5]]), 1);
+    expect(untouched.reacted).toBe(false);
+    expect(untouched.firstTestIndex).toBeUndefined();
   });
 
   it("rejects too little data", () => {

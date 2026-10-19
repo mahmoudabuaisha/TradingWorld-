@@ -42,7 +42,7 @@ export function SheetBar({ onSearch }: { onSearch: () => void }) {
         {clock && (
           <div className="hidden items-center gap-2 lg:flex" title={`${t(locale, "shell", "session")}`}>
             <span className="mono text-sm">{clock.utc}<span className="text-ink-3"> UTC</span></span>
-            <span className={`chip ${clock.sessions[0] !== "OFF" ? "text-up" : ""}`}>{clock.overlap ? "LDN/NY" : sessionLabel(clock.sessions[0])}</span>
+            <span className={`chip ${clock.sessions[0] !== "OFF" ? "text-up-ink" : ""}`}>{clock.overlap ? "LDN/NY" : sessionLabel(clock.sessions[0])}</span>
             {clock.next && <span className="mono text-2xs text-ink-3">{sessionLabel(clock.next.name)} {fmtMinutes(clock.next.minutes)}</span>}
           </div>
         )}

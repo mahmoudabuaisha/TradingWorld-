@@ -25,7 +25,7 @@ export function TradingClock({ full = false }: { full?: boolean }) {
           <div className="font-mono text-sm text-ink-2">{locale === "ar" ? "المحلي" : "Local"}: {now.toLocaleTimeString("en-GB")}</div>
         </div>
         <div className="text-end text-sm">
-          <div>{locale === "ar" ? "الجلسة الحالية" : "Active"}: {active.map((a) => <span key={a} className={`chip ms-1 ${a === "OFF" ? "" : "text-up"}`}>{a}</span>)}</div>
+          <div>{locale === "ar" ? "الجلسة الحالية" : "Active"}: {active.map((a) => <span key={a} className={`chip ms-1 ${a === "OFF" ? "" : "text-up-ink"}`}>{a}</span>)}</div>
           {next && <div className="mt-1 text-ink-2">{locale === "ar" ? "التالية" : "Next"}: {sessionLabel(next.w.name)} {locale === "ar" ? "بعد" : "in"} {Math.floor(next.inH)}h {Math.round((next.inH % 1) * 60)}m</div>}
         </div>
       </div>

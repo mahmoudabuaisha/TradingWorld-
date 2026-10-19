@@ -13,7 +13,7 @@ export function ConfluenceStack({ factors, score, direction, locale, scale = 2.2
   const [lifted, setLifted] = useState<Set<string>>(new Set());
   const whatIf = useMemo(() => factors.reduce((s, f) => s + (f.present && !lifted.has(f.key) ? f.contribution : 0), 0), [factors, lifted]);
   const modified = lifted.size > 0;
-  const tone = direction === "bullish" ? { border: "border-up", wash: "bg-up-wash", text: "text-up" } : { border: "border-down", wash: "bg-down-wash", text: "text-down" };
+  const tone = direction === "bullish" ? { border: "border-up", wash: "bg-up-wash", text: "text-up-ink" } : { border: "border-down", wash: "bg-down-wash", text: "text-down-ink" };
   const L = (ar: string, en: string) => (locale === "ar" ? ar : en);
   const toggle = (key: string) => { if (!interactive) return; setLifted((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; }); };
   let idx = 0;

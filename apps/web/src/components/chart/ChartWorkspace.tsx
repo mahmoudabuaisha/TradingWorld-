@@ -97,11 +97,11 @@ export function ChartWorkspace() {
         </select>
         <span className="mono text-xl">{pipPrice(price, instrument.pricePrecision)}</span>
         <div className="flex flex-wrap gap-0.5" style={{ direction: "ltr" }}>
-          {TIMEFRAMES.map((tf) => <button key={tf} onClick={() => setTimeframe(tf as Timeframe)} className={`mono rounded px-2 py-1 text-xs ${tf === timeframe ? "bg-ink text-field" : "text-ink-3 hover:bg-raised hover:text-ink"}`}>{tf}</button>)}
+          {TIMEFRAMES.map((tf) => <button key={tf} onClick={() => setTimeframe(tf as Timeframe)} aria-pressed={tf === timeframe} className={`mono min-h-[32px] rounded px-2 py-1 text-xs ${tf === timeframe ? "bg-ink text-field" : "text-ink-3 hover:bg-raised hover:text-ink"}`}>{tf}</button>)}
         </div>
         <div className="flex overflow-hidden rounded-full border border-hair text-xs">
-          <button onClick={() => setMode("manual")} className={`px-3 py-1 ${mode === "manual" ? "bg-ink text-field" : "text-ink-3"}`}>{t(locale, "chart", "manual")}</button>
-          <button onClick={() => setMode("ai")} className={`px-3 py-1 ${mode === "ai" ? "bg-ink text-field" : "text-ink-3"}`}>{t(locale, "chart", "ai")}</button>
+          <button onClick={() => setMode("manual")} aria-pressed={mode === "manual"} className={`px-3 py-1 ${mode === "manual" ? "bg-ink text-field" : "text-ink-3"}`}>{t(locale, "chart", "manual")}</button>
+          <button onClick={() => setMode("ai")} aria-pressed={mode === "ai"} className={`px-3 py-1 ${mode === "ai" ? "bg-ink text-field" : "text-ink-3"}`}>{t(locale, "chart", "ai")}</button>
         </div>
         <span className="flex-1" />
         <span className="hidden text-xs text-ink-3 lg:inline">{locale === "ar" ? instrument.nameAr : instrument.name}</span>
@@ -109,7 +109,7 @@ export function ChartWorkspace() {
         <button className="btn-ghost px-2" onClick={() => void load()} aria-label="refresh"><Icon name="refresh" size={15} /></button>
       </div>
       {error && <div className="border-b border-stamp/40 bg-sheet px-4 py-2 text-xs text-stamp md:px-6">{error} · {locale === "ar" ? "تأكد من تشغيل الـ API على" : "make sure the API is running at"} {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}</div>}
-      {toast && <div className="border-b border-hair bg-raised px-4 py-2 text-xs md:px-6"><Icon name="bell" size={13} className="me-1 inline" />{toast}</div>}
+      {toast && <div role="status" className="border-b border-hair bg-raised px-4 py-2 text-xs md:px-6"><Icon name="bell" size={13} className="me-1 inline" />{toast}</div>}
 
       {/* field + legend */}
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_300px]">

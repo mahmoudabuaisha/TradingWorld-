@@ -24,7 +24,7 @@ export function Timer() {
         <button className="btn-ghost" onClick={() => { setRunning(false); setLeft(total); }}>↺</button>
       </div>
       <div className="mt-4 flex flex-wrap justify-center gap-1.5">{PRESETS.map(([n, m]) => <button key={n} className="chip hover:text-ink" onClick={() => { setTotal(m * 60_000); setLeft(m * 60_000); setRunning(false); }}>{n}</button>)}</div>
-      <input type="number" className="input mt-3 mx-auto w-32 text-center font-mono" value={Math.round(total / 60_000)} onChange={(e) => { const m = Number(e.target.value) * 60_000; setTotal(m); setLeft(m); }} />
+      <input id="timer-minutes" aria-label="minutes" type="number" className="input mt-3 mx-auto w-32 text-center font-mono" value={Math.round(total / 60_000)} onChange={(e) => { const m = Number(e.target.value) * 60_000; setTotal(m); setLeft(m); }} />
     </div>
   );
 }
@@ -72,7 +72,7 @@ export function Calculator() {
   return (
     <div className="sheet p-4">
       <span className="eyebrow">ATLAS 03 · 54 · CALCULATOR</span>
-      <input className="input mt-2 font-mono text-lg" value={expr} onChange={(e) => { setExpr(e.target.value); setOut(evalSafe(e.target.value)); }} placeholder="(2650-2645)*100" />
+      <input id="calc-expr" aria-label="expression" className="input mt-2 font-mono text-lg" value={expr} onChange={(e) => { setExpr(e.target.value); setOut(evalSafe(e.target.value)); }} placeholder="(2650-2645)*100" />
       <div className="mono mt-2 text-3xl">{out || "0"}</div>
       <div className="mt-3 text-xs text-ink-2">{locale === "ar" ? "اختصارات (استبدل الرموز بالأرقام):" : "Shortcuts (replace symbols with numbers):"}</div>
       <div className="mt-1 flex flex-wrap gap-1.5">{quick.map(([n, e]) => <button key={n} className="chip hover:text-ink" onClick={() => setExpr(e)}>{n}: <span className="font-mono">{e}</span></button>)}</div>
@@ -94,7 +94,7 @@ export function TimezoneConverter() {
   return (
     <div className="sheet p-4">
       <span className="eyebrow">ATLAS 03 · 55 · TIME ZONES</span>
-      <div className="mt-2 flex gap-2"><input type="time" className="input w-32 font-mono" value={time} onChange={(e) => setTime(e.target.value)} /><select className="input" value={from} onChange={(e) => setFrom(e.target.value)}>{zones.map((z) => <option key={z}>{z}</option>)}</select></div>
+      <div className="mt-2 flex gap-2"><input id="tz-time" aria-label="time" type="time" className="input w-32 font-mono" value={time} onChange={(e) => setTime(e.target.value)} /><select id="tz-from" aria-label="from zone" className="input" value={from} onChange={(e) => setFrom(e.target.value)}>{zones.map((z) => <option key={z}>{z}</option>)}</select></div>
       <ul className="mt-3 grid grid-cols-1 gap-1 text-sm sm:grid-cols-2">{zones.map((z) => <li key={z} className="flex justify-between rounded border border-hair px-2 py-1"><span className="text-ink-2">{z}</span><span className="font-mono">{instant.toLocaleTimeString("en-GB", { timeZone: z, hour: "2-digit", minute: "2-digit" })}</span></li>)}</ul>
       <p className="mt-2 text-[11px] text-ink-3">{locale === "ar" ? "يراعي التوقيت الصيفي وفق بيانات المتصفح لليوم الحالي." : "DST-aware using the browser's tz database for today's date."}</p>
     </div>

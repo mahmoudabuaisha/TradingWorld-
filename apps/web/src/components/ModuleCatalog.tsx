@@ -4,7 +4,7 @@ import { ATLASES, PLATFORM_MODULES, modulesOfAtlas, type ModuleStatus } from "@t
 import { useApp } from "@/store/useApp";
 import { STATUS_LABEL } from "./shell/Rail";
 
-const STATUS_CLS: Record<ModuleStatus, string> = { planned: "text-ink-3", scaffold: "text-ink-2", in_progress: "text-down", done: "text-up", approved: "text-ink" };
+const STATUS_CLS: Record<ModuleStatus, string> = { planned: "text-ink-3", scaffold: "text-ink-2", in_progress: "text-down-ink", done: "text-up-ink", approved: "text-ink" };
 
 /** The index of all sixty sheets, bound into atlases. Numbers are the specification's own numbering. */
 export function ModuleCatalog() {

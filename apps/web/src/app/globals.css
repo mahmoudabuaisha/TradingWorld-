@@ -8,6 +8,8 @@
    Night survey is the default. Day survey is a cool map paper.
    Two colours belong to the engine (verdigris/amber), one to the
    human (chalk/ink), one stamp for invalidation. Nothing else.
+   --up-ink/--down-ink are the text-safe variants (AA on every surface);
+   marks (hatch, candles, arcs) use --up/--down.
    ───────────────────────────────────────────────────────────── */
 :root {
   --field: #13181b;
@@ -17,10 +19,12 @@
   --rule: #2f3b42;
   --ink: #e8ebe6;
   --ink-2: #a3adae;
-  --ink-3: #6d7a80;
+  --ink-3: #84939a;
   --up: #22a08a;
   --down: #c0821a;
-  --stamp: #cf4266;
+  --up-ink: #22a08a;
+  --down-ink: #c0821a;
+  --stamp: #e5648a;
   --up-wash: rgba(34, 160, 138, 0.16);
   --down-wash: rgba(192, 130, 26, 0.16);
   --flag: #e8ebe6;
@@ -33,20 +37,33 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     --field: #eef0ec; --sheet: #f6f7f4; --raised: #ffffff; --hair: #d8ded9; --rule: #bfc9c4;
-    --ink: #1a2124; --ink-2: #4f5c61; --ink-3: #8a979b;
-    --up: #0f9a82; --down: #b9781a; --stamp: #b83556;
+    --ink: #1a2124; --ink-2: #4f5c61; --ink-3: #616e74;
+    --up: #0f9a82; --down: #b9781a; --up-ink: #0a7a66; --down-ink: #8f5c10; --stamp: #b83556;
     --up-wash: rgba(15, 154, 130, 0.14); --down-wash: rgba(185, 120, 26, 0.14);
     --flag: #1a2124;
     color-scheme: light;
   }
+  :root:not([data-theme="dark"])[data-palette="classic"] {
+    --up: #1f9a57; --down: #c43d3d; --up-ink: #157a44; --down-ink: #a33232;
+    --up-wash: rgba(31, 154, 87, 0.14); --down-wash: rgba(196, 61, 61, 0.14);
+  }
 }
 :root[data-theme="light"] {
   --field: #eef0ec; --sheet: #f6f7f4; --raised: #ffffff; --hair: #d8ded9; --rule: #bfc9c4;
-  --ink: #1a2124; --ink-2: #4f5c61; --ink-3: #8a979b;
-  --up: #0f9a82; --down: #b9781a; --stamp: #b83556;
+  --ink: #1a2124; --ink-2: #4f5c61; --ink-3: #616e74;
+  --up: #0f9a82; --down: #b9781a; --up-ink: #0a7a66; --down-ink: #8f5c10; --stamp: #b83556;
   --up-wash: rgba(15, 154, 130, 0.14); --down-wash: rgba(185, 120, 26, 0.14);
   --flag: #1a2124;
   color-scheme: light;
+}
+/* Classic directional palette (optional, user preference): the familiar green/red. Not colourblind-safe; the hatch direction still encodes demand/supply. */
+:root[data-palette="classic"] {
+  --up: #35b872; --down: #e35d5d; --up-ink: #35b872; --down-ink: #e35d5d;
+  --up-wash: rgba(53, 184, 114, 0.16); --down-wash: rgba(227, 93, 93, 0.16);
+}
+:root[data-theme="light"][data-palette="classic"] {
+  --up: #1f9a57; --down: #c43d3d; --up-ink: #157a44; --down-ink: #a33232;
+  --up-wash: rgba(31, 154, 87, 0.14); --down-wash: rgba(196, 61, 61, 0.14);
 }
 
 html, body { height: 100%; }
@@ -58,6 +75,8 @@ body { background: var(--field); color: var(--ink); font-family: var(--font-ui);
 h1, h2, h3 { text-wrap: balance; }
 
 @layer components {
+  .skip { @apply sr-only; }
+  .skip:focus { @apply not-sr-only fixed start-3 top-3 z-50 rounded border border-ink bg-ink px-3 py-2 text-sm text-field; }
   /* surfaces */
   .sheet { @apply rounded border border-hair bg-sheet; }
   .raised { @apply rounded border border-hair bg-raised; }
