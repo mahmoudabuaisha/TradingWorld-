@@ -305,8 +305,13 @@ export interface RestoreOptions {
   ageIdentityFile?: string;
   /** from the manifest: TimescaleDB needs its pre/post restore hooks */
   timescale: boolean;
+  /** from the manifest (`pg_dump --version`): a dump made by a newer major version is refused */
+  pgDump?: string;
   log?: Log;
 }
+
+/** "pg_dump (PostgreSQL) 16.15 (Ubuntu …)" → 16 */
+export const majorOf = (version: string) => Number(/(\d+)(?:\.\d+)?/.exec(version.replace(/^[^\d]*/, ""))?.[1] ?? NaN);
 
 /** Restores an artifact (plain or .age) into an empty database. Refuses a database that already has user tables. */
 export async function restoreInto(artifact: string, o: RestoreOptions): Promise<void> {
@@ -318,6 +323,15 @@ export async function restoreInto(artifact: string, o: RestoreOptions): Promise<
     if (existing.length)
       throw new Error(
         `target database ${env.PGDATABASE} is not empty (${existing.length} tables, e.g. ${existing[0]}); restore into a new database`,
+      );
+    // pg_dump writes SQL for its own major version (17+ emits SET transaction_timeout, unknown to 16): restoring a newer
+    // dump into an older server fails halfway, so say so before touching anything
+    const serverMajor = Math.floor(
+      Number((await c.query<{ v: string }>("SELECT current_setting('server_version_num') AS v")).rows[0]!.v) / 10000,
+    );
+    if (o.pgDump && majorOf(o.pgDump) > serverMajor)
+      throw new Error(
+        `this dump was made by pg_dump ${majorOf(o.pgDump)}, newer than the target server (PostgreSQL ${serverMajor}); restore into PostgreSQL ${majorOf(o.pgDump)} or newer`,
       );
     if (o.timescale) {
       await c.query("CREATE EXTENSION IF NOT EXISTS timescaledb");
@@ -403,6 +417,7 @@ export async function drill(o: DrillOptions): Promise<DrillReport> {
       targetUrl: scratchUrl,
       ageIdentityFile: o.ageIdentityFile,
       timescale: m.extensions.some((e) => e.name === "timescaledb"),
+      pgDump: m.pgDump,
       log,
     });
     report.restoreMs = Date.now() - r0;

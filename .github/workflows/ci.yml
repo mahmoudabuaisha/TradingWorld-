@@ -8,7 +8,7 @@ on:
 jobs:
   node:
     name: Format · Lint · Typecheck · Test · Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
@@ -54,7 +54,7 @@ jobs:
     # OPS-02 end to end on the production database engine: TimescaleDB with a compressed hypertable chunk →
     # encrypted backup with an offsite copy → restore drill from the offsite copy → disaster restore into a new database
     name: Backup · restore drill on TimescaleDB
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       db:
         image: timescale/timescaledb:latest-pg16
@@ -112,7 +112,7 @@ jobs:
   docker-api:
     # the image the API and the backup job run from: it builds, and carries pg_dump 16, age and rclone
     name: Docker · API image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: docker build -f infra/Dockerfile.api -t tradingworld-api:ci .
@@ -120,7 +120,7 @@ jobs:
 
   python:
     name: ML service · ruff · tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: services/ml

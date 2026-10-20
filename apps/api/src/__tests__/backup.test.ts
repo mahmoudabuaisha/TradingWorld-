@@ -9,6 +9,7 @@ import { loadConfig } from "../config.js";
 import {
   createBackup,
   drill,
+  majorOf,
   manifestPath,
   pgEnv,
   prune,
@@ -43,6 +44,8 @@ describe("backup helpers", () => {
     });
     expect(withDatabase("postgresql://u:p@h:5432/trading?schema=public", "postgres")).toBe("postgresql://u:p@h:5432/postgres");
     expect(() => pgEnv("mysql://x@y/z")).toThrow(/not a postgres URL/);
+    expect(majorOf("pg_dump (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)")).toBe(16);
+    expect(majorOf("pg_dump (PostgreSQL) 17.2")).toBe(17);
   });
 
   it("keeps the newest backup per day, ISO week and month (grandfather-father-son)", () => {
@@ -148,6 +151,7 @@ describe.skipIf(!DB || !has("pg_dump"))("backup → drill → restore on Postgre
     await c.connect();
     await c.query(`DROP DATABASE IF EXISTS ${src} WITH (FORCE)`);
     await c.query(`DROP DATABASE IF EXISTS ${src}_restored WITH (FORCE)`);
+    await c.query(`DROP DATABASE IF EXISTS ${src}_newer WITH (FORCE)`);
     await c.end();
     await rm(dir, { recursive: true, force: true });
   });
@@ -201,6 +205,19 @@ describe.skipIf(!DB || !has("pg_dump"))("backup → drill → restore on Postgre
     const { rows } = await r.query<{ email: string }>(`SELECT email FROM public."User" ORDER BY id`);
     await r.end();
     expect(rows.map((x) => x.email)).toEqual(["survey@tradingworld.test", "المسّاح@tw.test"]);
+    // a dump from a newer pg_dump major is refused before anything is written (checked on a fresh empty database)
+    const c2 = admin();
+    await c2.connect();
+    await c2.query(`CREATE DATABASE ${src}_newer`);
+    await c2.end();
+    await expect(
+      restoreInto(join(local, m.file), {
+        targetUrl: withDatabase(DB!, `${src}_newer`),
+        ageIdentityFile: identity,
+        timescale: false,
+        pgDump: "pg_dump (PostgreSQL) 99.0",
+      }),
+    ).rejects.toThrow(/made by pg_dump 99, newer than the target server/);
     await expect(restoreInto(join(local, m.file), { targetUrl: target, ageIdentityFile: identity, timescale: false })).rejects.toThrow(
       /is not empty/,
     );

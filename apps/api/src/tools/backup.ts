@@ -115,6 +115,7 @@ async function restoreCmd(): Promise<void> {
     targetUrl: target,
     ageIdentityFile: cfg.BACKUP_AGE_IDENTITY_FILE,
     timescale: m.extensions.some((e) => e.name === "timescaledb"),
+    pgDump: m.pgDump,
     log,
   });
   log(`restored in ${((Date.now() - t0) / 1000).toFixed(1)} s. Run a drill on it or point DATABASE_URL at it; nothing else was changed.`);
