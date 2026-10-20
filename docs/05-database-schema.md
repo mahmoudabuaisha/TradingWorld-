@@ -11,9 +11,9 @@
 | `market.candles` | **hypertable** (symbol, timeframe, time) — **خارج Prisma**، مملوك للـSQL ومكتوب من مخزن الشموع في الـAPI (DATA-02) | قطع 7 أيام، ضغط بعد 30 يومًا؛ `provider` لكل صف (`aggregate:1m` للمشتق) |
 | `market.backfills` | سجل دورات التعبئة/اللحاق/الفجوات/الاشتقاق | خارج Prisma |
 | `EngineVersion` | سجل إصدارات المحرك/التقييم + الأوزان | واحد `active` |
-| `Zone` | المناطق القانونية لمتتبع النتائج (AI-01) — يحتاج معرفًا ثابتًا عالميًا | معرفات المحرك (`z-5m-fvg-412-0`) محلية لنافذة التحليل فلا تُكتب هنا |
+| `Zone` | المناطق التي يتابعها متتبع النتائج (AI-01): صف لكل مكان سوقي، لقطة عند **أول ملاحظة** | المعرف مفتاح ثابت `symbol:tf:origin:direction:createdTime:engine:scoring`؛ `provider` (لاستثناء demo)، `atr`، `context` (النظام/الجلسة/HTF)، `snapshot`، `detectedBarTime` |
 | `ZoneLog` | سجل بحثي إلحاقي: صف لكل منطقة كلما ظهرت بحالة جديدة (`repos.zoneLog`)، والكائن الكامل JSON | مفهرس بالوقت والرمز/الفريم والإصدار |
-| `ZoneOutcome` | نتيجة السوق النهائية (label للـML) | MFE/MAE بالـATR، retests، session، regime |
+| `ZoneOutcome` | نتيجة السوق النهائية (label للـML) عند الإبطال أو نهاية الأفق | `label` (REACTED/INVALIDATED/TESTED/UNTOUCHED)، `reason`، `outcomeVersion`، MFE/MAE/التفاعل بالـATR، `barsToOutcome`، `horizonBars`، retests، session، regime |
 | `ZoneFeedback` | رأي المستخدم 👍/👎 | **منفصل** عن ZoneOutcome عمدًا |
 | `BacktestRun` | نتائج اختبارات تاريخية مع المعاملات والإصدار | |
 | `Watchlist` | قوائم متابعة متعددة لكل مستخدم | |

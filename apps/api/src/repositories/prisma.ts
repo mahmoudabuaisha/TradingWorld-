@@ -1,7 +1,7 @@
 import { PrismaClient, Prisma } from "@tradingworld/db";
 import { DEFAULT_INSTRUMENTS, type Role } from "@tradingworld/shared";
-import type { Zone } from "@tradingworld/analysis-engine";
-import type { Repositories, User, Alert, JournalTrade, ZoneLogEntry, AuditEntry } from "./memory.js";
+import type { Zone, OutcomeLabel } from "@tradingworld/analysis-engine";
+import type { Repositories, User, Alert, JournalTrade, ZoneLogEntry, AuditEntry, TrackedZone, ZoneQuery } from "./memory.js";
 
 const DEFAULT_WATCHLIST = ["XAUUSD", "EURUSD", "BTCUSD", "US100"];
 
@@ -24,6 +24,24 @@ function nullify<T extends object>(patch: T, keys: readonly (keyof T)[]): Record
 type DbUser = Prisma.UserGetPayload<object>;
 type DbAlert = Prisma.AlertGetPayload<object>;
 type DbTrade = Prisma.TradeGetPayload<object>;
+type DbZone = Prisma.ZoneGetPayload<{ include: { outcome: true } }>;
+
+const toTracked = (z: DbZone): TrackedZone => ({
+  key: z.id, symbol: z.symbol, timeframe: z.timeframe, engineVersion: z.engineVersion, scoringVersion: z.scoringVersion, provider: z.provider,
+  zone: z.snapshot as unknown as Zone, atr: z.atr, context: z.context as unknown as TrackedZone["context"], detectedBarTime: dateToSec(z.detectedBarTime), detectedAt: ms(z.detectedAt),
+  outcome: z.outcome ? {
+    outcomeVersion: z.outcome.outcomeVersion, label: z.outcome.label as OutcomeLabel, reason: z.outcome.reason as "invalidated" | "horizon", finalStatus: z.outcome.finalStatus,
+    mfeAtr: z.outcome.mfeAtr, maeAtr: z.outcome.maeAtr, reactionAtr: z.outcome.reactionAtr, barsToOutcome: z.outcome.barsToOutcome, barsObserved: z.outcome.barsObserved,
+    horizonBars: z.outcome.horizonBars, retests: z.outcome.retests, resolvedAt: ms(z.outcome.resolvedAt),
+  } : undefined,
+});
+
+const zoneWhere = (q: ZoneQuery): Prisma.ZoneWhereInput => ({
+  ...(q.resolved === undefined ? {} : q.resolved ? { outcome: { isNot: null } } : { outcome: { is: null } }),
+  ...(q.includeDemo ? {} : { provider: { not: "demo" } }),
+  ...(q.engineVersion ? { engineVersion: q.engineVersion } : {}),
+  ...(q.scoringVersion ? { scoringVersion: q.scoringVersion } : {}),
+});
 
 const toUser = (u: DbUser): User => ({ id: u.id, email: u.email, displayName: u.displayName, passwordHash: u.passwordHash, role: u.role as Role, createdAt: ms(u.createdAt), settings: (u.settings ?? {}) as Record<string, unknown> });
 const toAlert = (a: DbAlert): Alert => ({ id: a.id, userId: a.userId, symbol: a.symbol, kind: a.kind, price: opt(a.price), zoneId: opt(a.zoneId), note: opt(a.note), active: a.active, createdAt: ms(a.createdAt), triggeredAt: optMs(a.triggeredAt) });
@@ -129,6 +147,34 @@ export function createPrismaRepositories(databaseUrl: string, opts: { client?: P
         return rows.map((r): ZoneLogEntry => ({ id: r.id, symbol: r.symbol, timeframe: r.timeframe, engineVersion: r.engineVersion, scoringVersion: r.scoringVersion, zone: r.zone as unknown as Zone, loggedAt: ms(r.loggedAt) }));
       },
       async count() { return db.zoneLog.count(); },
+    },
+
+    zones: {
+      async track(t) {
+        const z = t.zone;
+        try {
+          await db.zone.create({ data: {
+            id: t.key, symbol: t.symbol, timeframe: t.timeframe, engineVersion: t.engineVersion, scoringVersion: t.scoringVersion, provider: t.provider,
+            origin: z.origin, direction: z.direction, name: z.name, nameAr: z.nameAr, top: z.top, bottom: z.bottom, score: z.score, quality: z.quality, status: z.status, tests: z.tests,
+            factors: json(z.factors), htfContext: json(z.htfContext), invalidation: z.invalidation.price, atr: t.atr, context: json(t.context), snapshot: json(z),
+            createdTime: new Date(z.createdTime * 1000), detectedBarTime: new Date(t.detectedBarTime * 1000), detectedAt: t.detectedAt ? new Date(t.detectedAt) : undefined,
+          } });
+          return true;
+        } catch (e) {
+          if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return false; // already tracked: first observation wins
+          throw e;
+        }
+      },
+      async open(limit) { return (await db.zone.findMany({ where: { outcome: { is: null } }, include: { outcome: true }, orderBy: { detectedAt: "asc" }, take: limit })).map(toTracked); },
+      async resolve(key, o) {
+        const z = await db.zone.findUnique({ where: { id: key }, select: { context: true } });
+        if (!z) return;
+        const ctx = z.context as unknown as TrackedZone["context"];
+        const data = { outcomeVersion: o.outcomeVersion, label: o.label, reason: o.reason, finalStatus: o.finalStatus, mfeAtr: o.mfeAtr, maeAtr: o.maeAtr, reactionAtr: o.reactionAtr, barsToOutcome: o.barsToOutcome, barsObserved: o.barsObserved, horizonBars: o.horizonBars, retests: o.retests, regime: json(ctx.regime), session: ctx.session, resolvedAt: new Date(o.resolvedAt) };
+        await db.zoneOutcome.upsert({ where: { zoneId: key }, create: { zoneId: key, ...data }, update: data });
+      },
+      async list(q) { return (await db.zone.findMany({ where: zoneWhere(q), include: { outcome: true }, orderBy: { detectedAt: "desc" }, take: q.limit ?? 1000 })).map(toTracked); },
+      async count(q) { return db.zone.count({ where: zoneWhere(q) }); },
     },
 
     audit: {

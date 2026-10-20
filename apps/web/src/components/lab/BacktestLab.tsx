@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { analyze, evaluateLifecycle, type Candle, type Zone } from "@tradingworld/analysis-engine";
+import { analyze, resolveOutcome, OUTCOME_VERSION, type Candle, type Zone } from "@tradingworld/analysis-engine";
 import { DEFAULT_INSTRUMENTS, TIMEFRAMES, findInstrument, type Timeframe } from "@tradingworld/shared";
 import { api } from "@/lib/api";
 import { useApp } from "@/store/useApp";
@@ -40,24 +40,10 @@ export function BacktestLab() {
           if (seen.has(key) || z.quality === "LOW") continue;
           seen.add(key);
           const future: Candle[] = candles.slice(i, i + horizon);
-          const life = evaluateLifecycle({ ...z, createdIndex: -1 }, future, atr);
-          // Excursions only make sense once price has reached the zone: measure from the first touch
-          // (where a trader could act) up to and including the invalidation bar, in ATR units.
-          let mfeAtr: number | undefined, maeAtr: number | undefined;
-          if (life.firstTestIndex !== undefined) {
-            const end = life.invalidatedIndex ?? future.length - 1;
-            let mfe = 0, mae = 0;
-            for (let j = life.firstTestIndex; j <= end; j++) {
-              const c = future[j]!;
-              const fav = z.direction === "bullish" ? c.high - z.top : z.bottom - c.low;
-              const adv = z.direction === "bullish" ? z.bottom - c.low : c.high - z.top;
-              mfe = Math.max(mfe, fav); mae = Math.max(mae, adv);
-            }
-            mfeAtr = mfe / atr; maeAtr = mae / atr;
-          }
-          // A zone that reacted and was broken later still counts as a reaction (that is the question a backtest answers).
-          const outcome = life.reacted ? "REACTED" : life.status === "INVALIDATED" ? "INVALIDATED" : life.tests > 0 ? "TESTED" : "UNTOUCHED";
-          out.push({ zone: z, detectedAt: window[i - 1]!.time, outcome, invalidated: life.status === "INVALIDATED", mfeAtr, maeAtr });
+          // the same labelling rules as the live outcome tracker (engine resolveOutcome, OUTCOME_VERSION)
+          const r = resolveOutcome(z, future, atr, horizon);
+          const touched = r.firstTestIndex !== undefined;
+          out.push({ zone: z, detectedAt: window[i - 1]!.time, outcome: r.label, invalidated: r.invalidatedIndex !== undefined, mfeAtr: touched ? r.mfeAtr : undefined, maeAtr: touched ? r.maeAtr : undefined });
         }
       }
       setRes(out);
@@ -99,7 +85,7 @@ export function BacktestLab() {
             <div><b>REACTED THEN BROKEN</b><span>{res.filter((o) => o.outcome === "REACTED" && o.invalidated).length}</span></div>
             <div><b>TESTED</b><span>{res.filter((o) => o.outcome === "TESTED").length}</span></div>
             <div><b>UNTOUCHED</b><span>{res.filter((o) => o.outcome === "UNTOUCHED").length}</span></div>
-            <div><b>NO LOOK-AHEAD</b><span>{symbol} · {timeframe} · STEP {step} · HORIZON {horizon}</span></div>
+            <div><b>NO LOOK-AHEAD</b><span>{symbol} · {timeframe} · STEP {step} · HORIZON {horizon} · {OUTCOME_VERSION}</span></div>
           </div>
           <p className="mono text-2xs text-ink-3">{L("REACTED = إغلاق ≥ 1 ATR بعيدًا عن المنطقة بعد لمسها، حتى لو كُسرت لاحقًا · INVALIDATED = إغلاق خلف الحد البعيد خلال الأفق · MFE/MAE تُقاس من أول لمسة وبوحدة ATR، للمناطق الملموسة فقط", "REACTED = a close ≥ 1 ATR away from the zone after a touch, even if broken later · INVALIDATED = a close through the far edge within the horizon · MFE/MAE measured from the first touch, in ATR, touched zones only")}</p>
           <Table title={L("حسب الجودة", "By quality")} rows={group((o) => o.zone.quality)} />

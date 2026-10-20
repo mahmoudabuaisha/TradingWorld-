@@ -9,6 +9,7 @@ import { AnalysisService } from "./services/analysis.js";
 import { AiService } from "./services/ai.js";
 import { AlertService } from "./services/alerts.js";
 import { BackfillService } from "./services/backfill.js";
+import { OutcomeService, parseScan } from "./services/outcomes.js";
 import { createCandleStore } from "./store/index.js";
 import authPlugin from "./plugins/auth.js";
 import healthRoutes from "./routes/health.js";
@@ -47,9 +48,13 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     aggregateSeconds: config.BACKFILL_AGGREGATE_SECONDS, includeDemo: config.BACKFILL_INCLUDE_DEMO, symbols: config.BACKFILL_SYMBOLS?.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean),
     log: (m) => app.log.info(`[backfill] ${m}`),
   });
-  const ctx: AppContext = { config, repos, providers, analysis, ai, alerts, store, backfill };
+  const outcomes = new OutcomeService(repos, providers, { horizonBars: config.OUTCOME_HORIZON_BARS, intervalSeconds: config.OUTCOME_INTERVAL_SECONDS, scan: parseScan(config.OUTCOME_SCAN), log: (m) => app.log.info(`[outcomes] ${m}`) });
+  analysis.outcomes = outcomes;
+  outcomes.analyze = (symbol, timeframe) => analysis.run(symbol, timeframe, { force: true });
+  const ctx: AppContext = { config, repos, providers, analysis, ai, alerts, store, backfill, outcomes };
   if (config.BACKFILL_ENABLED && config.NODE_ENV !== "test") backfill.start();
-  app.addHook("onClose", async () => { backfill.stop(); providers.close(); await store.close(); if (!opts.repos) await repos.close?.(); });
+  if (config.OUTCOME_ENABLED && config.NODE_ENV !== "test") outcomes.start();
+  app.addHook("onClose", async () => { backfill.stop(); outcomes.stop(); providers.close(); await store.close(); if (!opts.repos) await repos.close?.(); });
   await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(cors, { origin: config.CORS_ORIGIN.split(",").map((s) => s.trim()), credentials: true });
   await app.register(rateLimit, { max: config.RATE_LIMIT_MAX, timeWindow: config.RATE_LIMIT_WINDOW });

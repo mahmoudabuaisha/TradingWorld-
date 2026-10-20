@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { analyze } from "../engine.js";
 import { evaluateLifecycle } from "../zones/lifecycle.js";
+import { resolveOutcome, OUTCOME_VERSION } from "../outcomes/resolve.js";
 import { candlesFrom } from "./helpers.js";
 import type { Zone } from "../types.js";
 import { SyntheticMarket } from "../data/synthetic.js";
@@ -96,6 +97,56 @@ describe("engine", () => {
     const untouched = evaluateLifecycle(zone, candlesFrom([[104, 105, 103, 104], [104, 106, 103.5, 105.5]]), 1);
     expect(untouched.reacted).toBe(false);
     expect(untouched.firstTestIndex).toBeUndefined();
+  });
+
+  it("resolveOutcome labels from future bars only: reaction, invalidation, horizon, untouched", () => {
+    const zone = { direction: "bullish", top: 102, bottom: 100, factors: [] } as unknown as Zone;
+    const bars = candlesFrom([
+      [104, 105, 103, 104],
+      [104, 104.5, 100.5, 101.5], // 1: first touch
+      [102.5, 104, 102.3, 103.5], // 2: close 1.5 ATR above → reaction
+      [103.5, 106, 103, 105.5],   // 3: high 106 → MFE 4 ATR
+      [105.5, 105.6, 101, 101.2],
+      [101.2, 101.5, 98, 99],     // 5: close below 100 → invalidated (after the reaction)
+    ]);
+    expect(OUTCOME_VERSION).toBe("outcome-v1");
+    const r = resolveOutcome(zone, bars, 1, 50);
+    expect(r).toMatchObject({ done: true, reason: "invalidated", label: "REACTED", finalStatus: "REACTED", firstTestIndex: 1, reactedIndex: 2, invalidatedIndex: 5, barsToOutcome: 3 });
+    expect(r.mfeAtr).toBe(4);
+    expect(r.maeAtr).toBe(2);     // low 98 on the invalidation bar
+    expect(r.reactionAtr).toBe(3.5);
+    // the same bars cut before the invalidation: horizon not reached → keep waiting, label so far REACTED
+    expect(resolveOutcome(zone, bars.slice(0, 4), 1, 50)).toMatchObject({ done: false, label: "REACTED" });
+    // horizon of 4 bars: decided at the horizon, the later invalidation is not seen
+    expect(resolveOutcome(zone, bars, 1, 4)).toMatchObject({ done: true, reason: "horizon", label: "REACTED", barsObserved: 4 });
+    // broken without a reaction
+    const broken = candlesFrom([[104, 105, 103, 104], [104, 104, 100.5, 101], [101, 101.2, 98.5, 99]]);
+    expect(resolveOutcome(zone, broken, 1, 50)).toMatchObject({ done: true, label: "INVALIDATED", finalStatus: "INVALIDATED", barsToOutcome: 3 });
+    // never reached
+    const away = candlesFrom([[110, 111, 109, 110], [110, 112, 109.5, 111]]);
+    expect(resolveOutcome(zone, away, 1, 2)).toMatchObject({ done: true, reason: "horizon", label: "UNTOUCHED", mfeAtr: 0, maeAtr: 0, retests: 0 });
+    expect(resolveOutcome(zone, [], 1, 2)).toMatchObject({ done: false, label: "UNTOUCHED", barsObserved: 0 });
+    // a confirmed zone with no later candles yet: no crash, still waiting
+    const confirmedZone = { ...zone, factors: [{ key: "DISPLACEMENT", present: true }] } as unknown as Zone;
+    expect(resolveOutcome(confirmedZone, [], 1, 2)).toMatchObject({ done: false, finalStatus: "CONFIRMED" });
+  });
+
+  it("a live synthetic market keeps advancing with the clock, deterministically", () => {
+    const a = new SyntheticMarket(500);
+    const first = a.candles("XAUUSD", "1m", 2650, 0.00045, 5);
+    const last = first[first.length - 1]!.time;
+    expect(last).toBe(Math.floor(Date.now() / 60_000) * 60);
+    // simulate time passing by rewinding the cached series, then asking again
+    const m = a.master("XAUUSD", 2650, 0.00045);
+    const cut = m.splice(-3);
+    const again = a.candles("XAUUSD", "1m", 2650, 0.00045, 3);
+    expect(again.map((c) => c.time)).toEqual(cut.map((c) => c.time));
+    expect(a.master("XAUUSD", 2650, 0.00045).length).toBe(500);
+    // another process extending the same minutes gets the same bars
+    const b = new SyntheticMarket(500);
+    const mb = b.master("XAUUSD", 2650, 0.00045);
+    mb.splice(-3);
+    expect(b.candles("XAUUSD", "1m", 2650, 0.00045, 3).map((c) => c.close)).toEqual(again.map((c) => c.close));
   });
 
   it("rejects too little data", () => {

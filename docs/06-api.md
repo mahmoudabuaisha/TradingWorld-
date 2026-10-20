@@ -46,7 +46,7 @@ Base URL: `http://localhost:4000/api/v1` · JSON · `Authorization: Bearer <jwt>
 | PATCH | `/settings` | أي JSON يُدمج في `user.settings` |
 
 ## Admin 🔒 (role ≥ admin)
-`GET /admin/overview` · `GET /admin/users` · `PATCH /admin/users/:id/role {role}` · `GET /admin/zones?limit` · `GET /admin/audit` · `GET /admin/research/factors` · `GET /admin/backfill` (نوع المخزن، حالة الوظيفة، تغطية كل سلسلة، آخر 50 دورة) · `POST /admin/backfill {kind: cycle|backfill|catchup|gaps|aggregate, symbol?, bars?}` (يُقبل فورًا ويعمل في الخلفية؛ يُسجَّل في audit)
+`GET /admin/overview` · `GET /admin/users` · `PATCH /admin/users/:id/role {role}` · `GET /admin/zones?limit` · `GET /admin/audit` · `GET /admin/research/factors` · `GET /admin/outcomes?includeDemo` (حالة متتبع النتائج + معدلات التفاعل حسب الجودة/نطاق الدرجة/الأصل/الجلسة/الفريم + آخر الوسوم) · `POST /admin/outcomes/run` (وسم المناطق المفتوحة الآن) · `GET /admin/research/dataset?engineVersion&scoringVersion&includeDemo&limit` (عينات بشكل `services/ml` `POST /train` حرفيًا؛ demo مستثنى افتراضيًا) · `GET /admin/backfill` (نوع المخزن، حالة الوظيفة، تغطية كل سلسلة، آخر 50 دورة) · `POST /admin/backfill {kind: cycle|backfill|catchup|gaps|aggregate, symbol?, bars?}` (يُقبل فورًا ويعمل في الخلفية؛ يُسجَّل في audit)
 
 ## WebSocket `/ws`
 Client → `{"type":"subscribe","symbol":"XAUUSD","timeframe":"5m","includeLowQuality":false,"includeInvalidated":false}` | `{"type":"unsubscribe"}` | `{"type":"ping"}`

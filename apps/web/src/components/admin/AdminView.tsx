@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { TIMEFRAMES } from "@tradingworld/shared";
-import { api, type AdminOverview, type FeedsResponse, type AdminBackfill } from "@/lib/api";
+import { api, type AdminOverview, type FeedsResponse, type AdminBackfill, type AdminOutcomes, type OutcomeBucket } from "@/lib/api";
 import { useApp } from "@/store/useApp";
 import { FeedMark } from "../marks/FeedMark";
 
@@ -12,6 +12,8 @@ export function AdminView() {
   const [factors, setFactors] = useState<Awaited<ReturnType<typeof api.adminFactors>>>();
   const [feeds, setFeeds] = useState<FeedsResponse>();
   const [backfill, setBackfill] = useState<AdminBackfill>();
+  const [outcomes, setOutcomes] = useState<AdminOutcomes>();
+  const [withDemo, setWithDemo] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string>();
   useEffect(() => {
@@ -23,6 +25,12 @@ export function AdminView() {
     const timer = setInterval(loadFeeds, 15_000);
     return () => clearInterval(timer);
   }, [token]);
+  useEffect(() => { if (token) api.adminOutcomes(token, withDemo).then(setOutcomes).catch(() => {}); }, [token, withDemo]);
+  const runOutcomes = async () => {
+    if (!token) return;
+    setBusy(true);
+    try { await api.runOutcomes(token); setOutcomes(await api.adminOutcomes(token, withDemo)); } finally { setBusy(false); }
+  };
   const runBackfill = async () => {
     if (!token) return;
     setBusy(true);
@@ -80,6 +88,7 @@ export function AdminView() {
           )}
           <p className="mt-2 text-xs text-ink-3">{L("المصدر ووقت الاستلام وحالة التدفق لكل أداة. CLOSED يعني أن السوق مغلق لا أن البيانات متوقفة. التفاصيل والخطط في docs/03.", "Source, receipt time and flow state per instrument. CLOSED means the market is closed, not that data stopped. Plans and details in docs/03.")}</p>
         </section>
+        {outcomes && <OutcomesPanel data={outcomes} withDemo={withDemo} setWithDemo={setWithDemo} onRun={runOutcomes} busy={busy} L={L} locale={locale} />}
         <section className="sheet p-4 md:col-span-2">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="eyebrow">CANDLE STORE · {L("مخزن الشموع", "Candle store")} · {(backfill?.store ?? "…").toUpperCase()}</span>
@@ -132,5 +141,76 @@ export function AdminView() {
         </section>
       </div>
     </div>
+  );
+}
+
+const pct = (r: number) => `${Math.round(r * 100)}%`;
+
+/** One reaction-rate row: hatched bar = share of zones that reacted, n = resolved zones behind it. */
+function RateRows({ title, rows }: { title: string; rows: Record<string, OutcomeBucket> }) {
+  const entries = Object.entries(rows);
+  return (
+    <div>
+      <span className="eyebrow">{title}</span>
+      {entries.length ? (
+        <ul className="mt-1 space-y-1 text-xs">
+          {entries.map(([k, b]) => (
+            <li key={k} className="grid grid-cols-[96px_1fr_88px] items-center gap-2">
+              <span className="mono truncate text-ink-2">{k}</span>
+              <span className="h-2 bg-raised"><span className="block h-2 hatch-up" style={{ width: pct(b.reactionRate) }} /></span>
+              <span dir="ltr" className="mono text-end">{pct(b.reactionRate)} · n {b.n}</span>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="mt-1 text-xs text-ink-3">—</p>}
+    </div>
+  );
+}
+
+/** AI-01 — what happened to the zones the engine emitted. Reaction-based labels, never profit. */
+function OutcomesPanel({ data, withDemo, setWithDemo, onRun, busy, L, locale }: { data: AdminOutcomes; withDemo: boolean; setWithDemo: (v: boolean) => void; onRun: () => void; busy: boolean; L: (ar: string, en: string) => string; locale: string }) {
+  const s = data.stats;
+  const tone: Record<string, string> = { REACTED: "text-up-ink", INVALIDATED: "text-down-ink", TESTED: "", UNTOUCHED: "text-ink-3" };
+  return (
+    <section className="sheet p-4 md:col-span-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="eyebrow">ZONE OUTCOMES · {L("نتائج المناطق", "Zone outcomes")} · {s.outcomeVersion} · HORIZON {s.horizonBars} BARS</span>
+        <label htmlFor="outcomes-demo" className="flex items-center gap-2 text-xs text-ink-2"><input id="outcomes-demo" type="checkbox" checked={withDemo} onChange={(e) => setWithDemo(e.target.checked)} />{L("تضمين بيانات العرض (اصطناعية)", "Include demo (synthetic) data")}</label>
+      </div>
+      <div className="tblock mt-2">
+        <div><b>OPEN</b><span>{s.open}</span></div>
+        <div><b>RESOLVED</b><span>{s.resolved}</span></div>
+        <div><b>REACTION RATE</b><span className="text-up-ink">{s.overall.n ? pct(s.overall.reactionRate) : "—"}</span></div>
+        <div><b>INVALIDATED</b><span className="text-down-ink">{s.overall.invalidated}</span></div>
+        <div><b>AVG MFE / MAE</b><span>{s.overall.avgMfeAtr !== undefined ? `${s.overall.avgMfeAtr} / ${s.overall.avgMaeAtr} ATR` : "—"}</span></div>
+        <div><b>JOB</b><span>{data.job.started ? `EVERY ${Math.round(data.job.intervalSeconds / 60)} MIN` : "OFF"}{data.job.scan.length ? ` · SCAN ${data.job.scan.join(" ")}` : ""}</span></div>
+      </div>
+      {s.resolved > 0 ? (
+        <div className="mt-3 grid gap-4 md:grid-cols-2">
+          <RateRows title={L("حسب الجودة", "By quality")} rows={s.byQuality} />
+          <RateRows title={L("حسب نطاق الدرجة", "By score band")} rows={s.byScoreBand} />
+          <RateRows title={L("حسب الأصل", "By origin")} rows={s.byOrigin} />
+          <RateRows title={L("حسب الجلسة", "By session")} rows={s.bySession} />
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-ink-3">{L("لا نتائج محلولة بعد. كل منطقة تُتابَع من أول ظهور لها، وتُوسَم عند إبطالها أو بعد اكتمال الأفق.", "No resolved outcomes yet. Every zone is followed from its first appearance and labelled when it is invalidated or its horizon closes.")}{!withDemo && s.open === 0 ? ` ${L("فعّل «تضمين بيانات العرض» لرؤية مناطق المزود الاصطناعي.", "Enable “include demo” to see zones from the synthetic provider.")}` : ""}</p>
+      )}
+      {s.recent.length > 0 && (
+        <ul className="mt-3 space-y-0.5 border-t border-hair pt-2 text-2xs">
+          {s.recent.slice(0, 8).map((r) => (
+            <li key={r.key} className="flex flex-wrap items-center gap-2 text-ink-2">
+              <span className={`chip mono ${tone[r.label] ?? ""}`}>{r.label}</span>
+              <span className="mono">{r.symbol} {r.timeframe}</span>
+              <span className="truncate">{locale === "ar" ? r.nameAr : r.name}</span>
+              <span dir="ltr" className="mono text-ink-3">{r.quality} {Math.round(r.score)} · {r.barsToOutcome} BARS · MFE {r.mfeAtr} ATR{r.provider === "demo" ? " · DEMO" : ""}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button type="button" className="btn" disabled={busy} onClick={onRun}>{L("وسم المناطق المفتوحة الآن", "Label open zones now")}</button>
+        <span className="text-xs text-ink-3">{L("الوسم يقيس التفاعل لا الربح، ويستخدم فقط الشموع المغلقة بعد لحظة الاكتشاف. مجموعة التدريب: GET /admin/research/dataset (بلا بيانات العرض).", "Labels measure reaction, not profit, using only closed bars after detection. Training set: GET /admin/research/dataset (demo excluded).")}</span>
+      </div>
+    </section>
   );
 }

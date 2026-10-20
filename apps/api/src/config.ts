@@ -16,6 +16,12 @@ const schema = z.object({
   REDIS_URL: z.string().optional(),
   /** users, alerts, journal, watchlists, zone log, audit: memory (default without DATABASE_URL) or PostgreSQL via Prisma (DB-02) */
   REPOSITORIES: z.enum(["auto", "memory", "prisma"]).default("auto"),
+  /** AI-01 outcome tracker: labels every observed zone once it is invalidated or OUTCOME_HORIZON_BARS have closed */
+  OUTCOME_ENABLED: envBool.default(true),
+  OUTCOME_HORIZON_BARS: z.coerce.number().int().min(10).max(2000).default(120),
+  OUTCOME_INTERVAL_SECONDS: z.coerce.number().int().min(30).default(300),
+  /** analysed every run so the dataset grows without viewers, e.g. "XAUUSD:15m,EURUSD:15m,US100:1h" */
+  OUTCOME_SCAN: z.string().optional(),
   /** where candles live: memory (default without DATABASE_URL) or the Timescale/PostgreSQL store */
   CANDLE_STORE: z.enum(["auto", "memory", "timescale"]).default("auto"),
   /** DATA-02 maintenance job: backfill, catch-up, gap repair and timeframe aggregation into the store */

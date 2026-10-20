@@ -129,35 +129,42 @@ model EngineVersion {
   @@unique([engineVersion, scoringVersion])
 }
 
-/// Canonical zones for the outcome tracker (AI-01). Needs a globally stable id; the engine's ids
-/// (`z-<tf>-<origin>-<index>-<n>`) are only unique inside one analysis window, so the API logs into ZoneLog instead.
+/// Zones followed by the outcome tracker (AI-01): one row per distinct market zone, snapshotted at FIRST observation
+/// (no look-ahead). `id` is a stable key — `<symbol>:<timeframe>:<origin>:<direction>:<createdTime>:<engine>:<scoring>` —
+/// because engine ids (`z-5m-fvg-412-0`) are only unique inside one analysis window.
 model Zone {
-  id             String      @id
-  symbol         String
-  instrument     Instrument  @relation(fields: [symbol], references: [symbol])
-  timeframe      String
-  engineVersion  String
-  scoringVersion String
-  origin         String
-  direction      String
-  name           String
-  nameAr         String
-  top            Float
-  bottom         Float
-  score          Int
-  quality        ZoneQuality
-  status         ZoneStatus
-  tests          Int         @default(0)
-  factors        Json        // Factor[] with evidence — the explainability record
-  htfContext     Json
-  invalidation   Float
-  createdTime    DateTime
-  detectedAt     DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  outcome        ZoneOutcome?
-  feedback       ZoneFeedback[]
+  id              String      @id
+  symbol          String
+  instrument      Instrument  @relation(fields: [symbol], references: [symbol])
+  timeframe       String
+  engineVersion   String
+  scoringVersion  String
+  provider        String      // source of the candles at detection — research excludes "demo" by default
+  origin          String
+  direction       String
+  name            String
+  nameAr          String
+  top             Float
+  bottom          Float
+  score           Float
+  quality         ZoneQuality
+  status          ZoneStatus  // status at detection
+  tests           Int         @default(0)
+  factors         Json        // Factor[] with evidence — the explainability record
+  htfContext      Json
+  invalidation    Float
+  atr             Float       // base-timeframe ATR at detection (outcome units)
+  context         Json        // { regime, session, htfBias } at detection — ML features
+  snapshot        Json        // the full engine Zone object as first observed
+  createdTime     DateTime    // origin candle
+  detectedBarTime DateTime    // last candle the detector had seen; outcomes use strictly later closed bars
+  detectedAt      DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  outcome         ZoneOutcome?
+  feedback        ZoneFeedback[]
   @@index([symbol, timeframe, detectedAt(sort: Desc)])
   @@index([engineVersion, scoringVersion])
+  @@index([provider])
 }
 
 /// Append-only research log: one row each time a zone is emitted with a new status (repos.zoneLog).
@@ -178,19 +185,26 @@ model ZoneLog {
   @@index([engineVersion, scoringVersion])
 }
 
-/// Market outcome, filled by the outcome tracker when the zone's lifecycle ends — ML training label.
+/// Market outcome, filled by the outcome tracker when the zone is invalidated or its horizon ends — ML training label.
+/// Rules: packages/analysis-engine/src/outcomes/resolve.ts (`outcomeVersion`).
 model ZoneOutcome {
-  zoneId        String     @id
-  zone          Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-  finalStatus   ZoneStatus
-  mfeAtr        Float
-  maeAtr        Float
-  barsToOutcome Int
-  retests       Int
-  reactionAtr   Float
-  regime        Json
-  session       String
-  resolvedAt    DateTime   @default(now())
+  zoneId         String     @id
+  zone           Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  outcomeVersion String
+  label          String     // REACTED | INVALIDATED | TESTED | UNTOUCHED
+  reason         String     // invalidated | horizon
+  finalStatus    ZoneStatus // REACTED when it reacted (the ML label), else the lifecycle status at the end
+  mfeAtr         Float
+  maeAtr         Float
+  reactionAtr    Float
+  barsToOutcome  Int
+  barsObserved   Int
+  horizonBars    Int
+  retests        Int
+  regime         Json
+  session        String
+  resolvedAt     DateTime   @default(now())
+  @@index([label])
 }
 
 /// User preference feedback — deliberately separate from market outcome data.

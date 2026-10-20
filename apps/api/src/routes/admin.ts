@@ -38,6 +38,26 @@ export default async function adminRoutes(app: FastifyInstance, ctx: AppContext)
 
   app.get("/admin/audit", { preHandler: admin }, async () => ({ entries: await ctx.repos.audit.recent(200) }));
 
+  /** AI-01: what happened to the zones the engine emitted — counts, reaction rates by quality/origin/session/score, recent labels. */
+  app.get("/admin/outcomes", { preHandler: admin }, async (req) => {
+    const includeDemo = ["1", "true"].includes(String((req.query as { includeDemo?: string }).includeDemo ?? ""));
+    return { job: ctx.outcomes.status(), stats: await ctx.outcomes.stats(includeDemo) };
+  });
+
+  app.post("/admin/outcomes/run", { preHandler: admin }, async (req) => {
+    await ctx.repos.audit.append({ actorId: req.user.id, action: "outcomes.run" });
+    return { run: await ctx.outcomes.run() };
+  });
+
+  /** ML dataset: resolved zones in the exact shape services/ml POST /train expects. Demo data only on request. */
+  app.get("/admin/research/dataset", { preHandler: admin }, async (req) => {
+    const q = req.query as { engineVersion?: string; scoringVersion?: string; includeDemo?: string; limit?: string };
+    const engineVersion = q.engineVersion ?? ENGINE_VERSION;
+    const scoringVersion = q.scoringVersion ?? SCORING_VERSION;
+    const samples = await ctx.outcomes.dataset({ engineVersion, scoringVersion, includeDemo: ["1", "true"].includes(q.includeDemo ?? ""), limit: q.limit ? Math.min(Number(q.limit), 100_000) : undefined });
+    return { engine_version: engineVersion, scoring_version: scoringVersion, n_folds: 5, samples };
+  });
+
   /** DATA-02: candle store coverage and the maintenance job's status. */
   app.get("/admin/backfill", { preHandler: admin }, async () => ({
     store: ctx.store.kind,

@@ -99,7 +99,30 @@ export class SyntheticMarket {
       m = generateSyntheticCandles({ symbol, startPrice, bars: this.masterBars, timeframe: "1m", vol, endTime: this.endTime });
       this.cache.set(key, m);
     }
+    if (this.endTime === undefined) this.extend(symbol, m, vol);
     return m;
+  }
+
+  /**
+   * A live series keeps moving: append every minute that has elapsed since the last bar (up to the current one),
+   * each seeded by symbol + minute so separate processes produce the same bars. The length stays `masterBars`.
+   */
+  private extend(symbol: string, m: Candle[], vol: number, nowMs = Date.now()): void {
+    const current = Math.floor(nowMs / 60_000) * 60;
+    let last = m[m.length - 1];
+    if (!last || last.time >= current) return;
+    const added: Candle[] = [];
+    for (let t = last.time + 60; t <= current && added.length < this.masterBars; t += 60) {
+      const r = mulberry32(hashSeed(`${symbol}:${t}`));
+      const open = last.close;
+      const close = open * (1 + (r() - 0.5) * 2 * vol * 1.7);
+      const high = Math.max(open, close) * (1 + r() * vol * 0.6);
+      const low = Math.min(open, close) * (1 - r() * vol * 0.6);
+      last = { time: t, open, high, low, close, volume: Math.round(40 + r() * 120) };
+      added.push(last);
+    }
+    m.push(...added);
+    if (m.length > this.masterBars) m.splice(0, m.length - this.masterBars);
   }
 
   candles(symbol: string, timeframe: Timeframe, startPrice: number, vol: number, limit: number, to?: number): Candle[] {

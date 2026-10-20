@@ -20,7 +20,7 @@ function migrate(url: string) {
 let prisma: PrismaRepositories | undefined;
 async function resetPrisma() {
   const db = prisma!.client;
-  await db.$executeRawUnsafe(`TRUNCATE "AuditLog", "ZoneLog", "Trade", "Alert", "Watchlist", "Session", "User" CASCADE`);
+  await db.$executeRawUnsafe(`TRUNCATE "ZoneOutcome", "Zone", "AuditLog", "ZoneLog", "Trade", "Alert", "Watchlist", "Session", "User" CASCADE`);
 }
 
 const impls: { name: string; make: () => Promise<Repositories> }[] = [{ name: "memory", make: async () => createMemoryRepositories() }];
@@ -119,6 +119,35 @@ describe.each(impls)("Repositories contract ($name)", ({ make }) => {
     expect(recent.map((e) => `${e.symbol}:${e.zone.status}`)).toEqual(["EURUSD:TESTED", "XAUUSD:REACTED"]);
     expect(recent[0]!.zone).toEqual(zone("z-15m-ob-3-1", "TESTED", 57.6));
     expect(typeof recent[0]!.loggedAt).toBe("number");
+  });
+
+  it("zones (outcome tracker): first observation wins, open oldest first, resolve, filters", async () => {
+    const z = (key: string, provider: string, detectedAt: number, score = 72) => ({
+      key, symbol: "EURUSD", timeframe: "5m", engineVersion: "1.1.1", scoringVersion: "scoring-v1", provider, atr: 0.0012, detectedBarTime: 1_792_400_000, detectedAt,
+      context: { regime: { trend: "RANGING", volatility: "NORMAL", phase: "NEUTRAL", atr: 0.0012, atrRatio: 1, rangeWidthAtr: 3 }, session: "LONDON", htfBias: "bullish" },
+      zone: { id: "z-5m-fvg-1-0", name: "Demand", nameAr: "طلب", origin: "FVG", direction: "bullish", top: 1.09, bottom: 1.089, createdTime: 1_792_399_000, score, quality: "HIGH", status: "ACTIVE", tests: 0, factors: [{ key: "FVG", present: true }], invalidation: { price: 1.089, ar: "", en: "" }, htfContext: ["1d bullish"] } as unknown as Zone,
+    }) as Parameters<Repositories["zones"]["track"]>[0];
+    const t = Date.now();
+    expect(await repos.zones.track(z("k-old", "twelvedata", t - 2000))).toBe(true);
+    expect(await repos.zones.track(z("k-old", "twelvedata", t, 99))).toBe(false);
+    expect(await repos.zones.track(z("k-new", "twelvedata", t - 1000))).toBe(true);
+    expect(await repos.zones.track(z("k-demo", "demo", t - 500))).toBe(true);
+    const open = await repos.zones.open(10);
+    expect(open.map((x) => x.key)).toEqual(["k-old", "k-new", "k-demo"]);
+    expect(open[0]).toMatchObject({ detectedBarTime: 1_792_400_000, atr: 0.0012, context: { session: "LONDON" } });
+    expect(open[0]!.zone.score).toBe(72);
+    expect(open[0]!.zone.htfContext).toEqual(["1d bullish"]);
+    expectAbsent(open[0]!, ["outcome"]);
+    const outcome = { outcomeVersion: "outcome-v1", label: "REACTED" as const, reason: "invalidated" as const, finalStatus: "REACTED" as const, mfeAtr: 2.5, maeAtr: 0.4, reactionAtr: 1.8, barsToOutcome: 7, barsObserved: 12, horizonBars: 120, retests: 1, resolvedAt: t };
+    await repos.zones.resolve("k-old", outcome);
+    await repos.zones.resolve("k-demo", { ...outcome, label: "UNTOUCHED", finalStatus: "ACTIVE", reason: "horizon" });
+    expect((await repos.zones.open(10)).map((x) => x.key)).toEqual(["k-new"]);
+    expect((await repos.zones.list({ resolved: true })).map((x) => x.key)).toEqual(["k-old"]);
+    expect((await repos.zones.list({ resolved: true, includeDemo: true })).map((x) => x.key)).toEqual(["k-demo", "k-old"]);
+    expect((await repos.zones.list({ resolved: true }))[0]!.outcome).toEqual(outcome);
+    expect(await repos.zones.count({ includeDemo: true })).toBe(3);
+    expect(await repos.zones.count({ resolved: false })).toBe(1);
+    expect(await repos.zones.count({ engineVersion: "0.0.1" })).toBe(0);
   });
 
   it("audit: append with meta, newest first", async () => {

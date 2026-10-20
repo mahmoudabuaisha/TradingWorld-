@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Role } from "@tradingworld/shared";
-import type { Zone } from "@tradingworld/analysis-engine";
+import type { Zone, Regime, OutcomeLabel } from "@tradingworld/analysis-engine";
 
 /**
  * In-memory repositories — the default store for local development and tests.
@@ -15,6 +15,37 @@ export interface JournalTrade {
   openedAt: number; closedAt?: number; exitPrice?: number; rMultiple?: number; setup?: string; strategy?: string; reason?: string; emotion?: string; notes?: string; zoneId?: string; createdAt: number;
 }
 export interface ZoneLogEntry { id: string; symbol: string; timeframe: string; engineVersion: string; scoringVersion: string; zone: Zone; loggedAt: number }
+/** A zone followed by the outcome tracker (AI-01), snapshotted at first observation. */
+export interface TrackedZone {
+  /** stable key: symbol:timeframe:origin:direction:createdTime:engineVersion:scoringVersion */
+  key: string;
+  symbol: string;
+  timeframe: string;
+  engineVersion: string;
+  scoringVersion: string;
+  provider: string;
+  zone: Zone;
+  /** base-timeframe ATR at detection */
+  atr: number;
+  context: { regime: Regime; session: string; htfBias: string };
+  /** s — the last candle the detector had seen */
+  detectedBarTime: number;
+  /** ms */
+  detectedAt: number;
+  outcome?: TrackedOutcome;
+}
+export interface TrackedOutcome {
+  outcomeVersion: string;
+  label: OutcomeLabel;
+  reason: "invalidated" | "horizon";
+  finalStatus: Zone["status"];
+  mfeAtr: number; maeAtr: number; reactionAtr: number;
+  barsToOutcome: number; barsObserved: number; horizonBars: number; retests: number;
+  /** ms */
+  resolvedAt: number;
+}
+export interface ZoneQuery { resolved?: boolean; includeDemo?: boolean; engineVersion?: string; scoringVersion?: string; limit?: number }
+
 export interface AuditEntry { id: string; at: number; actorId?: string; action: string; target?: string; meta?: Record<string, unknown> }
 
 export interface Repositories {
@@ -41,7 +72,22 @@ export interface Repositories {
   };
   zoneLog: { append(e: Omit<ZoneLogEntry, "id" | "loggedAt">): Promise<void>; recent(limit: number): Promise<ZoneLogEntry[]>; count(): Promise<number> };
   audit: { append(e: Omit<AuditEntry, "id" | "at">): Promise<void>; recent(limit: number): Promise<AuditEntry[]> };
+  /** outcome tracker (AI-01) */
+  zones: {
+    /** first observation wins: returns false (and changes nothing) when the key is already tracked */
+    track(z: Omit<TrackedZone, "outcome" | "detectedAt"> & { detectedAt?: number }): Promise<boolean>;
+    /** unresolved zones, oldest detection first */
+    open(limit: number): Promise<TrackedZone[]>;
+    resolve(key: string, outcome: TrackedOutcome): Promise<void>;
+    /** newest detection first */
+    list(q: ZoneQuery): Promise<TrackedZone[]>;
+    count(q: ZoneQuery): Promise<number>;
+  };
 }
+
+const matches = (z: TrackedZone, q: ZoneQuery) =>
+  (q.resolved === undefined || (q.resolved ? !!z.outcome : !z.outcome)) && (q.includeDemo || z.provider !== "demo") &&
+  (!q.engineVersion || z.engineVersion === q.engineVersion) && (!q.scoringVersion || z.scoringVersion === q.scoringVersion);
 
 export function createMemoryRepositories(): Repositories {
   const users = new Map<string, User>();
@@ -49,6 +95,7 @@ export function createMemoryRepositories(): Repositories {
   const alerts = new Map<string, Alert>();
   const trades = new Map<string, JournalTrade>();
   const zoneLog: ZoneLogEntry[] = [];
+  const tracked = new Map<string, TrackedZone>();
   const audit: AuditEntry[] = [];
   const MAX_LOG = 20_000;
 
@@ -85,6 +132,13 @@ export function createMemoryRepositories(): Repositories {
     audit: {
       async append(e) { audit.push({ ...e, id: randomUUID(), at: Date.now() }); if (audit.length > MAX_LOG) audit.splice(0, audit.length - MAX_LOG); },
       async recent(limit) { return audit.slice(-limit).reverse(); },
+    },
+    zones: {
+      async track(z) { if (tracked.has(z.key)) return false; tracked.set(z.key, { ...z, detectedAt: z.detectedAt ?? Date.now() }); return true; },
+      async open(limit) { return [...tracked.values()].filter((z) => !z.outcome).sort((a, b) => a.detectedAt - b.detectedAt).slice(0, limit); },
+      async resolve(key, outcome) { const z = tracked.get(key); if (z) z.outcome = outcome; },
+      async list(q) { return [...tracked.values()].filter((z) => matches(z, q)).sort((a, b) => b.detectedAt - a.detectedAt).slice(0, q.limit ?? 1000); },
+      async count(q) { return [...tracked.values()].filter((z) => matches(z, q)).length; },
     },
   };
 }

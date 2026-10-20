@@ -64,6 +64,20 @@ describe("api", () => {
     expect(h.json().routes).toEqual({});
   });
 
+  it("outcome tracker: analysis registers zones; research excludes demo data by default", async () => {
+    await app.inject({ method: "GET", url: "/api/v1/analysis?symbol=EURUSD&timeframe=15m&includeLowQuality=true" });
+    const h = { authorization: `Bearer ${token}` };
+    const withDemo = (await app.inject({ method: "GET", url: "/api/v1/admin/outcomes?includeDemo=1", headers: h })).json();
+    expect(withDemo.stats.open).toBeGreaterThan(0);
+    expect(withDemo.stats.outcomeVersion).toBe("outcome-v1");
+    expect((await app.inject({ method: "GET", url: "/api/v1/admin/outcomes", headers: h })).json().stats.open).toBe(0);
+    const run = await app.inject({ method: "POST", url: "/api/v1/admin/outcomes/run", headers: h });
+    expect(run.json().run.checked).toBeGreaterThan(0);
+    const ds = (await app.inject({ method: "GET", url: "/api/v1/admin/research/dataset", headers: h })).json();
+    expect(ds).toMatchObject({ engine_version: expect.any(String), scoring_version: "scoring-v1", n_folds: 5, samples: [] });
+    expect((await app.inject({ method: "GET", url: "/api/v1/admin/outcomes" })).statusCode).toBe(401);
+  });
+
   it("ai chat answers deterministically without a key", async () => {
     const r = await app.inject({ method: "POST", url: "/api/v1/ai/chat", payload: { symbol: "XAUUSD", timeframe: "5m", question: "ماذا يحدث على الفريمات الأعلى؟", locale: "ar" } });
     expect(r.statusCode).toBe(200);

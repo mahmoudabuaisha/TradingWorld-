@@ -2,6 +2,7 @@ import { analyze, type AnalysisResult, type Candle } from "@tradingworld/analysi
 import { MTF_CONTEXT, findInstrument, type Timeframe } from "@tradingworld/shared";
 import type { ProviderRegistry } from "../providers/registry.js";
 import type { Repositories } from "../repositories/memory.js";
+import type { OutcomeService } from "./outcomes.js";
 
 const HTF_LIMITS: Record<string, number> = { "1M": 36, "1w": 80, "1d": 200, "12h": 200, "4h": 300, "2h": 300, "1h": 400, "30m": 400, "15m": 500, "5m": 600, "3m": 600, "1m": 600 };
 
@@ -12,6 +13,9 @@ const HTF_LIMITS: Record<string, number> = { "1M": 36, "1w": 80, "1d": 200, "12h
 export class AnalysisService {
   private cache = new Map<string, { at: number; result: AnalysisResult }>();
   private inflight = new Map<string, Promise<AnalysisResult>>();
+
+  /** set by the app: every result registers its zones with the outcome tracker (AI-01) */
+  outcomes?: OutcomeService;
 
   constructor(private providers: ProviderRegistry, private repos: Repositories, private ttlMs = 5_000) {}
 
@@ -34,6 +38,8 @@ export class AnalysisService {
       const result = analyze({ symbol: instrument.symbol, timeframe, candles: base, htfCandles, pricePrecision: instrument.pricePrecision, options: { includeLowQuality: opts.includeLowQuality ?? false, keepInvalidatedBars: opts.includeInvalidated ? 120 : 0 } });
       this.cache.set(key, { at: Date.now(), result });
       await this.logZones(result);
+      // tracking must never break an analysis response
+      if (this.outcomes) await this.outcomes.observe(result, provider.id).catch(() => undefined);
       return result;
     })().finally(() => this.inflight.delete(key));
     this.inflight.set(key, p);

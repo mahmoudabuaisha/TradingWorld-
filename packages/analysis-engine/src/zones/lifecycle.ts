@@ -52,9 +52,11 @@ export function evaluateLifecycle(zone: Zone, candles: Candle[], atr: number): L
   else if (reacted) status = "REACTED";
   else if (tests > 0) status = "TESTED";
   else if (confirmed) {
-    const last = candles[candles.length - 1]!;
-    const away = zone.direction === "bullish" ? last.close - zone.top : zone.bottom - last.close;
-    status = away > 0 ? "ACTIVE" : "CONFIRMED";
+    const last = candles[candles.length - 1];
+    if (last) { // no candles after creation yet → stays CONFIRMED
+      const away = zone.direction === "bullish" ? last.close - zone.top : zone.bottom - last.close;
+      status = away > 0 ? "ACTIVE" : "CONFIRMED";
+    }
   }
   return { status, tests, firstTestIndex, lastTestIndex, reacted, reactedIndex };
 }
