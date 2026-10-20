@@ -3,6 +3,7 @@ import type { AnalysisResult } from "@tradingworld/analysis-engine";
 import type { Repositories, Alert } from "../repositories/memory.js";
 import type { ProviderRegistry } from "../providers/registry.js";
 import { describeError } from "../providers/support/status.js";
+import { traced } from "../ops/telemetry.js";
 
 export interface AlertEvent {
   alert: Alert;
@@ -144,7 +145,7 @@ export class AlertService {
 
   start(): void {
     if (this.timer) return;
-    this.timer = setInterval(() => void this.watchOnce(), this.opts.pollSeconds * 1000);
+    this.timer = setInterval(() => void traced("job alerts.watch", () => this.watchOnce()), this.opts.pollSeconds * 1000);
     this.timer.unref?.();
   }
 

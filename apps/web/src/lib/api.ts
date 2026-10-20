@@ -71,6 +71,9 @@ export const api = {
   adminOverview: (token: string) => request<AdminOverview>("/admin/overview", {}, token),
   adminBackfill: (token: string) => request<AdminBackfill>("/admin/backfill", {}, token),
   adminBackups: (token: string) => request<AdminBackups>("/admin/backups", {}, token),
+  adminOps: (token: string) => request<AdminOps>("/admin/ops", {}, token),
+  evaluateOps: (token: string) => request<{ alerts: OpsAlert[] }>("/admin/ops/evaluate", { method: "POST", body: "{}" }, token),
+  testOpsAlert: (token: string) => request<{ ok: true; webhook: boolean }>("/admin/ops/test", { method: "POST", body: "{}" }, token),
   triggerBackfill: (token: string, b: { kind?: "cycle" | "backfill" | "catchup" | "gaps" | "aggregate"; symbol?: string; bars?: number }) =>
     request<{ accepted: boolean }>("/admin/backfill", { method: "POST", body: JSON.stringify(b) }, token),
   adminOutcomes: (token: string, includeDemo = false) =>
@@ -191,6 +194,33 @@ export interface BackfillRun {
   error?: string;
   startedAt: number;
   finishedAt?: number;
+}
+type BiText = { ar: string; en: string };
+export interface OpsAlert {
+  id: string;
+  severity: "critical" | "warning";
+  title: BiText;
+  state: "ok" | "pending" | "firing";
+  since?: number;
+  summary?: BiText;
+  lastNotifiedAt?: number;
+  error?: string;
+}
+export interface AdminOps {
+  telemetry: { tracing: boolean; otlp: boolean; metrics: "token" | "disabled" | "open"; sampleRatio: number };
+  watchdog: { enabled: boolean; webhook: boolean; repeatHours: number };
+  signals: {
+    requests: { requests: number; errors: number; errorRatio: number; p50Ms?: number; p95Ms?: number; perMinute: number };
+    eventLoopUtilization: number;
+    heap: { used: number; limit: number; ratio: number };
+    rss: number;
+    uptime: number;
+    ws: number;
+    feeds: { total: number; down: string[] };
+    alertWatcher: { lastPollAt: number | null; polls: number; errors: number };
+  };
+  alerts: OpsAlert[];
+  history: { id: string; severity: string; kind: "firing" | "repeat" | "resolved"; at: number; title: BiText; summary: BiText }[];
 }
 export interface DrillReport {
   file: string;

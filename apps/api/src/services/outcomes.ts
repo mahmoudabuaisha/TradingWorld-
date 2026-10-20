@@ -3,6 +3,7 @@ import { TIMEFRAME_SECONDS, findInstrument, isTimeframe, zoneTrackKey, type Time
 import type { ProviderRegistry } from "../providers/registry.js";
 import type { Repositories, TrackedZone, ZoneQuery } from "../repositories/memory.js";
 import { describeError } from "../providers/support/status.js";
+import { traced } from "../ops/telemetry.js";
 
 export interface OutcomeOptions {
   /** closed bars after detection before a zone that was not invalidated is labelled */
@@ -182,8 +183,9 @@ export class OutcomeService {
 
   start(initialDelayMs = 10_000): void {
     if (this.timer) return;
-    setTimeout(() => void this.run(), initialDelayMs).unref?.();
-    this.timer = setInterval(() => void this.run(), this.opts.intervalSeconds * 1000);
+    const tick = () => void traced("job outcomes.run", () => this.run());
+    setTimeout(tick, initialDelayMs).unref?.();
+    this.timer = setInterval(tick, this.opts.intervalSeconds * 1000);
     this.timer.unref?.();
   }
 

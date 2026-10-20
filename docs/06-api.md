@@ -46,7 +46,7 @@ Base URL: `http://localhost:4000/api/v1` · JSON · `Authorization: Bearer <jwt>
 | PATCH | `/settings` | أي JSON يُدمج في `user.settings` |
 
 ## Admin 🔒 (role ≥ admin)
-`GET /admin/overview` · `GET /admin/users` · `PATCH /admin/users/:id/role {role}` · `GET /admin/zones?limit` · `GET /admin/audit` · `GET /admin/research/factors` · `GET /admin/outcomes?includeDemo` (حالة متتبع النتائج + معدلات التفاعل حسب الجودة/نطاق الدرجة/الأصل/الجلسة/الفريم + آخر الوسوم) · `POST /admin/outcomes/run` (وسم المناطق المفتوحة الآن) · `GET /admin/research/dataset?engineVersion&scoringVersion&includeDemo&limit` (عينات بشكل `services/ml` `POST /train` حرفيًا؛ demo مستثنى افتراضيًا) · `GET /admin/backfill` (نوع المخزن، حالة الوظيفة، تغطية كل سلسلة، آخر 50 دورة) · `POST /admin/backfill {kind: cycle|backfill|catchup|gaps|aggregate, symbol?, bars?}` (يُقبل فورًا ويعمل في الخلفية؛ يُسجَّل في audit) · `GET /admin/backups` (OPS-02: `{ database, status{lastBackup, lastFailure, lastDrill}, problems[], policy }` من `status.json` الذي تكتبه حاوية النسخ؛ قراءة فقط)
+`GET /admin/overview` · `GET /admin/users` · `PATCH /admin/users/:id/role {role}` · `GET /admin/zones?limit` · `GET /admin/audit` · `GET /admin/research/factors` · `GET /admin/outcomes?includeDemo` (حالة متتبع النتائج + معدلات التفاعل حسب الجودة/نطاق الدرجة/الأصل/الجلسة/الفريم + آخر الوسوم) · `POST /admin/outcomes/run` (وسم المناطق المفتوحة الآن) · `GET /admin/research/dataset?engineVersion&scoringVersion&includeDemo&limit` (عينات بشكل `services/ml` `POST /train` حرفيًا؛ demo مستثنى افتراضيًا) · `GET /admin/backfill` (نوع المخزن، حالة الوظيفة، تغطية كل سلسلة، آخر 50 دورة) · `POST /admin/backfill {kind: cycle|backfill|catchup|gaps|aggregate, symbol?, bars?}` (يُقبل فورًا ويعمل في الخلفية؛ يُسجَّل في audit) · `GET /admin/ops` (OPS-01: إشارات العملية، حالة قواعد المراقب، آخر التحولات، حالة القياس) · `POST /admin/ops/evaluate` (فحص القواعد الآن) · `POST /admin/ops/test` (تنبيه تجريبي عبر كل القنوات؛ 3/دقيقة؛ 502 عند فشل الـwebhook) · `GET /admin/backups` (OPS-02: `{ database, status{lastBackup, lastFailure, lastDrill}, problems[], policy }` من `status.json` الذي تكتبه حاوية النسخ؛ قراءة فقط)
 
 ## رسوم الشارت (UI-01)
 | Method | Path | Body | الرد |
@@ -79,6 +79,9 @@ Base URL: `http://localhost:4000/api/v1` · JSON · `Authorization: Bearer <jwt>
 `AppNotification = { id, kind: alert|test, title{ar,en}, body{ar,en}, url?, alertId?, deliveries[{channel: push|email, status: sent|failed|skipped, detail?, at}], readAt?, createdAt }`.
 
 **المراقب**: `AlertService` يفحص التنبيهات النشطة على الخادم كل `ALERT_POLL_SECONDS` (آخر شمعتي 1m لكل رمز له تنبيه)، بلا حاجة لمتصفح مفتوح. `price_above` بأعلى الشمعة، `price_below` بأدناها، `zone_enter` بتقاطع الشمعة مع حدود المنطقة المخزنة؛ الشمعة التي بدأت قبل إنشاء التنبيه تُقيَّم بإغلاقها فقط. الإطلاق ذري (`alerts.trigger`: يُحدَّث فقط إن كان نشطًا) فيُطلق كل تنبيه مرة واحدة حتى مع مسارين متزامنين (WS والمراقب). عند الإطلاق: صف في صندوق الإشعارات دائمًا، ثم Web Push لكل أجهزة المستخدم (VAPID، TTL ساعة، 404/410 يحذف الاشتراك) والبريد (SMTP) حسب التفضيلات وتهيئة الخادم؛ نتيجة كل قناة تُسجَّل في `deliveries`.
+
+## المراقبة (OPS-01)
+`GET /metrics` (خارج `/api/v1`) بصيغة Prometheus: معطّل في الإنتاج ما لم يُضبط `METRICS_TOKEN`، ثم `Authorization: Bearer`. كل استجابة تحمل `X-Request-Id` (يُقبل الوارد إن كان صالحًا). التفاصيل في [docs/14](./14-observability.md).
 
 ## WebSocket `/ws`
 Client → `{"type":"subscribe","symbol":"XAUUSD","timeframe":"5m","includeLowQuality":false,"includeInvalidated":false,"token?":"<JWT>"}` | `{"type":"auth","token":"<JWT>"}` | `{"type":"unsubscribe"}` | `{"type":"ping"}`

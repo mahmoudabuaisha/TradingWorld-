@@ -4,6 +4,7 @@ import type { ProviderRegistry } from "../providers/registry.js";
 import type { CandleStore } from "../store/candleStore.js";
 import { findGaps } from "../store/gaps.js";
 import { describeError } from "../providers/support/status.js";
+import { traced } from "../ops/telemetry.js";
 
 export interface BackfillOptions {
   /** the series pulled from providers; every higher timeframe is derived from it locally */
@@ -126,9 +127,12 @@ export class BackfillService {
     if (this.started) return;
     this.started = true;
     this.nextRunAt = this.now() + initialDelayMs;
-    this.timers.push(setTimeout(() => void this.runOnce(), initialDelayMs));
-    this.timers.push(setInterval(() => void this.runOnce(), this.opts.intervalMinutes * 60_000));
-    this.timers.push(setInterval(() => void this.aggregateRecentAll(), this.opts.aggregateSeconds * 1000));
+    const cycle = () => void traced("job backfill.cycle", () => this.runOnce());
+    this.timers.push(setTimeout(cycle, initialDelayMs));
+    this.timers.push(setInterval(cycle, this.opts.intervalMinutes * 60_000));
+    this.timers.push(
+      setInterval(() => void traced("job backfill.aggregate", () => this.aggregateRecentAll()), this.opts.aggregateSeconds * 1000),
+    );
   }
 
   stop(): void {

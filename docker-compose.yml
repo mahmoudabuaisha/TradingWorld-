@@ -1,5 +1,3 @@
-version: "3.9"
-
 # Local infrastructure for TradingWorld.
 #   docker compose up -d        → Postgres(Timescale) + Redis
 #   docker compose --profile app up → also builds api + web images
@@ -37,6 +35,7 @@ services:
       context: .
       dockerfile: infra/Dockerfile.api
     container_name: tw-api
+    restart: unless-stopped
     env_file: .env
     environment:
       DATABASE_URL: postgresql://tradingworld:tradingworld@db:5432/tradingworld?schema=public
@@ -47,6 +46,12 @@ services:
       - tw-backups:/backups:ro
     ports:
       - "4000:4000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
@@ -61,6 +66,7 @@ services:
       context: .
       dockerfile: infra/Dockerfile.api
     container_name: tw-backup
+    restart: unless-stopped
     env_file: .env
     environment:
       DATABASE_URL: postgresql://tradingworld:tradingworld@db:5432/tradingworld?schema=public
@@ -86,6 +92,7 @@ services:
       context: .
       dockerfile: infra/Dockerfile.web
     container_name: tw-web
+    restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:4000
       NEXT_PUBLIC_WS_URL: ws://localhost:4000/ws
@@ -93,6 +100,49 @@ services:
       - "3000:3000"
     depends_on:
       - api
+
+  # OPS-01: optional monitoring stack (docs/14-observability.md). Bound to localhost; reach it through an SSH tunnel or a
+  # reverse proxy with authentication. The API scrape needs secrets/metrics-token.txt = METRICS_TOKEN.
+  prometheus:
+    profiles: ["monitoring"]
+    image: prom/prometheus:v3.5.0
+    container_name: tw-prometheus
+    restart: unless-stopped
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=30d"]
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./secrets/metrics-token.txt:/etc/prometheus/metrics-token:ro
+      - tw-prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  grafana:
+    profiles: ["monitoring"]
+    image: grafana/grafana:12.1.0
+    container_name: tw-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me}
+    volumes:
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - tw-grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on:
+      - prometheus
+
+  # traces: set OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318 in .env (or point it at a hosted backend instead)
+  jaeger:
+    profiles: ["monitoring"]
+    image: jaegertracing/all-in-one:1.62.0
+    container_name: tw-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "127.0.0.1:16686:16686"
 
   ml:
     profiles: ["ml"]
@@ -108,4 +158,6 @@ services:
 volumes:
   tw-db-data:
   tw-backups:
+  tw-prometheus-data:
+  tw-grafana-data:
   tw-redis-data:

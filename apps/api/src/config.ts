@@ -28,6 +28,30 @@ const schema = z.object({
   EMAIL_FROM: z.string().default("TradingWorld <alerts@tradingworld.local>"),
   /** public web URL used in notification links (defaults to the first CORS origin) */
   APP_URL: z.string().optional(),
+  /** OPS-01 logs: pino level */
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+  /** OPS-01 OpenTelemetry: OTLP/HTTP base URL (collector, Grafana Cloud, Honeycomb…); enables traces and metric push */
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+  /** vendor headers for the OTLP endpoint, "k=v,k2=v2" */
+  OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
+  OTEL_SERVICE_NAME: z.string().default("tradingworld-api"),
+  /** share of new traces kept, 0..1 (a trace's children follow it) */
+  OTEL_TRACES_SAMPLE_RATIO: z.coerce.number().min(0).max(1).default(1),
+  /** print spans to stdout (debugging without a collector) */
+  OTEL_TRACES_CONSOLE: envBool.default(false),
+  /** bearer token for GET /metrics (Prometheus format); required in production, optional in development */
+  METRICS_TOKEN: z.string().min(16).optional(),
+  /** OPS-01 watchdog: checks the process every minute and notifies admins (inbox/push/email) and the webhook */
+  OPS_WATCHDOG_ENABLED: envBool.default(true),
+  /** POST target for ops alerts: Slack/Discord/Teams-compatible JSON ({ text, content }) */
+  OPS_ALERT_WEBHOOK_URL: z.string().url().optional(),
+  /** re-notify a still-firing alert after this many hours */
+  OPS_ALERT_REPEAT_HOURS: z.coerce.number().min(0.25).default(4),
+  OPS_ERROR_RATIO: z.coerce.number().min(0).max(1).default(0.05),
+  OPS_P95_MS: z.coerce.number().min(50).default(2000),
+  OPS_FEED_DOWN_MINUTES: z.coerce.number().min(1).default(5),
+  OPS_EVENT_LOOP_P99_MS: z.coerce.number().min(10).default(500),
+  OPS_HEAP_RATIO: z.coerce.number().min(0.1).max(1).default(0.85),
   /** OPS-02 backups (node apps/api/dist/tools/backup.js): where dumps, manifests and status.json live */
   BACKUP_DIR: z.string().default("./backups"),
   /** daily backup time for `backup schedule`, HH:MM UTC */

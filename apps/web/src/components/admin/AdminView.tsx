@@ -10,10 +10,12 @@ import {
   type OutcomeBucket,
   type AdminFeedback,
   type AdminBackups,
+  type AdminOps,
 } from "@/lib/api";
 import { useApp } from "@/store/useApp";
 import { FeedMark } from "../marks/FeedMark";
 import { BackupPanel } from "./BackupPanel";
+import { OpsPanel } from "./OpsPanel";
 
 /** SHEET 58 — the admin panel: system health, feeds, engine, module status and the research sheet. */
 export function AdminView() {
@@ -23,6 +25,7 @@ export function AdminView() {
   const [feeds, setFeeds] = useState<FeedsResponse>();
   const [backfill, setBackfill] = useState<AdminBackfill>();
   const [backups, setBackups] = useState<AdminBackups>();
+  const [ops, setOps] = useState<AdminOps>();
   const [outcomes, setOutcomes] = useState<AdminOutcomes>();
   const [withDemo, setWithDemo] = useState(false);
   const [feedback, setFeedback] = useState<AdminFeedback>();
@@ -50,6 +53,10 @@ export function AdminView() {
       api
         .adminBackups(token)
         .then(setBackups)
+        .catch(() => {});
+      api
+        .adminOps(token)
+        .then(setOps)
         .catch(() => {});
     };
     void loadFeeds();
@@ -142,6 +149,7 @@ export function AdminView() {
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
+        {ops && <OpsPanel data={ops} token={token} locale={locale} L={L} onChange={setOps} />}
         <section className="sheet p-4 md:col-span-2">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="eyebrow">DATA FEEDS · {L("مصادر البيانات", "Sources")}</span>

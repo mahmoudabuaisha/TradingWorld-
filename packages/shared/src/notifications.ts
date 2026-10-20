@@ -13,7 +13,7 @@ export interface Delivery {
 
 export interface AppNotification {
   id: string;
-  kind: "alert" | "test";
+  kind: "alert" | "test" | "ops";
   title: { ar: string; en: string };
   body: { ar: string; en: string };
   url?: string;

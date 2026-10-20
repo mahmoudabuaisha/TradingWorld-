@@ -6,6 +6,8 @@ import type { AppContext } from "../context.js";
 import { feedbackStats } from "../services/feedback.js";
 import { readStatus, statusProblems } from "../ops/backup.js";
 import { resolve } from "node:path";
+import { getHeapStatistics } from "node:v8";
+import { performance } from "node:perf_hooks";
 
 export default async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
   const admin = app.requireRole("admin");
@@ -79,6 +81,62 @@ export default async function adminRoutes(app: FastifyInstance, ctx: AppContext)
     job: ctx.backfill.status(),
     series: await ctx.store.series(),
   }));
+
+  /** OPS-01: the process as the watchdog sees it, its rules' states and the last transitions */
+  app.get("/admin/ops", { preHandler: admin }, async () => {
+    const c = ctx.config;
+    const heapLimit = getHeapStatistics().heap_size_limit;
+    const mem = process.memoryUsage();
+    const feeds = ctx.providers.feeds();
+    return {
+      telemetry: {
+        tracing: ctx.ops.telemetry.tracing,
+        otlp: ctx.ops.telemetry.otlp,
+        metrics: c.METRICS_TOKEN ? "token" : c.NODE_ENV === "production" ? "disabled" : "open",
+        sampleRatio: c.OTEL_TRACES_SAMPLE_RATIO,
+      },
+      watchdog: { enabled: c.OPS_WATCHDOG_ENABLED, webhook: !!c.OPS_ALERT_WEBHOOK_URL, repeatHours: c.OPS_ALERT_REPEAT_HOURS },
+      signals: {
+        requests: ctx.ops.window.summary(5),
+        eventLoopUtilization: performance.eventLoopUtilization().utilization,
+        heap: { used: mem.heapUsed, limit: heapLimit, ratio: mem.heapUsed / heapLimit },
+        rss: mem.rss,
+        uptime: process.uptime(),
+        ws: ctx.ops.ws.open,
+        feeds: {
+          total: feeds.length,
+          down: feeds.filter((f) => f.state === "STALE" || f.state === "OFFLINE").map((f) => `${f.symbol}:${f.provider}:${f.state}`),
+        },
+        alertWatcher: { lastPollAt: ctx.alerts.stats.lastPollAt || null, polls: ctx.alerts.stats.polls, errors: ctx.alerts.stats.errors },
+      },
+      alerts: ctx.ops.watchdog.state(),
+      history: ctx.ops.watchdog.history.slice(0, 30),
+    };
+  });
+
+  /** Evaluate every rule now (instead of waiting for the next minute). */
+  app.post("/admin/ops/evaluate", { preHandler: admin }, async () => {
+    await ctx.ops.watchdog.evaluate();
+    return { alerts: ctx.ops.watchdog.state() };
+  });
+
+  /** Send a test ops alert through every channel (admins' inbox/push/email and the webhook) to prove the wiring. */
+  app.post("/admin/ops/test", { preHandler: admin, config: { rateLimit: { max: 3, timeWindow: "1 minute" } } }, async (req, reply) => {
+    try {
+      await ctx.ops.notify({
+        id: "test",
+        severity: "warning",
+        kind: "firing",
+        at: Date.now(),
+        title: { ar: "اختبار التنبيهات التشغيلية", en: "Ops alert test" },
+        summary: { ar: "رسالة تجريبية من لوحة الإدارة. لا شيء معطّل.", en: "Test message from the admin sheet. Nothing is broken." },
+      });
+      return { ok: true, webhook: !!ctx.config.OPS_ALERT_WEBHOOK_URL };
+    } catch (e) {
+      req.log.warn(e);
+      return reply.code(502).send({ error: "DELIVERY_FAILED", message: (e as Error).message });
+    }
+  });
 
   /**
    * OPS-02: what the backup job last reported (status.json in BACKUP_DIR, shared with the backup container) and anything

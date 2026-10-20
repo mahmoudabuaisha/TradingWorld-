@@ -3,6 +3,7 @@ import websocket from "@fastify/websocket";
 import { findInstrument, isTimeframe, type Instrument, type Timeframe } from "@tradingworld/shared";
 import type { AppContext } from "../context.js";
 import type { CandleUpdate } from "../providers/types.js";
+import { instruments } from "../ops/metrics.js";
 
 type ClientMsg =
   | { type: "subscribe"; symbol: string; timeframe: string; includeLowQuality?: boolean; includeInvalidated?: boolean; token?: string }
@@ -18,7 +19,10 @@ type ClientMsg =
 export default async function realtime(app: FastifyInstance, ctx: AppContext) {
   await app.register(websocket);
 
+  const { wsConnections } = instruments(ctx.ops.telemetry.meter);
   app.get("/ws", { websocket: true }, (socket) => {
+    ctx.ops.ws.open++;
+    wsConnections.add(1);
     let unsub: (() => void) | undefined;
     let analysisTimer: NodeJS.Timeout | undefined;
     let current:
@@ -112,6 +116,8 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
       }
     });
     socket.on("close", () => {
+      ctx.ops.ws.open--;
+      wsConnections.add(-1);
       cleanup();
       offAlert();
       offNotify();

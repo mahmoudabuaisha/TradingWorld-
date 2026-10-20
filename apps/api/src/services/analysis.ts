@@ -29,6 +29,8 @@ export class AnalysisService {
 
   /** set by the app: every result registers its zones with the outcome tracker (AI-01) */
   outcomes?: OutcomeService;
+  /** set by the app (OPS-01): seconds per run, candle fetches included */
+  onRun?: (timeframe: Timeframe, seconds: number) => void;
 
   constructor(
     private providers: ProviderRegistry,
@@ -49,6 +51,7 @@ export class AnalysisService {
     const existing = this.inflight.get(key);
     if (existing) return existing;
 
+    const t0 = performance.now();
     const p = (async () => {
       const provider = this.providers.for(instrument);
       const base = await provider.getCandles(instrument, timeframe, opts.limit ?? 600);
@@ -74,6 +77,7 @@ export class AnalysisService {
       await this.logZones(result);
       // tracking must never break an analysis response
       if (this.outcomes) await this.outcomes.observe(result, provider.id).catch(() => undefined);
+      this.onRun?.(timeframe, (performance.now() - t0) / 1000);
       return result;
     })().finally(() => this.inflight.delete(key));
     this.inflight.set(key, p);

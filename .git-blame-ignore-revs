@@ -1,3 +1,5 @@
 # Formatting-only commits. `git config blame.ignoreRevsFile .git-blame-ignore-revs` (GitHub applies it automatically).
 # style: format the repository with Prettier (QA-01)
 53a38a7d58f2ff409d83fe98ab8dc05d914b47d5
+# style: format apps/api/src/services, missed by .prettierignore (QA-01)
+e5965f75073de9fe1cfa1de0a6885121805c3276

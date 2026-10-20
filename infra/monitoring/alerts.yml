@@ -1,0 +1,74 @@
+# OPS-01 — the in-process watchdog's rules (apps/api/src/ops/watchdog.ts) as Prometheus alerts, plus the one the
+# watchdog cannot raise about itself: the API being down. Thresholds match the OPS_* defaults.
+groups:
+  - name: tradingworld
+    rules:
+      - alert: TradingWorldApiDown
+        expr: up{job="tradingworld-api"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "API not answering /metrics for 2 minutes (process down, crash loop, or token mismatch)"
+
+      - alert: TradingWorldApiErrors
+        expr: |
+          sum(rate(http_server_request_duration_count{http_response_status_code=~"5..", http_route!="/metrics"}[5m]))
+            / sum(rate(http_server_request_duration_count{http_route!="/metrics"}[5m])) > 0.05
+          and sum(increase(http_server_request_duration_count{http_route!="/metrics"}[5m])) >= 20
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of requests ended in 5xx over 5 minutes"
+
+      - alert: TradingWorldApiLatency
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_bucket{http_route!="/metrics"}[5m]))) > 2
+          and sum(increase(http_server_request_duration_count{http_route!="/metrics"}[5m])) >= 20
+        labels: { severity: warning }
+        annotations:
+          summary: "p95 response time {{ $value | humanizeDuration }} over 5 minutes"
+
+      - alert: TradingWorldFeedDown
+        expr: tw_feed_up{provider!="demo"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.symbol }} from {{ $labels.provider }} has had no data for 5 minutes (market open)"
+
+      - alert: TradingWorldProviderBudget
+        expr: tw_provider_budget_utilization >= 0.9
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.provider }} at {{ $value | humanizePercentage }} of its request budget"
+
+      - alert: TradingWorldAlertWatcherStalled
+        expr: tw_alerts_watch_age > 105
+        labels: { severity: critical }
+        annotations:
+          summary: "user alerts are not being checked: last poll {{ $value | humanizeDuration }} ago"
+
+      - alert: TradingWorldEventLoopLag
+        expr: nodejs_eventloop_delay_p99 > 0.5
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "event loop p99 delay {{ $value | humanizeDuration }}"
+
+      - alert: TradingWorldHeapHigh
+        expr: tw_process_heap_ratio > 0.85
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "heap at {{ $value | humanizePercentage }} of the V8 limit"
+
+      - alert: TradingWorldBackupStale
+        expr: tw_backup_age > 26 * 3600
+        labels: { severity: critical }
+        annotations:
+          summary: "last successful backup {{ $value | humanizeDuration }} ago"
+
+      - alert: TradingWorldRestoreDrillFailed
+        expr: tw_backup_drill_ok == 0
+        labels: { severity: critical }
+        annotations:
+          summary: "the last restore drill failed: the newest backup may not be restorable"

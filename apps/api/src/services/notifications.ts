@@ -62,6 +62,9 @@ export class NotificationService {
     return this.cfg.vapidPublicKey;
   }
 
+  /** set by the app (OPS-01): every delivery attempt, for the deliveries counter */
+  onDeliveries?: (d: Delivery[]) => void;
+
   onNotify(fn: (n: StoredNotification) => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -81,6 +84,7 @@ export class NotificationService {
     const locale = (user?.settings?.locale as "ar" | "en" | undefined) === "en" ? "en" : "ar";
     const deliveries: Delivery[] = [await this.sendPush(userId, n, prefs, locale), await this.sendEmail(user, n, prefs, locale)];
     await this.repos.notifications.setDeliveries(n.id, deliveries);
+    this.onDeliveries?.(deliveries);
     return { ...n, deliveries };
   }
 

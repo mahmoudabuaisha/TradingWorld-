@@ -23,12 +23,22 @@ import drawingRoutes from "./routes/drawings.js";
 import notificationRoutes from "./routes/notifications.js";
 import realtime from "./realtime/ws.js";
 import type { AppContext } from "./context.js";
+import { telemetry } from "./ops/telemetry.js";
+import { genReqId, loggerOptions, registerHttpObservability, type LogStream } from "./ops/observability.js";
+import { instruments, observe, RequestWindow } from "./ops/metrics.js";
+import { buildRules, eventLoopMonitor, opsNotifier, Watchdog } from "./ops/watchdog.js";
+import { readStatus } from "./ops/backup.js";
+import { resolve } from "node:path";
 
 export interface BuildOptions {
   config?: Config;
   repos?: Repositories;
   logger?: boolean;
+  /** capture JSON log lines (tests); implies logging on */
+  logStream?: LogStream;
   senders?: Senders;
+  /** the ops webhook's fetch (tests) */
+  fetch?: typeof fetch;
 }
 
 /** memory, or PostgreSQL through Prisma when REPOSITORIES=prisma (or auto with DATABASE_URL). Loaded lazily so the
@@ -56,7 +66,19 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   const analysis = new AnalysisService(providers, repos);
   const ai = new AiService(config);
   const alerts = new AlertService(repos, providers, { pollSeconds: config.ALERT_POLL_SECONDS });
-  const app = Fastify({ logger: opts.logger ?? config.NODE_ENV !== "test", trustProxy: true });
+  const logging = opts.logStream ? true : (opts.logger ?? config.NODE_ENV !== "test");
+  const app = Fastify({
+    logger: logging ? loggerOptions(config, opts.logStream) : false,
+    genReqId,
+    requestIdHeader: false,
+    trustProxy: true,
+  });
+  // OPS-01: metrics and traces (process-wide; started by server.ts before anything else was imported)
+  const tel = telemetry();
+  const inst = instruments(tel.meter);
+  const window = new RequestWindow();
+  registerHttpObservability(app, config, tel, window);
+  analysis.onRun = (timeframe, seconds) => inst.analysisDuration.record(seconds, { timeframe });
   const backfill = new BackfillService(providers, store, {
     baseTimeframe: config.BACKFILL_BASE_TIMEFRAME,
     bars: config.BACKFILL_BARS,
@@ -90,8 +112,12 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     opts.senders,
     (m) => app.log.warn(`[notify] ${m}`),
   );
+  notifications.onDeliveries = (ds) => {
+    for (const d of ds) inst.deliveries.add(1, { channel: d.channel, status: d.status });
+  };
   // every triggered alert becomes a notification for its owner (inbox + push + email per preferences)
   alerts.onTrigger((e) => {
+    inst.alertsFired.add(1);
     void notifications
       .notify(e.alert.userId, {
         kind: "alert",
@@ -102,11 +128,34 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
       })
       .catch((err) => app.log.error(err));
   });
-  const ctx: AppContext = { config, repos, providers, analysis, ai, alerts, store, backfill, outcomes, notifications };
+  const ops: AppContext["ops"] = { telemetry: tel, window, ws: { open: 0 } } as AppContext["ops"];
+  const ctx: AppContext = { config, repos, providers, analysis, ai, alerts, store, backfill, outcomes, notifications, ops };
+  const loop = eventLoopMonitor();
+  ops.notify = opsNotifier(ctx, opts.fetch);
+  ops.watchdog = new Watchdog(buildRules(ctx, { window, loop }), ops.notify, {
+    repeatMs: config.OPS_ALERT_REPEAT_HOURS * 36e5,
+    log: (m) => app.log.warn(`[watchdog] ${m}`),
+  });
+  if (config.OPS_WATCHDOG_ENABLED && config.NODE_ENV !== "test") ops.watchdog.start();
+  const unobserve = observe(tel.meter, {
+    feeds: () => providers.feeds(),
+    providers: () => providers.statuses(),
+    watchAgeSeconds: () =>
+      config.ALERT_WATCH_ENABLED && alerts.stats.lastPollAt ? (Date.now() - alerts.stats.lastPollAt) / 1000 : undefined,
+    backup: async () => {
+      if (!config.DATABASE_URL) return undefined;
+      const s = await readStatus(resolve(config.BACKUP_DIR));
+      return { ageSeconds: s?.lastBackup ? (Date.now() - Date.parse(s.lastBackup.at)) / 1000 : undefined, drillOk: s?.lastDrill?.ok };
+    },
+    firing: () => ops.watchdog.firing(),
+  });
   if (config.ALERT_WATCH_ENABLED && config.NODE_ENV !== "test") alerts.start();
   if (config.BACKFILL_ENABLED && config.NODE_ENV !== "test") backfill.start();
   if (config.OUTCOME_ENABLED && config.NODE_ENV !== "test") outcomes.start();
   app.addHook("onClose", async () => {
+    ops.watchdog.stop();
+    unobserve();
+    loop.disable();
     alerts.stop();
     backfill.stop();
     outcomes.stop();
