@@ -8,11 +8,11 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "dev": "pnpm -r --parallel --filter ./apps/* dev",
+    "dev": "pnpm -r --parallel --filter './apps/*' dev",
     "dev:web": "pnpm --filter @tradingworld/web dev",
     "dev:api": "pnpm --filter @tradingworld/api dev",
     "build": "pnpm -r build",
-    "build:packages": "pnpm -r --filter ./packages/* build",
+    "build:packages": "pnpm -r --filter './packages/*' build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "lint": "eslint . --max-warnings=0 --cache --cache-location node_modules/.cache/eslint/",
