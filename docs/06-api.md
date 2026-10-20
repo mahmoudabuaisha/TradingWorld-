@@ -48,6 +48,14 @@ Base URL: `http://localhost:4000/api/v1` · JSON · `Authorization: Bearer <jwt>
 ## Admin 🔒 (role ≥ admin)
 `GET /admin/overview` · `GET /admin/users` · `PATCH /admin/users/:id/role {role}` · `GET /admin/zones?limit` · `GET /admin/audit` · `GET /admin/research/factors` · `GET /admin/outcomes?includeDemo` (حالة متتبع النتائج + معدلات التفاعل حسب الجودة/نطاق الدرجة/الأصل/الجلسة/الفريم + آخر الوسوم) · `POST /admin/outcomes/run` (وسم المناطق المفتوحة الآن) · `GET /admin/research/dataset?engineVersion&scoringVersion&includeDemo&limit` (عينات بشكل `services/ml` `POST /train` حرفيًا؛ demo مستثنى افتراضيًا) · `GET /admin/backfill` (نوع المخزن، حالة الوظيفة، تغطية كل سلسلة، آخر 50 دورة) · `POST /admin/backfill {kind: cycle|backfill|catchup|gaps|aggregate, symbol?, bars?}` (يُقبل فورًا ويعمل في الخلفية؛ يُسجَّل في audit)
 
+## رسوم الشارت (UI-01)
+| Method | Path | Body | الرد |
+|---|---|---|---|
+| GET | `/drawings?symbol=` | — | `{ symbol, drawings[] }` — رسومك فقط، مشتركة بين الفريمات |
+| POST | `/drawings` | `{ symbol, kind: trendline\|hline\|rect\|fib, points: [{ time, price }] }` | `{ drawing }` — عدد النقاط حسب الأداة (1 أو 2)؛ 409 `TOO_MANY_DRAWINGS` بعد 200 |
+| PATCH | `/drawings/:id` | `{ points }` | `{ drawing }` — المالك فقط، وعدد النقاط يطابق النوع المخزن |
+| DELETE | `/drawings/:id` · `/drawings?symbol=` | — | `{ ok }` · `{ removed }` |
+
 ## رأي المستخدم في المنطقة (AI-02)
 | Method | Path | Body | الرد |
 |---|---|---|---|

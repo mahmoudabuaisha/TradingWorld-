@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TIMEFRAMES } from "../timeframes.js";
 import { FACTOR_KEYS, FEEDBACK_COMMENT_MAX } from "../research.js";
+import { DRAWING_KINDS, DRAWING_POINTS } from "../drawings.js";
 
 export const timeframeSchema = z.enum(TIMEFRAMES);
 
@@ -43,6 +44,15 @@ export const zoneFeedbackSchema = z.object({
     .transform((s) => (s === undefined ? undefined : s.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, FEEDBACK_COMMENT_MAX) || undefined)),
 });
 export type ZoneFeedbackInput = z.infer<typeof zoneFeedbackSchema>;
+
+/** UI-01: a chart drawing anchored to (time, price). The point count must match the tool. */
+const drawingPoint = z.object({ time: z.number().int().min(946_684_800).max(4_102_444_800), price: z.number().finite().positive() });
+export const drawingCreateSchema = z.object({
+  symbol: z.string().min(3).max(20),
+  kind: z.enum(DRAWING_KINDS),
+  points: z.array(drawingPoint).min(1).max(2),
+}).refine((d) => d.points.length === DRAWING_POINTS[d.kind], { message: "point count does not match the drawing kind", path: ["points"] });
+export const drawingUpdateSchema = z.object({ points: z.array(drawingPoint).min(1).max(2) });
 
 export const alertCreateSchema = z.object({
   symbol: z.string().min(3).max(20),

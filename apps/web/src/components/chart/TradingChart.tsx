@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useRef } from "react";
-import type { IChartApi, ISeriesApi, UTCTimestamp, IPriceLine, LineStyle } from "lightweight-charts";
+import type { IChartApi, ISeriesApi, UTCTimestamp, IPriceLine, LineStyle, Logical } from "lightweight-charts";
 import type { AnalysisResult, Candle, Zone } from "@tradingworld/analysis-engine";
+import { DRAWING_POINTS, fibLevels, hitTest, logicalToTime, timeToLogical, type Drawing, type DrawingKind, type DrawingPixels, type DrawingPoint } from "@tradingworld/shared";
 import { useTokens, type Tokens } from "@/hooks/useTokens";
+import type { Tool } from "./DrawingToolbar";
 
 export interface ChartTrade { id: string; entry: number; stopLoss: number; takeProfit?: number; direction: "long" | "short" }
 
@@ -19,7 +21,20 @@ interface Props {
   calloutAnchor?: { x: number; y: number };
   /** open trades on this instrument, drawn as dimension lines */
   trades?: ChartTrade[];
+  /** UI-01: the human's drawings (chalk), the active tool and the bar duration used to place points between bars */
+  drawings?: Drawing[];
+  tool?: Tool;
+  stepSeconds?: number;
+  selectedDrawingId?: string;
+  onSelectDrawing?: (id?: string) => void;
+  onCreateDrawing?: (kind: DrawingKind, points: DrawingPoint[]) => void;
+  onUpdateDrawing?: (id: string, points: DrawingPoint[]) => void;
+  /** a drawing was completed: the workspace returns to the select tool */
+  onToolDone?: () => void;
 }
+
+interface Pending { kind: DrawingKind; points: DrawingPoint[]; hover?: DrawingPoint }
+interface Drag { id: string; part: "body" | number; startLogical: number; startPrice: number; orig: DrawingPoint[]; preview?: DrawingPoint[]; moved: boolean }
 
 const MONO = "IBM Plex Mono, ui-monospace, monospace";
 
@@ -29,8 +44,9 @@ const MONO = "IBM Plex Mono, ui-monospace, monospace";
  * a stamp on recently invalidated zones, a leader line from the survey callout to the selected zone,
  * a distance dimension from price to the selected zone, and open trades as dimension lines.
  */
-export function TradingChart({ candles, analysis, liveCandle, precision, selectedZoneId, onSelectZone, showStructure = true, showLevels = true, calloutAnchor, trades }: Props) {
+export function TradingChart({ candles, analysis, liveCandle, precision, selectedZoneId, onSelectZone, showStructure = true, showLevels = true, calloutAnchor, trades, drawings = [], tool = "select", stepSeconds = 300, selectedDrawingId, onSelectDrawing, onCreateDrawing, onUpdateDrawing, onToolDone }: Props) {
   const tokens = useTokens();
+  const wrapRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<IChartApi | undefined>(undefined);
@@ -43,6 +59,26 @@ export function TradingChart({ candles, analysis, liveCandle, precision, selecte
   const tradesRef = useRef(trades);
   const lastRef = useRef<{ price: number; atr: number } | undefined>(undefined);
   const patternsRef = useRef<{ up?: CanvasPattern; down?: CanvasPattern; key?: string }>({});
+  // drawings (UI-01): refs so the native pointer listeners always see current values
+  const drawingsRef = useRef(drawings);
+  const toolRef = useRef<Tool>(tool);
+  const stepRef = useRef(stepSeconds);
+  const selDrawingRef = useRef(selectedDrawingId);
+  const timesRef = useRef<number[]>([]);
+  const pendingRef = useRef<Pending | undefined>(undefined);
+  const dragRef = useRef<Drag | undefined>(undefined);
+  const suppressClickUntil = useRef(0);
+  const cbRef = useRef({ onSelectDrawing, onCreateDrawing, onUpdateDrawing, onToolDone });
+  drawingsRef.current = drawings;
+  toolRef.current = tool;
+  stepRef.current = stepSeconds;
+  selDrawingRef.current = selectedDrawingId;
+  cbRef.current = { onSelectDrawing, onCreateDrawing, onUpdateDrawing, onToolDone };
+  {
+    const t = candles.map((c) => c.time);
+    if (liveCandle && (!t.length || liveCandle.time > t[t.length - 1]!)) t.push(liveCandle.time);
+    timesRef.current = t;
+  }
   selectedRef.current = selectedZoneId;
   tokensRef.current = tokens;
   anchorRef.current = calloutAnchor;
@@ -62,7 +98,9 @@ export function TradingChart({ candles, analysis, liveCandle, precision, selecte
         crosshair: { mode: lc.CrosshairMode.Normal, vertLine: { color: tokens.ink3, labelBackgroundColor: tokens.raised }, horzLine: { color: tokens.ink3, labelBackgroundColor: tokens.raised } },
         rightPriceScale: { borderColor: tokens.rule },
         timeScale: { borderColor: tokens.rule, timeVisible: true, secondsVisible: false, rightOffset: 8 },
-        localization: { priceFormatter: (p: number) => p.toFixed(precision) },
+        // explicit locale: tick formatting otherwise uses navigator.language, and an invalid tag (e.g. "en-US@posix"
+        // from a POSIX environment) throws on every paint and leaves the chart blank; Latin digits also match the mono labels
+        localization: { locale: "en-US", priceFormatter: (p: number) => p.toFixed(precision) },
         autoSize: true,
       });
       const series = chart.addCandlestickSeries({ upColor: tokens.up, downColor: tokens.field, wickUpColor: tokens.up, wickDownColor: tokens.down, borderUpColor: tokens.up, borderDownColor: tokens.down, borderVisible: true, priceFormat: { type: "price", precision, minMove: 1 / 10 ** precision } });
@@ -70,6 +108,7 @@ export function TradingChart({ candles, analysis, liveCandle, precision, selecte
       seriesRef.current = series;
       chart.timeScale().subscribeVisibleLogicalRangeChange(() => draw());
       chart.subscribeClick((p) => {
+        if (performance.now() < suppressClickUntil.current) return; // that click placed or moved a drawing
         if (!p.point || !seriesRef.current) return;
         const price = seriesRef.current.coordinateToPrice(p.point.y);
         if (price === null) return;
@@ -154,7 +193,150 @@ export function TradingChart({ candles, analysis, liveCandle, precision, selecte
     draw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedZoneId, analysis]);
-  useEffect(() => { draw(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [calloutAnchor, trades]);
+  useEffect(() => { draw(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [calloutAnchor, trades, drawings, selectedDrawingId]);
+
+  // a drawing tool takes the pointer: the chart must not pan or zoom under it; switching tools drops a half-placed drawing
+  useEffect(() => {
+    pendingRef.current = undefined;
+    const drawing = tool !== "select";
+    chartRef.current?.applyOptions({ handleScroll: !drawing, handleScale: !drawing });
+    if (wrapRef.current) wrapRef.current.style.cursor = drawing ? "crosshair" : "";
+    draw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool]);
+
+  // ── drawings: geometry (time ↔ fractional bar index, so points sit correctly on any timeframe and in the future area)
+  function toX(time: number): number | null {
+    const chart = chartRef.current;
+    if (!chart || !timesRef.current.length) return null;
+    // lightweight-charts maps only whole bar indices (a fractional index comes back as 0), so interpolate between the
+    // two neighbouring bars — a drawing made on 5m then sits at the right spot inside a 15m or 1h bar
+    const l = timeToLogical(timesRef.current, time, stepRef.current);
+    const i = Math.floor(l), f = l - i;
+    const ts = chart.timeScale();
+    const x0 = ts.logicalToCoordinate(i as Logical);
+    if (x0 === null) return null;
+    if (f === 0) return x0;
+    const x1 = ts.logicalToCoordinate((i + 1) as Logical);
+    return x1 === null ? null : x0 + (x1 - x0) * f;
+  }
+  function toY(price: number): number | null { return seriesRef.current?.priceToCoordinate(price) ?? null; }
+  function fromXY(x: number, y: number): DrawingPoint | undefined {
+    const chart = chartRef.current, series = seriesRef.current;
+    if (!chart || !series || !timesRef.current.length) return undefined;
+    const l = chart.timeScale().coordinateToLogical(x);
+    const price = series.coordinateToPrice(y);
+    if (l === null || price === null || price <= 0) return undefined;
+    return { time: logicalToTime(timesRef.current, l, stepRef.current), price: Number(price.toFixed(precision + 2)) };
+  }
+  function pixels(kind: DrawingKind, pts: DrawingPoint[]): DrawingPixels | undefined {
+    const xy = pts.map((p) => ({ x: toX(p.time), y: toY(p.price) }));
+    if (xy.some((q) => q.x === null || q.y === null)) return undefined;
+    const out: DrawingPixels = { kind, pts: xy as { x: number; y: number }[] };
+    if (kind === "fib" && pts.length === 2) out.levels = fibLevels(pts[0]!, pts[1]!).map((l) => ({ y: toY(l.price) ?? -1e6 }));
+    return out;
+  }
+
+  // ── drawings: pointer handling (capture phase, before the chart sees the event)
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const local = (e: PointerEvent) => { const r = containerRef.current!.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    const plotRight = () => (containerRef.current?.clientWidth ?? 0) - (chartRef.current?.priceScale("right").width() ?? 0);
+    const consume = (e: PointerEvent) => { e.preventDefault(); e.stopPropagation(); suppressClickUntil.current = performance.now() + 600; };
+    const hitAt = (x: number, y: number) => {
+      const list = [...drawingsRef.current].reverse(); // topmost (last drawn) first, the selected one before all
+      const sel = list.findIndex((d) => d.id === selDrawingRef.current);
+      if (sel > 0) list.unshift(...list.splice(sel, 1));
+      for (const d of list) {
+        const px = pixels(d.kind, d.points);
+        const hit = px && hitTest(px, x, y, plotRight());
+        if (hit) return { d, hit };
+      }
+      return undefined;
+    };
+
+    const down = (e: PointerEvent) => {
+      if (e.button !== 0 || !chartRef.current || !seriesRef.current) return;
+      const { x, y } = local(e);
+      if (x < 0 || x > plotRight()) return;
+      const t = toolRef.current;
+      if (t !== "select") {
+        const pt = fromXY(x, y);
+        if (!pt) return;
+        consume(e);
+        const p = pendingRef.current ?? { kind: t, points: [] };
+        p.points.push(pt);
+        p.hover = pt;
+        if (p.points.length >= DRAWING_POINTS[t]) {
+          pendingRef.current = undefined;
+          cbRef.current.onCreateDrawing?.(t, p.points);
+          cbRef.current.onToolDone?.();
+        } else pendingRef.current = p;
+        draw();
+        return;
+      }
+      const found = hitAt(x, y);
+      if (!found) { if (selDrawingRef.current) cbRef.current.onSelectDrawing?.(undefined); return; }
+      consume(e);
+      cbRef.current.onSelectDrawing?.(found.d.id);
+      const l = chartRef.current.timeScale().coordinateToLogical(x);
+      const price = seriesRef.current.coordinateToPrice(y);
+      if (l === null || price === null) return;
+      dragRef.current = { id: found.d.id, part: found.hit.part === "handle" ? found.hit.index : "body", startLogical: l, startPrice: price, orig: found.d.points, moved: false };
+      chartRef.current.applyOptions({ handleScroll: false, handleScale: false });
+      try { el.setPointerCapture(e.pointerId); } catch { /* not all pointers can be captured */ }
+    };
+
+    const move = (e: PointerEvent) => {
+      const chart = chartRef.current, series = seriesRef.current;
+      if (!chart || !series) return;
+      const { x, y } = local(e);
+      const p = pendingRef.current;
+      if (p) { const pt = fromXY(x, y); if (pt) { p.hover = pt; draw(); } return; }
+      const dg = dragRef.current;
+      if (!dg) {
+        if (toolRef.current === "select") el.style.cursor = x <= plotRight() && hitAt(x, y) ? "move" : "";
+        return;
+      }
+      const l = chart.timeScale().coordinateToLogical(x);
+      const price = series.coordinateToPrice(y);
+      if (l === null || price === null) return;
+      const times = timesRef.current, step = stepRef.current;
+      const round = (v: number) => Number(v.toFixed(precision + 2));
+      if (dg.part === "body") {
+        const dl = l - dg.startLogical, dp = price - dg.startPrice;
+        dg.preview = dg.orig.map((q) => ({ time: logicalToTime(times, timeToLogical(times, q.time, step) + dl, step), price: round(q.price + dp) }));
+      } else {
+        dg.preview = dg.orig.map((q, i) => (i === dg.part ? { time: logicalToTime(times, l, step), price: round(price) } : q));
+      }
+      dg.moved = true;
+      draw();
+    };
+
+    const up = (e: PointerEvent) => {
+      const dg = dragRef.current;
+      if (!dg) return;
+      dragRef.current = undefined;
+      chartRef.current?.applyOptions({ handleScroll: toolRef.current === "select", handleScale: toolRef.current === "select" });
+      try { el.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+      suppressClickUntil.current = performance.now() + 600;
+      if (dg.moved && dg.preview && dg.preview.every((q) => q.price > 0)) cbRef.current.onUpdateDrawing?.(dg.id, dg.preview);
+      draw();
+    };
+
+    el.addEventListener("pointerdown", down, true);
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+    return () => {
+      el.removeEventListener("pointerdown", down, true);
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", up);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [precision]);
 
   function hatch(ctx: CanvasRenderingContext2D, dir: "up" | "down"): CanvasPattern | null {
     const tk = tokensRef.current;
@@ -307,10 +489,58 @@ export function TradingChart({ candles, analysis, liveCandle, precision, selecte
         ctx.beginPath(); ctx.arc(a.x, a.y, 2, 0, Math.PI * 2); ctx.fill();
       }
     }
+    // ── the human's drawings, in chalk, above the engine's marks
+    const dg = dragRef.current;
+    for (const d of drawingsRef.current) renderDrawing(ctx, d.kind, dg && dg.id === d.id && dg.preview ? dg.preview : d.points, right, tk, d.id === selDrawingRef.current, false);
+    const pend = pendingRef.current;
+    if (pend) {
+      const pts = pend.hover ? [...pend.points, pend.hover] : pend.points;
+      if (pts.length >= DRAWING_POINTS[pend.kind]) renderDrawing(ctx, pend.kind, pts.slice(0, DRAWING_POINTS[pend.kind]), right, tk, false, true);
+    }
+  }
+
+  /** Draw one drawing in chalk (the human colour). `ghost` = being placed. */
+  function renderDrawing(ctx: CanvasRenderingContext2D, kind: DrawingKind, pts: DrawingPoint[], right: number, tk: Tokens, sel: boolean, ghost: boolean) {
+    const px = pixels(kind, pts);
+    if (!px) return;
+    const chalk = tk.ink;
+    ctx.save();
+    ctx.strokeStyle = chalk; ctx.fillStyle = chalk;
+    ctx.lineWidth = sel ? 2 : 1.5;
+    ctx.setLineDash(ghost ? [5, 4] : []);
+    const [a, b] = px.pts;
+    if (kind === "hline" && a) {
+      ctx.beginPath(); ctx.moveTo(0, a.y + 0.5); ctx.lineTo(right, a.y + 0.5); ctx.stroke();
+      labelBox(ctx, pts[0]!.price.toFixed(precision), right - 4, a.y - 3, chalk, "right");
+    } else if (kind === "trendline" && a && b) {
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    } else if (kind === "rect" && a && b) {
+      const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y), w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
+      ctx.globalAlpha = 0.07; ctx.fillRect(x, y, w, h); ctx.globalAlpha = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, w, h);
+    } else if (kind === "fib" && a && b && pts.length === 2) {
+      const x1 = Math.min(a.x, b.x), x2 = Math.max(a.x, b.x);
+      ctx.save(); ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.globalAlpha = 0.6;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.restore();
+      for (const lv of fibLevels(pts[0]!, pts[1]!)) {
+        const y = toY(lv.price);
+        if (y === null) continue;
+        const key = lv.ratio === 0.5 || lv.ratio === 0.618;
+        ctx.globalAlpha = key ? 1 : 0.7; ctx.lineWidth = key ? 1.25 : 1;
+        ctx.beginPath(); ctx.moveTo(x1, y + 0.5); ctx.lineTo(x2, y + 0.5); ctx.stroke();
+        ctx.globalAlpha = 1;
+        labelBox(ctx, `${lv.ratio} · ${lv.price.toFixed(precision)}`, x1 + 3, y - 3, chalk, "left");
+      }
+    }
+    if (sel || ghost) {
+      ctx.setLineDash([]); ctx.lineWidth = 1;
+      for (const q of px.pts) { ctx.fillStyle = tk.field; ctx.fillRect(q.x - 3.5, q.y - 3.5, 7, 7); ctx.strokeStyle = chalk; ctx.strokeRect(q.x - 3.5, q.y - 3.5, 7, 7); }
+    }
+    ctx.restore();
   }
 
   return (
-    <div className="relative h-full w-full">
+    <div ref={wrapRef} className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
       <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 z-[3]" />
     </div>

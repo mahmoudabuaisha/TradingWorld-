@@ -1,5 +1,5 @@
 import type { AnalysisResult, Candle } from "@tradingworld/analysis-engine";
-import type { Timeframe, ProviderStatus, FeedStatus, FeedState, ProviderId, AssetClass } from "@tradingworld/shared";
+import type { Timeframe, ProviderStatus, FeedStatus, FeedState, ProviderId, AssetClass, Drawing, DrawingKind, DrawingPoint } from "@tradingworld/shared";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:4000/ws";
@@ -7,7 +7,8 @@ export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:4000/ws"
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   const res = await fetch(`${API_URL}/api/v1${path}`, {
     ...init,
-    headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}), ...(init.headers ?? {}) },
+    // content-type only with a body: Fastify rejects a body-less request (e.g. DELETE) that claims to carry JSON with 400
+    headers: { ...(init.body !== undefined ? { "content-type": "application/json" } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}), ...(init.headers ?? {}) },
     cache: "no-store",
   });
   if (!res.ok) {
@@ -42,6 +43,11 @@ export const api = {
   saveZoneFeedback: (token: string, key: string, b: { useful: boolean; bestFactor?: string; comment?: string }) => request<{ feedback: ZoneFeedback }>(`/zones/${encodeURIComponent(key)}/feedback`, { method: "PUT", body: JSON.stringify(b) }, token),
   deleteZoneFeedback: (token: string, key: string) => request<{ ok: true }>(`/zones/${encodeURIComponent(key)}/feedback`, { method: "DELETE" }, token),
   adminFeedback: (token: string, includeDemo = false) => request<AdminFeedback>(`/admin/feedback${includeDemo ? "?includeDemo=1" : ""}`, {}, token),
+  drawings: (token: string, symbol: string) => request<{ drawings: Drawing[] }>(`/drawings?symbol=${encodeURIComponent(symbol)}`, {}, token),
+  createDrawing: (token: string, b: { symbol: string; kind: DrawingKind; points: DrawingPoint[] }) => request<{ drawing: Drawing }>("/drawings", { method: "POST", body: JSON.stringify(b) }, token),
+  updateDrawing: (token: string, id: string, points: DrawingPoint[]) => request<{ drawing: Drawing }>(`/drawings/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ points }) }, token),
+  deleteDrawing: (token: string, id: string) => request<{ ok: true }>(`/drawings/${encodeURIComponent(id)}`, { method: "DELETE" }, token),
+  clearDrawings: (token: string, symbol: string) => request<{ removed: number }>(`/drawings?symbol=${encodeURIComponent(symbol)}`, { method: "DELETE" }, token),
   adminFactors: (token: string) => request<{ sample: number; factors: Record<string, { present: number; total: number; avgScoreWhenPresent: number }>; byStatus: Record<string, number> }>("/admin/research/factors", {}, token),
 };
 

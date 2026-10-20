@@ -11,6 +11,7 @@ beforeAll(async () => {
   await app.ready();
 });
 afterAll(async () => { await app.close(); });
+const ctxRepos = () => app.ctx.repos;
 
 describe("api", () => {
   it("health", async () => {
@@ -108,6 +109,45 @@ describe("api", () => {
     expect((await app.inject({ method: "GET", url: "/api/v1/admin/feedback", headers: h })).json().total).toBe(0); // demo excluded by default
     expect((await app.inject({ method: "DELETE", url: `/api/v1/zones/${key}/feedback`, headers: h })).json()).toEqual({ ok: true });
     expect((await app.inject({ method: "DELETE", url: `/api/v1/zones/${key}/feedback`, headers: h })).statusCode).toBe(404);
+  });
+
+  it("drawings: create, list per symbol, move, validate, owner-only, limit, clear", async () => {
+    const h = { authorization: `Bearer ${token}` };
+    const T = 1_792_400_000;
+    expect((await app.inject({ method: "GET", url: "/api/v1/drawings?symbol=XAUUSD" })).statusCode).toBe(401);
+    const fib = await app.inject({ method: "POST", url: "/api/v1/drawings", headers: h, payload: { symbol: "xauusd", kind: "fib", points: [{ time: T, price: 2400 }, { time: T + 3600, price: 2450 }] } });
+    expect(fib.statusCode).toBe(200);
+    expect(fib.json().drawing).toMatchObject({ symbol: "XAUUSD", kind: "fib" });
+    const id = fib.json().drawing.id;
+    expect((await app.inject({ method: "POST", url: "/api/v1/drawings", headers: h, payload: { symbol: "XAUUSD", kind: "hline", points: [{ time: T, price: 1 }, { time: T, price: 2 }] } })).statusCode).toBe(400);
+    expect((await app.inject({ method: "POST", url: "/api/v1/drawings", headers: h, payload: { symbol: "NOPE1", kind: "hline", points: [{ time: T, price: 1 }] } })).json().error).toBe("UNKNOWN_INSTRUMENT");
+    expect((await app.inject({ method: "GET", url: "/api/v1/drawings?symbol=XAUUSD", headers: h })).json().drawings.length).toBe(1);
+    expect((await app.inject({ method: "GET", url: "/api/v1/drawings?symbol=EURUSD", headers: h })).json().drawings).toEqual([]);
+    // move: point count must match the stored kind
+    expect((await app.inject({ method: "PATCH", url: `/api/v1/drawings/${id}`, headers: h, payload: { points: [{ time: T, price: 2401 }] } })).statusCode).toBe(400);
+    const moved = await app.inject({ method: "PATCH", url: `/api/v1/drawings/${id}`, headers: h, payload: { points: [{ time: T + 300, price: 2401 }, { time: T + 3900, price: 2455 }] } });
+    expect(moved.json().drawing.points[0]).toEqual({ time: T + 300, price: 2401 });
+    // another user cannot see, move or delete it
+    const other = await app.inject({ method: "POST", url: "/api/v1/auth/register", payload: { email: "draw-other@b.co", password: "password123", displayName: "Other" } });
+    const h2 = { authorization: `Bearer ${other.json().token}` };
+    expect((await app.inject({ method: "GET", url: "/api/v1/drawings?symbol=XAUUSD", headers: h2 })).json().drawings).toEqual([]);
+    expect((await app.inject({ method: "PATCH", url: `/api/v1/drawings/${id}`, headers: h2, payload: { points: [{ time: T, price: 1 }, { time: T, price: 2 }] } })).statusCode).toBe(404);
+    expect((await app.inject({ method: "DELETE", url: `/api/v1/drawings/${id}`, headers: h2 })).statusCode).toBe(404);
+    // per-symbol limit
+    for (let i = 0; i < 199; i++) await ctxRepos().drawings.create(other.json().user.id, { symbol: "EURUSD", kind: "hline", points: [{ time: T, price: 1 + i / 1000 }] });
+    expect((await app.inject({ method: "POST", url: "/api/v1/drawings", headers: h2, payload: { symbol: "EURUSD", kind: "hline", points: [{ time: T, price: 2 }] } })).statusCode).toBe(200);
+    expect((await app.inject({ method: "POST", url: "/api/v1/drawings", headers: h2, payload: { symbol: "EURUSD", kind: "hline", points: [{ time: T, price: 2 }] } })).json().error).toBe("TOO_MANY_DRAWINGS");
+    expect((await app.inject({ method: "DELETE", url: "/api/v1/drawings?symbol=EURUSD", headers: h2 })).json()).toEqual({ removed: 200 });
+    expect((await app.inject({ method: "DELETE", url: `/api/v1/drawings/${id}`, headers: h })).json()).toEqual({ ok: true });
+  });
+
+  it("body-less DELETE requests succeed the way browsers send them (regression: content-type without a body was a 400)", async () => {
+    const h = { authorization: `Bearer ${token}` };
+    const al = (await app.inject({ method: "POST", url: "/api/v1/alerts", headers: h, payload: { symbol: "XAUUSD", kind: "price_above", price: 9999 } })).json().alert;
+    // what the web client used to send: JSON content-type, no body
+    expect((await app.inject({ method: "DELETE", url: `/api/v1/alerts/${al.id}`, headers: { ...h, "content-type": "application/json" } })).statusCode).toBe(400);
+    // what it sends now
+    expect((await app.inject({ method: "DELETE", url: `/api/v1/alerts/${al.id}`, headers: h })).json()).toEqual({ ok: true });
   });
 
   it("ai chat answers deterministically without a key", async () => {

@@ -20,7 +20,7 @@ function migrate(url: string) {
 let prisma: PrismaRepositories | undefined;
 async function resetPrisma() {
   const db = prisma!.client;
-  await db.$executeRawUnsafe(`TRUNCATE "ZoneFeedback", "ZoneOutcome", "Zone", "AuditLog", "ZoneLog", "Trade", "Alert", "Watchlist", "Session", "User" CASCADE`);
+  await db.$executeRawUnsafe(`TRUNCATE "Drawing", "ZoneFeedback", "ZoneOutcome", "Zone", "AuditLog", "ZoneLog", "Trade", "Alert", "Watchlist", "Session", "User" CASCADE`);
 }
 
 const impls: { name: string; make: () => Promise<Repositories> }[] = [{ name: "memory", make: async () => createMemoryRepositories() }];
@@ -179,6 +179,35 @@ describe.each(impls)("Repositories contract ($name)", ({ make }) => {
     expect(await repos.feedback.remove("fk-real", u.id)).toBe(true);
     expect(await repos.feedback.remove("fk-real", u.id)).toBe(false);
     expect(await repos.feedback.get("fk-real", u.id)).toBeUndefined();
+  });
+
+  it("drawings: per user and symbol, owner-scoped update/remove, clear", async () => {
+    const u = await repos.users.create({ email: "dr@tw.test", displayName: "Dr", passwordHash: "h", role: "user", settings: {} });
+    const v = await repos.users.create({ email: "dr2@tw.test", displayName: "Dr2", passwordHash: "h", role: "user", settings: {} });
+    const T = 1_792_400_000;
+    const a = await repos.drawings.create(u.id, { symbol: "XAUUSD", kind: "trendline", points: [{ time: T, price: 2400.5 }, { time: T + 900, price: 2412.25 }] });
+    await sleep(3);
+    const b = await repos.drawings.create(u.id, { symbol: "XAUUSD", kind: "hline", points: [{ time: T, price: 2390 }] });
+    await repos.drawings.create(u.id, { symbol: "EURUSD", kind: "fib", points: [{ time: T, price: 1.08 }, { time: T + 600, price: 1.09 }] });
+    await repos.drawings.create(v.id, { symbol: "XAUUSD", kind: "rect", points: [{ time: T, price: 1 }, { time: T + 1, price: 2 }] });
+    expect(a).toMatchObject({ symbol: "XAUUSD", kind: "trendline", points: [{ time: T, price: 2400.5 }, { time: T + 900, price: 2412.25 }] });
+    expect(typeof a.createdAt).toBe("number");
+    expect((a as unknown as Record<string, unknown>).userId).toBeUndefined();
+    expect((await repos.drawings.list(u.id, "XAUUSD")).map((d) => d.id)).toEqual([a.id, b.id]);
+    expect(await repos.drawings.count(u.id, "XAUUSD")).toBe(2);
+    expect((await repos.drawings.get(a.id, u.id))?.kind).toBe("trendline");
+    expect(await repos.drawings.get(a.id, v.id)).toBeUndefined();
+    expect(await repos.drawings.update(a.id, v.id, [{ time: T, price: 1 }, { time: T, price: 2 }])).toBeUndefined();
+    await sleep(3);
+    const moved = await repos.drawings.update(a.id, u.id, [{ time: T + 300, price: 2401 }, { time: T + 1200, price: 2415 }]);
+    expect(moved?.points).toEqual([{ time: T + 300, price: 2401 }, { time: T + 1200, price: 2415 }]);
+    expect(moved!.updatedAt).toBeGreaterThan(a.updatedAt);
+    expect(await repos.drawings.remove(b.id, v.id)).toBe(false);
+    expect(await repos.drawings.remove(b.id, u.id)).toBe(true);
+    expect(await repos.drawings.clear(u.id, "XAUUSD")).toBe(1);
+    expect(await repos.drawings.list(u.id, "XAUUSD")).toEqual([]);
+    expect((await repos.drawings.list(u.id, "EURUSD")).length).toBe(1);
+    expect((await repos.drawings.list(v.id, "XAUUSD")).length).toBe(1);
   });
 
   it("audit: append with meta, newest first", async () => {

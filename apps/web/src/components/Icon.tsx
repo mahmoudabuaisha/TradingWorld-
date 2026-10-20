@@ -1,7 +1,8 @@
 /** Kharita line icons: one stroke weight, no fills, drawn for a 20px grid. No emoji anywhere in the shell. */
 export type IconName =
   | "home" | "analysis" | "markets" | "tools" | "lab" | "journal" | "learn" | "community"
-  | "search" | "settings" | "admin" | "user" | "sun" | "moon" | "close" | "bell" | "refresh" | "menu" | "chevron" | "logout" | "check";
+  | "search" | "settings" | "admin" | "user" | "sun" | "moon" | "close" | "bell" | "refresh" | "menu" | "chevron" | "logout" | "check"
+  | "cursor" | "trendline" | "hline" | "rect" | "fib" | "trash";
 
 const PATHS: Record<IconName, string> = {
   home: "M4 3h8.5L16 6.5V17H4zM12.5 3v3.5H16",
@@ -25,6 +26,12 @@ const PATHS: Record<IconName, string> = {
   chevron: "M8 5l5 5-5 5",
   logout: "M8 4H4v12h4M12 7l3 3-3 3M7 10h8",
   check: "M4 10.5l4 4 8-9",
+  cursor: "M5 3l10 6.5-4.5 1.2L8.3 15z",
+  trendline: "M3.5 16.5l13-13M3.5 16.5h.01M16.5 3.5h.01",
+  hline: "M2.5 10h15M5 6.5v7",
+  rect: "M3.5 5.5h13v9h-13z",
+  fib: "M3 4h14M3 8h14M3 11.5h14M3 16h14M5 16L15 4",
+  trash: "M4 6h12M8 6V4h4v2M6 6l.8 10h6.4L14 6",
 };
 
 export function Icon({ name, size = 18, className = "", strokeWidth = 1.5 }: { name: IconName; size?: number; className?: string; strokeWidth?: number }) {

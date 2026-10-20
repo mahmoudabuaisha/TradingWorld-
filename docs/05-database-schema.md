@@ -16,6 +16,7 @@
 | `ZoneOutcome` | نتيجة السوق النهائية (label للـML) عند الإبطال أو نهاية الأفق | `label` (REACTED/INVALIDATED/TESTED/UNTOUCHED)، `reason`، `outcomeVersion`، MFE/MAE/التفاعل بالـATR، `barsToOutcome`، `horizonBars`، retests، session، regime |
 | `ZoneFeedback` | رأي المستخدم في منطقة (AI-02): مفيد/غير مفيد، العامل الأكثر إقناعًا، ملاحظة | **منفصل** عن ZoneOutcome عمدًا؛ فريد (zoneId, userId)، `updatedAt` للتعديل |
 | `BacktestRun` | نتائج اختبارات تاريخية مع المعاملات والإصدار | |
+| `Drawing` | رسوم المستخدم على الشارت (UI-01): `kind` + `points` JSON بنقاط (وقت، سعر) | لكل (userId, symbol)، مشتركة بين الفريمات؛ حد 200 لكل أصل |
 | `Watchlist` | قوائم متابعة متعددة لكل مستخدم | |
 | `Alert` | سعر/منطقة، triggeredAt | |
 | `Trade` | سجل التداول + `zoneId` و`snapshotId` للربط | R multiple مخزن |

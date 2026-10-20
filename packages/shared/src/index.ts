@@ -3,6 +3,7 @@ export * from "./feeds.js";
 export * from "./instruments.js";
 export * from "./marketHours.js";
 export * from "./research.js";
+export * from "./drawings.js";
 export * from "./sessions.js";
 export * from "./modules.js";
 export * from "./roles.js";

@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from "@tradingworld/db";
-import { DEFAULT_INSTRUMENTS, type Role } from "@tradingworld/shared";
+import { DEFAULT_INSTRUMENTS, type Role, type Drawing, type DrawingKind, type DrawingPoint } from "@tradingworld/shared";
 import type { Zone, OutcomeLabel } from "@tradingworld/analysis-engine";
 import type { Repositories, User, Alert, JournalTrade, ZoneLogEntry, AuditEntry, TrackedZone, ZoneQuery, ZoneFeedbackEntry } from "./memory.js";
 
@@ -35,6 +35,9 @@ const toTracked = (z: DbZone): TrackedZone => ({
     horizonBars: z.outcome.horizonBars, retests: z.outcome.retests, resolvedAt: ms(z.outcome.resolvedAt),
   } : undefined,
 });
+
+type DbDrawing = Prisma.DrawingGetPayload<object>;
+const toDrawing = (d: DbDrawing): Drawing => ({ id: d.id, symbol: d.symbol, kind: d.kind as DrawingKind, points: d.points as unknown as DrawingPoint[], createdAt: ms(d.createdAt), updatedAt: ms(d.updatedAt) });
 
 type DbFeedback = Prisma.ZoneFeedbackGetPayload<object>;
 const toFeedback = (f: DbFeedback): ZoneFeedbackEntry => ({ id: f.id, zoneKey: f.zoneId, userId: f.userId, useful: f.useful, bestFactor: opt(f.bestFactor), comment: opt(f.comment), createdAt: ms(f.createdAt), updatedAt: ms(f.updatedAt) });
@@ -179,6 +182,21 @@ export function createPrismaRepositories(databaseUrl: string, opts: { client?: P
       async list(q) { return (await db.zone.findMany({ where: zoneWhere(q), include: { outcome: true }, orderBy: { detectedAt: "desc" }, take: q.limit ?? 1000 })).map(toTracked); },
       async count(q) { return db.zone.count({ where: zoneWhere(q) }); },
       async get(key) { const z = await db.zone.findUnique({ where: { id: key }, include: { outcome: true } }); return z ? toTracked(z) : undefined; },
+    },
+
+    drawings: {
+      async list(userId, symbol) { return (await db.drawing.findMany({ where: { userId, symbol }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] })).map(toDrawing); },
+      async count(userId, symbol) { return db.drawing.count({ where: { userId, symbol } }); },
+      async get(id, userId) { const d = await db.drawing.findFirst({ where: { id, userId } }); return d ? toDrawing(d) : undefined; },
+      async create(userId, d) { return toDrawing(await db.drawing.create({ data: { userId, symbol: d.symbol, kind: d.kind, points: json(d.points) } })); },
+      async update(id, userId, points) {
+        const res = await db.drawing.updateMany({ where: { id, userId }, data: { points: json(points) } });
+        if (!res.count) return undefined;
+        const d = await db.drawing.findUnique({ where: { id } });
+        return d ? toDrawing(d) : undefined;
+      },
+      async remove(id, userId) { return (await db.drawing.deleteMany({ where: { id, userId } })).count > 0; },
+      async clear(userId, symbol) { return (await db.drawing.deleteMany({ where: { userId, symbol } })).count; },
     },
 
     feedback: {

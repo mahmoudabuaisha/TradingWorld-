@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Role } from "@tradingworld/shared";
+import type { Role, Drawing, DrawingKind, DrawingPoint } from "@tradingworld/shared";
 import type { Zone, Regime, OutcomeLabel } from "@tradingworld/analysis-engine";
 
 /**
@@ -95,6 +95,18 @@ export interface Repositories {
     count(q: ZoneQuery): Promise<number>;
     get(key: string): Promise<TrackedZone | undefined>;
   };
+  /** chart drawings (UI-01), per user and symbol */
+  drawings: {
+    list(userId: string, symbol: string): Promise<Drawing[]>;
+    count(userId: string, symbol: string): Promise<number>;
+    /** owner-scoped */
+    get(id: string, userId: string): Promise<Drawing | undefined>;
+    create(userId: string, d: { symbol: string; kind: DrawingKind; points: DrawingPoint[] }): Promise<Drawing>;
+    /** owner-scoped; undefined when not found or not the owner */
+    update(id: string, userId: string, points: DrawingPoint[]): Promise<Drawing | undefined>;
+    remove(id: string, userId: string): Promise<boolean>;
+    clear(userId: string, symbol: string): Promise<number>;
+  };
   /** user feedback (AI-02) — kept apart from outcomes on purpose */
   feedback: {
     /** one vote per user and zone: replaces the previous one (absent optional fields are cleared) */
@@ -118,6 +130,8 @@ export function createMemoryRepositories(): Repositories {
   const zoneLog: ZoneLogEntry[] = [];
   const tracked = new Map<string, TrackedZone>();
   const feedback = new Map<string, ZoneFeedbackEntry>(); // `${zoneKey}|${userId}`
+  const drawings = new Map<string, Drawing & { userId: string }>();
+  const publicDrawing = ({ userId: _u, ...d }: Drawing & { userId: string }): Drawing => ({ ...d, points: d.points.map((p) => ({ ...p })) });
   const audit: AuditEntry[] = [];
   const MAX_LOG = 20_000;
 
@@ -162,6 +176,15 @@ export function createMemoryRepositories(): Repositories {
       async list(q) { return [...tracked.values()].filter((z) => matches(z, q)).sort((a, b) => b.detectedAt - a.detectedAt).slice(0, q.limit ?? 1000); },
       async count(q) { return [...tracked.values()].filter((z) => matches(z, q)).length; },
       async get(key) { return tracked.get(key); },
+    },
+    drawings: {
+      async list(userId, symbol) { return [...drawings.values()].filter((d) => d.userId === userId && d.symbol === symbol).sort((a, b) => a.createdAt - b.createdAt).map(publicDrawing); },
+      async count(userId, symbol) { return [...drawings.values()].filter((d) => d.userId === userId && d.symbol === symbol).length; },
+      async get(id, userId) { const d = drawings.get(id); return d && d.userId === userId ? publicDrawing(d) : undefined; },
+      async create(userId, d) { const now = Date.now(); const row = { ...d, points: d.points.map((p) => ({ ...p })), id: randomUUID(), userId, createdAt: now, updatedAt: now }; drawings.set(row.id, row); return publicDrawing(row); },
+      async update(id, userId, points) { const d = drawings.get(id); if (!d || d.userId !== userId) return undefined; d.points = points.map((p) => ({ ...p })); d.updatedAt = Date.now(); return publicDrawing(d); },
+      async remove(id, userId) { const d = drawings.get(id); if (!d || d.userId !== userId) return false; drawings.delete(id); return true; },
+      async clear(userId, symbol) { let n = 0; for (const [id, d] of drawings) if (d.userId === userId && d.symbol === symbol) { drawings.delete(id); n++; } return n; },
     },
     feedback: {
       async upsert(f) {

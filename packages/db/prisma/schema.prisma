@@ -79,6 +79,7 @@ model User {
   trades     Trade[]
   notes      Note[]
   feedback   ZoneFeedback[]
+  drawings   Drawing[]
   audit      AuditLog[]
   goals      Goal[]
 }
@@ -290,6 +291,20 @@ model Trade {
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
   @@index([userId, openedAt(sort: Desc)])
+}
+
+/// UI-01: a user's chart drawing (trend line, horizontal line, rectangle, Fibonacci), anchored to (time, price).
+/// Per user and symbol, shared across timeframes. `points` = [{ time (unix s), price }].
+model Drawing {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol    String
+  kind      String   // trendline | hline | rect | fib
+  points    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId, symbol])
 }
 
 model Note {

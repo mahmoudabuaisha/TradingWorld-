@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { AnalysisResult, Candle, Zone } from "@tradingworld/analysis-engine";
-import { DEFAULT_INSTRUMENTS, TIMEFRAMES, findInstrument, type Timeframe, type ProviderStatus, type FeedStatus } from "@tradingworld/shared";
+import { DEFAULT_INSTRUMENTS, TIMEFRAMES, findInstrument, type Timeframe, type ProviderStatus, type FeedStatus , TIMEFRAME_SECONDS } from "@tradingworld/shared";
 import { api } from "@/lib/api";
 import { subscribeMarket } from "@/lib/ws";
 import { useApp } from "@/store/useApp";
@@ -11,6 +11,8 @@ import { SidePanel } from "./SidePanel";
 import { ZoneDetails } from "./ZoneDetails";
 import { AiChat } from "./AiChat";
 import { TitleBlock } from "./TitleBlock";
+import { DrawingToolbar, type Tool } from "./DrawingToolbar";
+import { useDrawings } from "@/hooks/useDrawings";
 import { SessionDial } from "../marks/SessionDial";
 import { Icon } from "../Icon";
 
@@ -34,6 +36,10 @@ export function ChartWorkspace() {
   const [trades, setTrades] = useState<ChartTrade[]>([]);
   const [anchor, setAnchor] = useState<{ x: number; y: number }>();
   const [toast, setToast] = useState<string>();
+  // UI-01: the human's drawings for this symbol (all timeframes), the active tool and the selected drawing
+  const [tool, setTool] = useState<Tool>("select");
+  const [selDrawing, setSelDrawing] = useState<string>();
+  const sketch = useDrawings(symbol, token ?? undefined);
   const [error, setError] = useState<string>();
   const hostRef = useRef<HTMLDivElement>(null);
   const calloutRef = useRef<HTMLDivElement>(null);
@@ -66,6 +72,23 @@ export function ChartWorkspace() {
     if (!token) { setTrades([]); return; }
     api.journal(token).then((j) => setTrades(j.trades.filter((x) => x.exitPrice === undefined && x.symbol === symbol).map((x) => ({ id: x.id, entry: x.entry, stopLoss: x.stopLoss, takeProfit: x.takeProfit, direction: x.direction })))).catch(() => setTrades([]));
   }, [token, symbol]);
+
+  useEffect(() => { setSelDrawing(undefined); setTool("select"); }, [symbol]);
+
+  // keyboard: V T H R F pick a tool, Esc cancels, Delete removes the selected drawing (never while typing)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (e.metaKey || e.ctrlKey || e.altKey || (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)))) return;
+      const map: Record<string, Tool> = { v: "select", t: "trendline", h: "hline", r: "rect", f: "fib" };
+      const k = e.key.toLowerCase();
+      if (map[k]) { setTool(map[k]!); e.preventDefault(); }
+      else if (e.key === "Escape") { setTool("select"); setSelDrawing(undefined); }
+      else if ((e.key === "Delete" || e.key === "Backspace") && selDrawing) { void sketch.remove(selDrawing); setSelDrawing(undefined); e.preventDefault(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selDrawing, sketch]);
 
   // keep the selected zone in sync with fresh analysis results
   useEffect(() => {
@@ -115,7 +138,22 @@ export function ChartWorkspace() {
       {/* field + legend */}
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_300px]">
         <div ref={hostRef} className="relative min-h-[360px]">
-          <TradingChart candles={candles} liveCandle={live} analysis={mode === "ai" ? analysis : undefined} precision={instrument.pricePrecision} selectedZoneId={selected?.id} onSelectZone={setSelected} calloutAnchor={anchor} trades={trades} />
+          <TradingChart candles={candles} liveCandle={live} analysis={mode === "ai" ? analysis : undefined} precision={instrument.pricePrecision} selectedZoneId={selected?.id} onSelectZone={setSelected} calloutAnchor={anchor} trades={trades}
+            drawings={sketch.drawings} tool={tool} stepSeconds={TIMEFRAME_SECONDS[timeframe]} selectedDrawingId={selDrawing} onSelectDrawing={setSelDrawing}
+            onCreateDrawing={(kind, points) => { void sketch.add(kind, points).then((d) => d && setSelDrawing(d.id)); }} onUpdateDrawing={(id, points) => void sketch.update(id, points)} onToolDone={() => setTool("select")} />
+          {/* the wrapper spans the palette's height and the hint's width: it must not swallow chart clicks */}
+          <div className="pointer-events-none absolute left-2 top-2 z-[6] flex items-start gap-2 [&>*]:pointer-events-auto" style={{ direction: "ltr" }}>
+            <DrawingToolbar tool={tool} setTool={setTool} selected={!!selDrawing} count={sketch.drawings.length} locale={locale}
+              onDelete={() => { if (selDrawing) { void sketch.remove(selDrawing); setSelDrawing(undefined); } }}
+              onClear={() => { if (window.confirm(locale === "ar" ? `مسح كل الرسوم على ${symbol}؟` : `Clear all drawings on ${symbol}?`)) { void sketch.clear(); setSelDrawing(undefined); } }} />
+            {(tool !== "select" || sketch.error) && (
+              <span role="status" className="sheet px-2 py-1 text-2xs text-ink-2 shadow-sheet" style={{ direction: locale === "ar" ? "rtl" : "ltr" }}>
+                {sketch.error ? <span className="text-stamp">{sketch.error === "TOO_MANY_DRAWINGS" ? (locale === "ar" ? "بلغت الحد الأقصى للرسوم على هذا الأصل" : "Drawing limit reached for this instrument") : sketch.error}</span>
+                  : tool === "hline" ? (locale === "ar" ? "انقر على السعر · Esc للإلغاء" : "Click a price · Esc to cancel")
+                  : (locale === "ar" ? "انقر النقطة الأولى ثم الثانية · Esc للإلغاء" : "Click the first point, then the second · Esc to cancel")}
+              </span>
+            )}
+          </div>
           {selected && mode === "ai" && (
             <div ref={calloutRef} className="absolute bottom-3 end-3 z-10 w-[min(440px,calc(100%-1.5rem))]">
               <ZoneDetails zone={selected} precision={instrument.pricePrecision} onClose={() => setSelected(undefined)} track={analysis ? { symbol: analysis.symbol, timeframe: analysis.timeframe, engineVersion: analysis.engineVersion, scoringVersion: analysis.scoringVersion } : undefined} />

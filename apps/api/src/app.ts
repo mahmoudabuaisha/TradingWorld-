@@ -18,6 +18,7 @@ import marketRoutes from "./routes/market.js";
 import userRoutes from "./routes/user.js";
 import adminRoutes from "./routes/admin.js";
 import feedbackRoutes from "./routes/feedback.js";
+import drawingRoutes from "./routes/drawings.js";
 import realtime from "./realtime/ws.js";
 import type { AppContext } from "./context.js";
 
@@ -68,6 +69,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     await userRoutes(api, ctx);
     await adminRoutes(api, ctx);
     await feedbackRoutes(api, ctx);
+    await drawingRoutes(api, ctx);
   }, { prefix: "/api/v1" });
   await realtime(app, ctx);
 
