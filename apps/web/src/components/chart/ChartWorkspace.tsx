@@ -118,7 +118,7 @@ export function ChartWorkspace() {
           <TradingChart candles={candles} liveCandle={live} analysis={mode === "ai" ? analysis : undefined} precision={instrument.pricePrecision} selectedZoneId={selected?.id} onSelectZone={setSelected} calloutAnchor={anchor} trades={trades} />
           {selected && mode === "ai" && (
             <div ref={calloutRef} className="absolute bottom-3 end-3 z-10 w-[min(440px,calc(100%-1.5rem))]">
-              <ZoneDetails zone={selected} precision={instrument.pricePrecision} onClose={() => setSelected(undefined)} />
+              <ZoneDetails zone={selected} precision={instrument.pricePrecision} onClose={() => setSelected(undefined)} track={analysis ? { symbol: analysis.symbol, timeframe: analysis.timeframe, engineVersion: analysis.engineVersion, scoringVersion: analysis.scoringVersion } : undefined} />
             </div>
           )}
         </div>

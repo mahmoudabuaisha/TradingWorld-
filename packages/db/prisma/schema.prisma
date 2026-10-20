@@ -207,18 +207,22 @@ model ZoneOutcome {
   @@index([label])
 }
 
-/// User preference feedback — deliberately separate from market outcome data.
+/// User opinion of a zone (AI-02) — deliberately separate from market outcome data (ZoneOutcome).
+/// One row per user and zone (editable); users only ever see their own vote, aggregates are admin-only.
 model ZoneFeedback {
-  id        String   @id @default(uuid())
-  zoneId    String
-  zone      Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  useful    Boolean
-  bestFactor String?
-  comment   String?
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  zoneId     String   // tracked zone key (Zone.id)
+  zone       Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  useful     Boolean
+  bestFactor String?  // FactorKey present on that zone
+  comment    String?  // ≤ 280 chars, control characters stripped
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   @@unique([zoneId, userId])
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
 }
 
 model BacktestRun {

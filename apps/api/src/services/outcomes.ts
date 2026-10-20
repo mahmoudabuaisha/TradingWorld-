@@ -1,5 +1,5 @@
 import { resolveOutcome, OUTCOME_VERSION, type AnalysisResult, type Candle } from "@tradingworld/analysis-engine";
-import { TIMEFRAME_SECONDS, findInstrument, isTimeframe, type Timeframe } from "@tradingworld/shared";
+import { TIMEFRAME_SECONDS, findInstrument, isTimeframe, zoneTrackKey, type Timeframe } from "@tradingworld/shared";
 import type { ProviderRegistry } from "../providers/registry.js";
 import type { Repositories, TrackedZone, ZoneQuery } from "../repositories/memory.js";
 import { describeError } from "../providers/support/status.js";
@@ -46,7 +46,7 @@ export function parseScan(spec: string | undefined): { symbol: string; timeframe
 
 /** Stable identity of a market zone across analysis windows (engine ids are window-local). */
 export function zoneKey(r: Pick<AnalysisResult, "symbol" | "timeframe" | "engineVersion" | "scoringVersion">, z: AnalysisResult["zones"][number]): string {
-  return `${r.symbol}:${r.timeframe}:${z.origin}:${z.direction}:${z.createdTime}:${r.engineVersion}:${r.scoringVersion}`;
+  return zoneTrackKey(r, z); // shared with the browser (feedback) — packages/shared/src/research.ts
 }
 
 const scoreBand = (s: number) => (s >= 80 ? "80-100" : s >= 65 ? "65-79" : s >= 50 ? "50-64" : "0-49");

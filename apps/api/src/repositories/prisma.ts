@@ -1,7 +1,7 @@
 import { PrismaClient, Prisma } from "@tradingworld/db";
 import { DEFAULT_INSTRUMENTS, type Role } from "@tradingworld/shared";
 import type { Zone, OutcomeLabel } from "@tradingworld/analysis-engine";
-import type { Repositories, User, Alert, JournalTrade, ZoneLogEntry, AuditEntry, TrackedZone, ZoneQuery } from "./memory.js";
+import type { Repositories, User, Alert, JournalTrade, ZoneLogEntry, AuditEntry, TrackedZone, ZoneQuery, ZoneFeedbackEntry } from "./memory.js";
 
 const DEFAULT_WATCHLIST = ["XAUUSD", "EURUSD", "BTCUSD", "US100"];
 
@@ -35,6 +35,9 @@ const toTracked = (z: DbZone): TrackedZone => ({
     horizonBars: z.outcome.horizonBars, retests: z.outcome.retests, resolvedAt: ms(z.outcome.resolvedAt),
   } : undefined,
 });
+
+type DbFeedback = Prisma.ZoneFeedbackGetPayload<object>;
+const toFeedback = (f: DbFeedback): ZoneFeedbackEntry => ({ id: f.id, zoneKey: f.zoneId, userId: f.userId, useful: f.useful, bestFactor: opt(f.bestFactor), comment: opt(f.comment), createdAt: ms(f.createdAt), updatedAt: ms(f.updatedAt) });
 
 const zoneWhere = (q: ZoneQuery): Prisma.ZoneWhereInput => ({
   ...(q.resolved === undefined ? {} : q.resolved ? { outcome: { isNot: null } } : { outcome: { is: null } }),
@@ -175,6 +178,20 @@ export function createPrismaRepositories(databaseUrl: string, opts: { client?: P
       },
       async list(q) { return (await db.zone.findMany({ where: zoneWhere(q), include: { outcome: true }, orderBy: { detectedAt: "desc" }, take: q.limit ?? 1000 })).map(toTracked); },
       async count(q) { return db.zone.count({ where: zoneWhere(q) }); },
+      async get(key) { const z = await db.zone.findUnique({ where: { id: key }, include: { outcome: true } }); return z ? toTracked(z) : undefined; },
+    },
+
+    feedback: {
+      async upsert(f) {
+        const data = { useful: f.useful, bestFactor: f.bestFactor ?? null, comment: f.comment ?? null };
+        return toFeedback(await db.zoneFeedback.upsert({ where: { zoneId_userId: { zoneId: f.zoneKey, userId: f.userId } }, create: { zoneId: f.zoneKey, userId: f.userId, ...data }, update: data }));
+      },
+      async get(zoneKey, userId) { const f = await db.zoneFeedback.findUnique({ where: { zoneId_userId: { zoneId: zoneKey, userId } } }); return f ? toFeedback(f) : undefined; },
+      async remove(zoneKey, userId) { return (await db.zoneFeedback.deleteMany({ where: { zoneId: zoneKey, userId } })).count > 0; },
+      async list(q) {
+        const rows = await db.zoneFeedback.findMany({ where: q.includeDemo ? {} : { zone: { provider: { not: "demo" } } }, include: { zone: { include: { outcome: true } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: q.limit ?? 5000 });
+        return rows.map((r) => ({ ...toFeedback(r), zone: toTracked(r.zone) }));
+      },
     },
 
     audit: {

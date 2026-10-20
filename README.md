@@ -67,7 +67,7 @@ pnpm dev:web                   # http://localhost:3000
 
 ```bash
 pnpm typecheck      # كل الحزم
-pnpm test           # engine (17) + api (67؛ اختبارات المخزن والمستودعات على Postgres حقيقي عند ضبط TEST_DATABASE_URL)
+pnpm test           # engine (18) + api (70؛ اختبارات المخزن والمستودعات على Postgres حقيقي عند ضبط TEST_DATABASE_URL)
 cd services/ml && pip install -e ".[dev]" && pytest -q   # ml (3)
 ```
 

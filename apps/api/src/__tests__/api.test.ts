@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { buildApp } from "../app.js";
 import { loadConfig } from "../config.js";
+import { zoneTrackKey } from "@tradingworld/shared";
 
 let app: Awaited<ReturnType<typeof buildApp>>;
 let token = "";
@@ -76,6 +77,37 @@ describe("api", () => {
     const ds = (await app.inject({ method: "GET", url: "/api/v1/admin/research/dataset", headers: h })).json();
     expect(ds).toMatchObject({ engine_version: expect.any(String), scoring_version: "scoring-v1", n_folds: 5, samples: [] });
     expect((await app.inject({ method: "GET", url: "/api/v1/admin/outcomes" })).statusCode).toBe(401);
+  });
+
+  it("zone feedback: own vote only, validated against the zone, separate from outcomes", async () => {
+    const a = (await app.inject({ method: "GET", url: "/api/v1/analysis?symbol=XAUUSD&timeframe=15m&includeLowQuality=true" })).json();
+    const zone = a.zones.find((z: { status: string }) => z.status !== "INVALIDATED");
+    expect(zone).toBeTruthy();
+    const key = encodeURIComponent(zoneTrackKey(a, zone));
+    const present = zone.factors.find((f: { present: boolean }) => f.present).key;
+    const absent = zone.factors.find((f: { present: boolean }) => !f.present)?.key;
+    const h = { authorization: `Bearer ${token}` };
+    expect((await app.inject({ method: "PUT", url: `/api/v1/zones/${key}/feedback`, payload: { useful: true } })).statusCode).toBe(401);
+    expect((await app.inject({ method: "GET", url: `/api/v1/zones/${key}/feedback`, headers: h })).json()).toEqual({ tracked: true, feedback: null });
+    const put = await app.inject({ method: "PUT", url: `/api/v1/zones/${key}/feedback`, headers: h, payload: { useful: true, bestFactor: present, comment: "  منطقة\nواضحة  " } });
+    expect(put.statusCode).toBe(200);
+    expect(put.json().feedback).toMatchObject({ useful: true, bestFactor: present, comment: "منطقة واضحة" });
+    if (absent) expect((await app.inject({ method: "PUT", url: `/api/v1/zones/${key}/feedback`, headers: h, payload: { useful: true, bestFactor: absent } })).json().error).toBe("FACTOR_NOT_PRESENT");
+    expect((await app.inject({ method: "PUT", url: `/api/v1/zones/${key}/feedback`, headers: h, payload: { useful: "yes" } })).statusCode).toBe(400);
+    expect((await app.inject({ method: "PUT", url: `/api/v1/zones/${encodeURIComponent("XAUUSD:15m:FVG:bullish:1:x:y")}/feedback`, headers: h, payload: { useful: true } })).json().error).toBe("ZONE_NOT_TRACKED");
+    // a second user sees only their own (empty) vote
+    const other = await app.inject({ method: "POST", url: "/api/v1/auth/register", payload: { email: "fb-other@b.co", password: "password123", displayName: "Other" } });
+    const h2 = { authorization: `Bearer ${other.json().token}` };
+    expect((await app.inject({ method: "GET", url: `/api/v1/zones/${key}/feedback`, headers: h2 })).json().feedback).toBeNull();
+    await app.inject({ method: "PUT", url: `/api/v1/zones/${key}/feedback`, headers: h2, payload: { useful: false } });
+    expect((await app.inject({ method: "GET", url: "/api/v1/admin/feedback", headers: h2 })).statusCode).toBe(403);
+    const stats = (await app.inject({ method: "GET", url: "/api/v1/admin/feedback?includeDemo=1", headers: h })).json();
+    expect(stats).toMatchObject({ total: 2, zones: 1, overall: { n: 2, useful: 1, usefulRate: 0.5 }, bestFactor: { [present]: 1 } });
+    expect(stats.recentComments[0]).toMatchObject({ comment: "منطقة واضحة", useful: true });
+    expect(stats.recentComments[0].userId).toBeUndefined();
+    expect((await app.inject({ method: "GET", url: "/api/v1/admin/feedback", headers: h })).json().total).toBe(0); // demo excluded by default
+    expect((await app.inject({ method: "DELETE", url: `/api/v1/zones/${key}/feedback`, headers: h })).json()).toEqual({ ok: true });
+    expect((await app.inject({ method: "DELETE", url: `/api/v1/zones/${key}/feedback`, headers: h })).statusCode).toBe(404);
   });
 
   it("ai chat answers deterministically without a key", async () => {

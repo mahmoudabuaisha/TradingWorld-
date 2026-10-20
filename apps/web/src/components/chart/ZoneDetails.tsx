@@ -6,9 +6,10 @@ import { t, type Dict } from "@/i18n/dictionary";
 import { api } from "@/lib/api";
 import { Icon } from "../Icon";
 import { ConfluenceStack } from "../marks/ConfluenceStack";
+import { ZoneFeedback, type TrackContext } from "./ZoneFeedback";
 
 /** Survey callout: pinned to the zone by the overlay's leader line. Reasons, the confluence stack, weaknesses, invalidation. */
-export function ZoneDetails({ zone, precision, onClose }: { zone: Zone; precision: number; onClose: () => void }) {
+export function ZoneDetails({ zone, precision, onClose, track }: { zone: Zone; precision: number; onClose: () => void; track?: TrackContext }) {
   const { locale, token, symbol } = useApp();
   const [alertState, setAlertState] = useState<"idle" | "ok" | "err">("idle");
   const L = (k: keyof Dict["chart"]) => t(locale, "chart", k);
@@ -46,6 +47,7 @@ export function ZoneDetails({ zone, precision, onClose }: { zone: Zone; precisio
             {!token && <span className="text-[11px] text-ink-3">{locale === "ar" ? "سجّل الدخول لإنشاء تنبيه" : "Sign in to create alerts"}</span>}
           </div>
         )}
+        {!dead && track && <ZoneFeedback zone={zone} ctx={track} />}
       </div>
     </div>
   );

@@ -38,6 +38,10 @@ export const api = {
   triggerBackfill: (token: string, b: { kind?: "cycle" | "backfill" | "catchup" | "gaps" | "aggregate"; symbol?: string; bars?: number }) => request<{ accepted: boolean }>("/admin/backfill", { method: "POST", body: JSON.stringify(b) }, token),
   adminOutcomes: (token: string, includeDemo = false) => request<AdminOutcomes>(`/admin/outcomes${includeDemo ? "?includeDemo=1" : ""}`, {}, token),
   runOutcomes: (token: string) => request<{ run: { checked: number; resolved: number; failed: number } }>("/admin/outcomes/run", { method: "POST", body: "{}" }, token),
+  zoneFeedback: (token: string, key: string) => request<{ tracked: boolean; feedback: ZoneFeedback | null }>(`/zones/${encodeURIComponent(key)}/feedback`, {}, token),
+  saveZoneFeedback: (token: string, key: string, b: { useful: boolean; bestFactor?: string; comment?: string }) => request<{ feedback: ZoneFeedback }>(`/zones/${encodeURIComponent(key)}/feedback`, { method: "PUT", body: JSON.stringify(b) }, token),
+  deleteZoneFeedback: (token: string, key: string) => request<{ ok: true }>(`/zones/${encodeURIComponent(key)}/feedback`, { method: "DELETE" }, token),
+  adminFeedback: (token: string, includeDemo = false) => request<AdminFeedback>(`/admin/feedback${includeDemo ? "?includeDemo=1" : ""}`, {}, token),
   adminFactors: (token: string) => request<{ sample: number; factors: Record<string, { present: number; total: number; avgScoreWhenPresent: number }>; byStatus: Record<string, number> }>("/admin/research/factors", {}, token),
 };
 
@@ -58,6 +62,15 @@ export interface AdminBackfill {
   store: "memory" | "timescale"; enabled: boolean;
   job: { running: boolean; started: boolean; baseTimeframe: string; bars: number; symbols: string[]; lastRunAt?: number; nextRunAt?: number; runs: BackfillRun[] };
   series: { symbol: string; timeframe: string; first: number; last: number; count: number }[];
+}
+export interface ZoneFeedback { id: string; zoneKey: string; useful: boolean; bestFactor?: string; comment?: string; createdAt: number; updatedAt: number }
+export interface FeedbackBucket { n: number; useful: number; usefulRate: number }
+export interface AdminFeedback {
+  includeDemo: boolean; total: number; zones: number; overall: FeedbackBucket;
+  byQuality: Record<string, FeedbackBucket>; byOrigin: Record<string, FeedbackBucket>; byScoreBand: Record<string, FeedbackBucket>;
+  bestFactor: Record<string, number>;
+  agreement: { useful: Record<string, number>; notUseful: Record<string, number>; resolved: number };
+  recentComments: { zoneName: string; zoneNameAr: string; symbol: string; timeframe: string; useful: boolean; bestFactor?: string; comment: string; at: number; outcome?: string }[];
 }
 export interface OutcomeBucket { n: number; reacted: number; invalidated: number; tested: number; untouched: number; reactionRate: number; avgMfeAtr?: number; avgMaeAtr?: number }
 export interface AdminOutcomes {

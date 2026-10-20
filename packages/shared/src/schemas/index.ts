@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TIMEFRAMES } from "../timeframes.js";
+import { FACTOR_KEYS, FEEDBACK_COMMENT_MAX } from "../research.js";
 
 export const timeframeSchema = z.enum(TIMEFRAMES);
 
@@ -32,6 +33,16 @@ export const analysisQuerySchema = z.object({
   includeInvalidated: queryBool.default(false),
   locale: z.enum(["ar", "en"]).default("ar"),
 });
+
+/** AI-02: one user's opinion of one zone. Kept apart from market outcomes; never changes the score. */
+export const zoneFeedbackSchema = z.object({
+  useful: z.boolean(),
+  /** the factor that convinced the user most — must be present on that zone (checked by the API) */
+  bestFactor: z.enum(FACTOR_KEYS).optional(),
+  comment: z.string().max(FEEDBACK_COMMENT_MAX * 2).optional()
+    .transform((s) => (s === undefined ? undefined : s.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, FEEDBACK_COMMENT_MAX) || undefined)),
+});
+export type ZoneFeedbackInput = z.infer<typeof zoneFeedbackSchema>;
 
 export const alertCreateSchema = z.object({
   symbol: z.string().min(3).max(20),

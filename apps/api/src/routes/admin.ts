@@ -3,6 +3,7 @@ import { ENGINE_VERSION, SCORING_VERSION, FACTOR_WEIGHTS } from "@tradingworld/a
 import { PLATFORM_MODULES, ROLES } from "@tradingworld/shared";
 import { publicUser } from "./auth.js";
 import type { AppContext } from "../context.js";
+import { feedbackStats } from "../services/feedback.js";
 
 export default async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
   const admin = app.requireRole("admin");
@@ -37,6 +38,12 @@ export default async function adminRoutes(app: FastifyInstance, ctx: AppContext)
   });
 
   app.get("/admin/audit", { preHandler: admin }, async () => ({ entries: await ctx.repos.audit.recent(200) }));
+
+  /** AI-02: what users think of the zones — aggregates, best factors, agreement with outcomes, recent comments. */
+  app.get("/admin/feedback", { preHandler: admin }, async (req) => {
+    const includeDemo = ["1", "true"].includes(String((req.query as { includeDemo?: string }).includeDemo ?? ""));
+    return feedbackStats(ctx.repos, includeDemo);
+  });
 
   /** AI-01: what happened to the zones the engine emitted — counts, reaction rates by quality/origin/session/score, recent labels. */
   app.get("/admin/outcomes", { preHandler: admin }, async (req) => {

@@ -14,7 +14,7 @@
 | `Zone` | المناطق التي يتابعها متتبع النتائج (AI-01): صف لكل مكان سوقي، لقطة عند **أول ملاحظة** | المعرف مفتاح ثابت `symbol:tf:origin:direction:createdTime:engine:scoring`؛ `provider` (لاستثناء demo)، `atr`، `context` (النظام/الجلسة/HTF)، `snapshot`، `detectedBarTime` |
 | `ZoneLog` | سجل بحثي إلحاقي: صف لكل منطقة كلما ظهرت بحالة جديدة (`repos.zoneLog`)، والكائن الكامل JSON | مفهرس بالوقت والرمز/الفريم والإصدار |
 | `ZoneOutcome` | نتيجة السوق النهائية (label للـML) عند الإبطال أو نهاية الأفق | `label` (REACTED/INVALIDATED/TESTED/UNTOUCHED)، `reason`، `outcomeVersion`، MFE/MAE/التفاعل بالـATR، `barsToOutcome`، `horizonBars`، retests، session، regime |
-| `ZoneFeedback` | رأي المستخدم 👍/👎 | **منفصل** عن ZoneOutcome عمدًا |
+| `ZoneFeedback` | رأي المستخدم في منطقة (AI-02): مفيد/غير مفيد، العامل الأكثر إقناعًا، ملاحظة | **منفصل** عن ZoneOutcome عمدًا؛ فريد (zoneId, userId)، `updatedAt` للتعديل |
 | `BacktestRun` | نتائج اختبارات تاريخية مع المعاملات والإصدار | |
 | `Watchlist` | قوائم متابعة متعددة لكل مستخدم | |
 | `Alert` | سعر/منطقة، triggeredAt | |

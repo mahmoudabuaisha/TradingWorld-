@@ -20,7 +20,7 @@ function migrate(url: string) {
 let prisma: PrismaRepositories | undefined;
 async function resetPrisma() {
   const db = prisma!.client;
-  await db.$executeRawUnsafe(`TRUNCATE "ZoneOutcome", "Zone", "AuditLog", "ZoneLog", "Trade", "Alert", "Watchlist", "Session", "User" CASCADE`);
+  await db.$executeRawUnsafe(`TRUNCATE "ZoneFeedback", "ZoneOutcome", "Zone", "AuditLog", "ZoneLog", "Trade", "Alert", "Watchlist", "Session", "User" CASCADE`);
 }
 
 const impls: { name: string; make: () => Promise<Repositories> }[] = [{ name: "memory", make: async () => createMemoryRepositories() }];
@@ -148,6 +148,37 @@ describe.each(impls)("Repositories contract ($name)", ({ make }) => {
     expect(await repos.zones.count({ includeDemo: true })).toBe(3);
     expect(await repos.zones.count({ resolved: false })).toBe(1);
     expect(await repos.zones.count({ engineVersion: "0.0.1" })).toBe(0);
+  });
+
+  it("feedback: one vote per user and zone, edit replaces, list joins the zone and skips demo", async () => {
+    const u = await repos.users.create({ email: "fb@tw.test", displayName: "Fb", passwordHash: "h", role: "user", settings: {} });
+    const v = await repos.users.create({ email: "fb2@tw.test", displayName: "Fb2", passwordHash: "h", role: "user", settings: {} });
+    const base = { symbol: "EURUSD", timeframe: "5m", engineVersion: "1.1.1", scoringVersion: "scoring-v1", atr: 0.001, detectedBarTime: 1_792_400_000,
+      context: { regime: { trend: "RANGING", volatility: "NORMAL", phase: "NEUTRAL", atr: 0.001, atrRatio: 1, rangeWidthAtr: 3 }, session: "LONDON", htfBias: "bullish" },
+      zone: { id: "z", name: "Demand", nameAr: "طلب", origin: "FVG", direction: "bullish", top: 1.09, bottom: 1.089, createdTime: 1_792_399_000, score: 70, quality: "HIGH", status: "ACTIVE", tests: 0, factors: [{ key: "FVG", present: true }], invalidation: { price: 1.089, ar: "", en: "" }, htfContext: [] } as unknown as Zone };
+    await repos.zones.track({ ...base, key: "fk-real", provider: "twelvedata" } as Parameters<Repositories["zones"]["track"]>[0]);
+    await repos.zones.track({ ...base, key: "fk-demo", provider: "demo" } as Parameters<Repositories["zones"]["track"]>[0]);
+    expect((await repos.zones.get("fk-real"))?.zone.quality).toBe("HIGH");
+    expect(await repos.zones.get("nope")).toBeUndefined();
+    const first = await repos.feedback.upsert({ zoneKey: "fk-real", userId: u.id, useful: true, bestFactor: "FVG", comment: "واضحة" });
+    expect(first).toMatchObject({ zoneKey: "fk-real", userId: u.id, useful: true, bestFactor: "FVG", comment: "واضحة" });
+    await sleep(5);
+    const edited = await repos.feedback.upsert({ zoneKey: "fk-real", userId: u.id, useful: false });
+    expect(edited.id).toBe(first.id);
+    expect(edited.createdAt).toBe(first.createdAt);
+    expect(edited.updatedAt).toBeGreaterThan(first.updatedAt);
+    expect(edited.useful).toBe(false);
+    expectAbsent(edited, ["bestFactor", "comment"]);
+    expect(await repos.feedback.get("fk-real", v.id)).toBeUndefined();
+    await repos.feedback.upsert({ zoneKey: "fk-real", userId: v.id, useful: true });
+    await repos.feedback.upsert({ zoneKey: "fk-demo", userId: v.id, useful: true });
+    const list = await repos.feedback.list({});
+    expect(list.length).toBe(2);
+    expect(list.every((r) => r.zone.key === "fk-real" && r.zone.provider === "twelvedata")).toBe(true);
+    expect((await repos.feedback.list({ includeDemo: true })).length).toBe(3);
+    expect(await repos.feedback.remove("fk-real", u.id)).toBe(true);
+    expect(await repos.feedback.remove("fk-real", u.id)).toBe(false);
+    expect(await repos.feedback.get("fk-real", u.id)).toBeUndefined();
   });
 
   it("audit: append with meta, newest first", async () => {

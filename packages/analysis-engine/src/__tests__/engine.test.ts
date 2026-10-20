@@ -6,6 +6,7 @@ import { candlesFrom } from "./helpers.js";
 import type { Zone } from "../types.js";
 import { SyntheticMarket } from "../data/synthetic.js";
 import { FACTOR_WEIGHTS } from "../scoring/weights.js";
+import { FACTOR_KEYS } from "@tradingworld/shared";
 import { answerDeterministic, buildGrounding } from "../explain/llm.js";
 
 const market = new SyntheticMarket(20_000, 1_720_000_000);
@@ -17,6 +18,10 @@ const htf = {
 };
 
 describe("engine", () => {
+  it("the shared FACTOR_KEYS list matches the engine's factors", () => {
+    expect([...FACTOR_KEYS].sort()).toEqual(Object.keys(FACTOR_WEIGHTS).sort());
+  });
+
   it("scoring weights sum to 100", () => {
     expect(Object.values(FACTOR_WEIGHTS).reduce((a, b) => a + b, 0)).toBe(100);
   });

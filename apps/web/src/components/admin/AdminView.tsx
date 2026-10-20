@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { TIMEFRAMES } from "@tradingworld/shared";
-import { api, type AdminOverview, type FeedsResponse, type AdminBackfill, type AdminOutcomes, type OutcomeBucket } from "@/lib/api";
+import { api, type AdminOverview, type FeedsResponse, type AdminBackfill, type AdminOutcomes, type OutcomeBucket, type AdminFeedback } from "@/lib/api";
 import { useApp } from "@/store/useApp";
 import { FeedMark } from "../marks/FeedMark";
 
@@ -14,6 +14,7 @@ export function AdminView() {
   const [backfill, setBackfill] = useState<AdminBackfill>();
   const [outcomes, setOutcomes] = useState<AdminOutcomes>();
   const [withDemo, setWithDemo] = useState(false);
+  const [feedback, setFeedback] = useState<AdminFeedback>();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string>();
   useEffect(() => {
@@ -25,7 +26,11 @@ export function AdminView() {
     const timer = setInterval(loadFeeds, 15_000);
     return () => clearInterval(timer);
   }, [token]);
-  useEffect(() => { if (token) api.adminOutcomes(token, withDemo).then(setOutcomes).catch(() => {}); }, [token, withDemo]);
+  useEffect(() => {
+    if (!token) return;
+    api.adminOutcomes(token, withDemo).then(setOutcomes).catch(() => {});
+    api.adminFeedback(token, withDemo).then(setFeedback).catch(() => {});
+  }, [token, withDemo]);
   const runOutcomes = async () => {
     if (!token) return;
     setBusy(true);
@@ -89,6 +94,7 @@ export function AdminView() {
           <p className="mt-2 text-xs text-ink-3">{L("المصدر ووقت الاستلام وحالة التدفق لكل أداة. CLOSED يعني أن السوق مغلق لا أن البيانات متوقفة. التفاصيل والخطط في docs/03.", "Source, receipt time and flow state per instrument. CLOSED means the market is closed, not that data stopped. Plans and details in docs/03.")}</p>
         </section>
         {outcomes && <OutcomesPanel data={outcomes} withDemo={withDemo} setWithDemo={setWithDemo} onRun={runOutcomes} busy={busy} L={L} locale={locale} />}
+        {feedback && <FeedbackPanel data={feedback} L={L} locale={locale} />}
         <section className="sheet p-4 md:col-span-2">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="eyebrow">CANDLE STORE · {L("مخزن الشموع", "Candle store")} · {(backfill?.store ?? "…").toUpperCase()}</span>
@@ -211,6 +217,67 @@ function OutcomesPanel({ data, withDemo, setWithDemo, onRun, busy, L, locale }: 
         <button type="button" className="btn" disabled={busy} onClick={onRun}>{L("وسم المناطق المفتوحة الآن", "Label open zones now")}</button>
         <span className="text-xs text-ink-3">{L("الوسم يقيس التفاعل لا الربح، ويستخدم فقط الشموع المغلقة بعد لحظة الاكتشاف. مجموعة التدريب: GET /admin/research/dataset (بلا بيانات العرض).", "Labels measure reaction, not profit, using only closed bars after detection. Training set: GET /admin/research/dataset (demo excluded).")}</span>
       </div>
+    </section>
+  );
+}
+
+/** AI-02 — what users think of the zones. Admin-only aggregates; users only ever see their own vote. */
+function FeedbackPanel({ data, L, locale }: { data: AdminFeedback; L: (ar: string, en: string) => string; locale: string }) {
+  const labels = ["REACTED", "INVALIDATED", "TESTED", "UNTOUCHED"];
+  const rate = (rows: Record<string, { n: number; useful: number; usefulRate: number }>) =>
+    Object.fromEntries(Object.entries(rows).map(([k, b]) => [k, { n: b.n, reacted: b.useful, invalidated: 0, tested: 0, untouched: 0, reactionRate: b.usefulRate } as OutcomeBucket]));
+  const factors = Object.entries(data.bestFactor);
+  const maxF = Math.max(1, ...factors.map(([, n]) => n));
+  return (
+    <section className="sheet p-4 md:col-span-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="eyebrow">USER FEEDBACK · {L("آراء المستخدمين", "User feedback")} · {L("منفصلة عن نتائج السوق", "kept apart from outcomes")}</span>
+        <span className="mono text-2xs text-ink-3">{data.includeDemo ? "INCL. DEMO" : "REAL DATA ONLY"}</span>
+      </div>
+      <div className="tblock mt-2">
+        <div><b>VOTES</b><span>{data.total}</span></div>
+        <div><b>ZONES RATED</b><span>{data.zones}</span></div>
+        <div><b>USEFUL</b><span className="text-up-ink">{data.total ? pct(data.overall.usefulRate) : "—"}</span></div>
+        <div><b>ON RESOLVED ZONES</b><span>{data.agreement.resolved}</span></div>
+      </div>
+      {data.total > 0 ? (
+        <div className="mt-3 grid gap-4 md:grid-cols-2">
+          <RateRows title={L("نسبة «مفيد» حسب الجودة", "Useful by quality")} rows={rate(data.byQuality)} />
+          <RateRows title={L("نسبة «مفيد» حسب نطاق الدرجة", "Useful by score band")} rows={rate(data.byScoreBand)} />
+          <div>
+            <span className="eyebrow">{L("العامل الأكثر إقناعًا", "Most convincing factor")}</span>
+            {factors.length ? (
+              <ul className="mt-1 space-y-1 text-xs">{factors.map(([k, n]) => (
+                <li key={k} className="grid grid-cols-[150px_1fr_36px] items-center gap-2"><span className="mono truncate text-ink-2">{k}</span><span className="h-2 bg-raised"><span className="block h-2 hatch-up" style={{ width: `${(n / maxF) * 100}%` }} /></span><span className="mono text-end">{n}</span></li>
+              ))}</ul>
+            ) : <p className="mt-1 text-xs text-ink-3">—</p>}
+          </div>
+          <div>
+            <span className="eyebrow">{L("الرأي مقابل نتيجة السوق", "Opinion vs market outcome")}</span>
+            <table className="mt-1 w-full text-2xs">
+              <thead><tr><th className="text-start font-normal" />{labels.map((l) => <th key={l} className="mono px-1 text-end font-normal text-ink-3">{l}</th>)}</tr></thead>
+              <tbody>
+                {([["useful", L("مفيد", "Useful")], ["notUseful", L("غير مفيد", "Not useful")]] as const).map(([row, name]) => (
+                  <tr key={row} className="border-t border-hair"><td className="py-1 text-ink-2">{name}</td>{labels.map((l) => <td key={l} className="mono px-1 text-end">{data.agreement[row][l] ?? 0}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-1 text-2xs text-ink-3">{L("للبحث فقط: الرأي والنتيجة لا يُدمجان في وسم واحد.", "Research only: opinion and outcome are never merged into one label.")}</p>
+          </div>
+        </div>
+      ) : <p className="mt-3 text-xs text-ink-3">{L("لا آراء بعد. يسجّل المستخدم رأيه من بطاقة المنطقة على الشارت.", "No feedback yet. Users rate a zone from its callout on the chart.")}</p>}
+      {data.recentComments.length > 0 && (
+        <ul className="mt-3 space-y-1 border-t border-hair pt-2 text-xs">
+          {data.recentComments.slice(0, 6).map((c, i) => (
+            <li key={i} className="flex flex-wrap items-baseline gap-2">
+              <span className={`chip ${c.useful ? "text-up-ink" : "text-down-ink"}`}>{c.useful ? "USEFUL" : "NOT USEFUL"}</span>
+              <span className="mono text-2xs text-ink-3">{c.symbol} {c.timeframe}{c.outcome ? ` · ${c.outcome}` : ""}</span>
+              <span className="text-ink-2">«{c.comment}»</span>
+              <span className="truncate text-2xs text-ink-3">{locale === "ar" ? c.zoneNameAr : c.zoneName}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

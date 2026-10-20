@@ -44,6 +44,17 @@ export interface TrackedOutcome {
   /** ms */
   resolvedAt: number;
 }
+/** AI-02: one user's opinion of one tracked zone. */
+export interface ZoneFeedbackEntry {
+  id: string;
+  zoneKey: string;
+  userId: string;
+  useful: boolean;
+  bestFactor?: string;
+  comment?: string;
+  createdAt: number;
+  updatedAt: number;
+}
 export interface ZoneQuery { resolved?: boolean; includeDemo?: boolean; engineVersion?: string; scoringVersion?: string; limit?: number }
 
 export interface AuditEntry { id: string; at: number; actorId?: string; action: string; target?: string; meta?: Record<string, unknown> }
@@ -82,6 +93,16 @@ export interface Repositories {
     /** newest detection first */
     list(q: ZoneQuery): Promise<TrackedZone[]>;
     count(q: ZoneQuery): Promise<number>;
+    get(key: string): Promise<TrackedZone | undefined>;
+  };
+  /** user feedback (AI-02) — kept apart from outcomes on purpose */
+  feedback: {
+    /** one vote per user and zone: replaces the previous one (absent optional fields are cleared) */
+    upsert(f: { zoneKey: string; userId: string; useful: boolean; bestFactor?: string; comment?: string }): Promise<ZoneFeedbackEntry>;
+    get(zoneKey: string, userId: string): Promise<ZoneFeedbackEntry | undefined>;
+    remove(zoneKey: string, userId: string): Promise<boolean>;
+    /** newest first, joined with the tracked zone (and its outcome when resolved) */
+    list(q: { includeDemo?: boolean; limit?: number }): Promise<(ZoneFeedbackEntry & { zone: TrackedZone })[]>;
   };
 }
 
@@ -96,6 +117,7 @@ export function createMemoryRepositories(): Repositories {
   const trades = new Map<string, JournalTrade>();
   const zoneLog: ZoneLogEntry[] = [];
   const tracked = new Map<string, TrackedZone>();
+  const feedback = new Map<string, ZoneFeedbackEntry>(); // `${zoneKey}|${userId}`
   const audit: AuditEntry[] = [];
   const MAX_LOG = 20_000;
 
@@ -139,6 +161,23 @@ export function createMemoryRepositories(): Repositories {
       async resolve(key, outcome) { const z = tracked.get(key); if (z) z.outcome = outcome; },
       async list(q) { return [...tracked.values()].filter((z) => matches(z, q)).sort((a, b) => b.detectedAt - a.detectedAt).slice(0, q.limit ?? 1000); },
       async count(q) { return [...tracked.values()].filter((z) => matches(z, q)).length; },
+      async get(key) { return tracked.get(key); },
+    },
+    feedback: {
+      async upsert(f) {
+        const k = `${f.zoneKey}|${f.userId}`;
+        const prev = feedback.get(k);
+        const now = Date.now();
+        const e: ZoneFeedbackEntry = { id: prev?.id ?? randomUUID(), zoneKey: f.zoneKey, userId: f.userId, useful: f.useful, bestFactor: f.bestFactor, comment: f.comment, createdAt: prev?.createdAt ?? now, updatedAt: now };
+        feedback.set(k, e);
+        return e;
+      },
+      async get(zoneKey, userId) { return feedback.get(`${zoneKey}|${userId}`); },
+      async remove(zoneKey, userId) { return feedback.delete(`${zoneKey}|${userId}`); },
+      async list(q) {
+        return [...feedback.values()].map((f) => ({ ...f, zone: tracked.get(f.zoneKey)! })).filter((f) => f.zone && (q.includeDemo || f.zone.provider !== "demo"))
+          .sort((a, b) => b.createdAt - a.createdAt).slice(0, q.limit ?? 5000);
+      },
     },
   };
 }
