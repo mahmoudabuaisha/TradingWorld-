@@ -33,7 +33,9 @@ export async function enablePush(token: string, publicKey: string): Promise<"gra
   if (permission !== "granted") return permission;
   const reg = await registration();
   await navigator.serviceWorker.ready;
-  const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource }));
+  const sub =
+    (await reg.pushManager.getSubscription()) ??
+    (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource }));
   const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
   await api.subscribePush(token, { endpoint: json.endpoint, keys: json.keys });
   return "granted";

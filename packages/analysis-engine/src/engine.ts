@@ -41,7 +41,19 @@ export function analyzeTimeframe(candles: Candle[], timeframe: Timeframe, opts: 
   ];
   const sweeps = detectSweeps(candles, liquidity, displacements);
   const regime = detectRegime(candles, atrs, structure);
-  return { timeframe, bars: candles.length, bias: structureBias(structure), structure, fvgs, orderBlocks, displacements, liquidity, sweeps, regime, atr };
+  return {
+    timeframe,
+    bars: candles.length,
+    bias: structureBias(structure),
+    structure,
+    fvgs,
+    orderBlocks,
+    displacements,
+    liquidity,
+    sweeps,
+    regime,
+    atr,
+  };
 }
 
 /**
@@ -74,11 +86,32 @@ export function analyze(input: AnalyzeInput): AnalysisResult {
     const a = analyzeTimeframe(series, h, { ...opts, swingLookback: Math.max(2, opts.swingLookback - 1) });
     const last = candles[candles.length - 1]!.close;
     const lv: KeyLevel[] = [];
-    if (a.structure.lastSwingHigh) lv.push({ id: `kl-${h}-sh`, kind: "HTF_SWING_HIGH", price: a.structure.lastSwingHigh.price, timeframe: h, label: `${h} Swing High` });
-    if (a.structure.lastSwingLow) lv.push({ id: `kl-${h}-sl`, kind: "HTF_SWING_LOW", price: a.structure.lastSwingLow.price, timeframe: h, label: `${h} Swing Low` });
-    for (const g of a.fvgs.filter((g) => !g.mitigated).slice(-3)) lv.push({ id: `kl-${h}-${g.id}`, kind: "HTF_FVG", price: (g.top + g.bottom) / 2, top: g.top, bottom: g.bottom, timeframe: h, label: `${h} ${g.direction} FVG` });
-    for (const o of a.orderBlocks.filter((o) => !o.mitigated).slice(-2)) lv.push({ id: `kl-${h}-${o.id}`, kind: "HTF_OB", price: (o.top + o.bottom) / 2, top: o.top, bottom: o.bottom, timeframe: h, label: `${h} ${o.direction} OB` });
-    for (const p of a.liquidity.filter((p) => p.kind === "EQH" || p.kind === "EQL")) lv.push({ id: `kl-${h}-${p.id}`, kind: p.kind, price: p.price, timeframe: h, label: `${h} ${p.label}` });
+    if (a.structure.lastSwingHigh)
+      lv.push({ id: `kl-${h}-sh`, kind: "HTF_SWING_HIGH", price: a.structure.lastSwingHigh.price, timeframe: h, label: `${h} Swing High` });
+    if (a.structure.lastSwingLow)
+      lv.push({ id: `kl-${h}-sl`, kind: "HTF_SWING_LOW", price: a.structure.lastSwingLow.price, timeframe: h, label: `${h} Swing Low` });
+    for (const g of a.fvgs.filter((g) => !g.mitigated).slice(-3))
+      lv.push({
+        id: `kl-${h}-${g.id}`,
+        kind: "HTF_FVG",
+        price: (g.top + g.bottom) / 2,
+        top: g.top,
+        bottom: g.bottom,
+        timeframe: h,
+        label: `${h} ${g.direction} FVG`,
+      });
+    for (const o of a.orderBlocks.filter((o) => !o.mitigated).slice(-2))
+      lv.push({
+        id: `kl-${h}-${o.id}`,
+        kind: "HTF_OB",
+        price: (o.top + o.bottom) / 2,
+        top: o.top,
+        bottom: o.bottom,
+        timeframe: h,
+        label: `${h} ${o.direction} OB`,
+      });
+    for (const p of a.liquidity.filter((p) => p.kind === "EQH" || p.kind === "EQL"))
+      lv.push({ id: `kl-${h}-${p.id}`, kind: p.kind, price: p.price, timeframe: h, label: `${h} ${p.label}` });
     lv.sort((x, y) => Math.abs(x.price - last) - Math.abs(y.price - last));
     htf.push({ timeframe: h, bars: series.length, bias: a.bias, regime: a.regime.trend, keyLevels: lv });
     keyLevels.push(...lv);

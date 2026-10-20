@@ -12,8 +12,14 @@ const root = import.meta.dirname;
 export default tseslint.config(
   {
     ignores: [
-      "**/node_modules/**", "**/dist/**", "**/.next/**", "**/coverage/**", "**/*.tsbuildinfo",
-      "packages/db/generated/**", "services/**", "apps/web/next-env.d.ts",
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.next/**",
+      "**/coverage/**",
+      "**/*.tsbuildinfo",
+      "packages/db/generated/**",
+      "services/**",
+      "apps/web/next-env.d.ts",
     ],
   },
   js.configs.recommended,
@@ -26,8 +32,11 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         project: [
-          "apps/api/tsconfig.test.json", "apps/web/tsconfig.json", "packages/analysis-engine/tsconfig.test.json",
-          "packages/shared/tsconfig.test.json", "packages/db/tsconfig.json",
+          "apps/api/tsconfig.test.json",
+          "apps/web/tsconfig.json",
+          "packages/analysis-engine/tsconfig.test.json",
+          "packages/shared/tsconfig.test.json",
+          "packages/db/tsconfig.json",
         ],
         tsconfigRootDir: root,
       },
@@ -45,7 +54,10 @@ export default tseslint.config(
 
   {
     rules: {
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrors: "none", ignoreRestSiblings: true }],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrors: "none", ignoreRestSiblings: true },
+      ],
       "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
       "no-console": ["error", { allow: ["warn", "error"] }],
       eqeqeq: ["error", "always", { null: "ignore" }],

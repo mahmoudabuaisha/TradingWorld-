@@ -5,8 +5,18 @@ import { ReconnectingSocket } from "./support/socket.js";
 import { buildStatus, describeError, type FeedClock } from "./support/status.js";
 
 const TF_MAP: Partial<Record<Timeframe, string>> = {
-  "1m": "1m", "3m": "3m", "5m": "5m", "15m": "15m", "30m": "30m",
-  "1h": "1h", "2h": "2h", "4h": "4h", "12h": "12h", "1d": "1d", "1w": "1w", "1M": "1M",
+  "1m": "1m",
+  "3m": "3m",
+  "5m": "5m",
+  "15m": "15m",
+  "30m": "30m",
+  "1h": "1h",
+  "2h": "2h",
+  "4h": "4h",
+  "12h": "12h",
+  "1d": "1d",
+  "1w": "1w",
+  "1M": "1M",
 };
 
 export interface BinanceOptions {
@@ -38,7 +48,9 @@ export class BinanceProvider implements MarketDataProvider {
   }
   private readonly WebSocketCtor?: typeof WebSocket;
 
-  supports(i: Instrument): boolean { return !!i.providerSymbols.binance; }
+  supports(i: Instrument): boolean {
+    return !!i.providerSymbols.binance;
+  }
 
   async getCandles(i: Instrument, tf: Timeframe, limit: number, to?: number): Promise<Candle[]> {
     const sym = i.providerSymbols.binance;
@@ -50,10 +62,25 @@ export class BinanceProvider implements MarketDataProvider {
     url.searchParams.set("limit", String(Math.min(limit, 1000)));
     if (to) url.searchParams.set("endTime", String(to * 1000 - 1));
     let res: Response;
-    try { res = await this.fetchImpl(url); } catch (e) { this.fail(describeError(e)); throw e; }
-    if (!res.ok) { this.fail(`HTTP ${res.status}`); throw new Error(`Binance klines failed: ${res.status}`); }
+    try {
+      res = await this.fetchImpl(url);
+    } catch (e) {
+      this.fail(describeError(e));
+      throw e;
+    }
+    if (!res.ok) {
+      this.fail(`HTTP ${res.status}`);
+      throw new Error(`Binance klines failed: ${res.status}`);
+    }
     const rows = (await res.json()) as (string | number)[][];
-    const candles = rows.map((r) => ({ time: Math.floor(Number(r[0]) / 1000), open: Number(r[1]), high: Number(r[2]), low: Number(r[3]), close: Number(r[4]), volume: Number(r[5]) }));
+    const candles = rows.map((r) => ({
+      time: Math.floor(Number(r[0]) / 1000),
+      open: Number(r[1]),
+      high: Number(r[2]),
+      low: Number(r[3]),
+      close: Number(r[4]),
+      volume: Number(r[5]),
+    }));
     this.clock.lastUpdate = Date.now();
     const last = candles[candles.length - 1];
     if (last) this.clock.lastEventTime = last.time;
@@ -64,28 +91,49 @@ export class BinanceProvider implements MarketDataProvider {
     const sym = i.providerSymbols.binance?.toLowerCase();
     const interval = TF_MAP[tf];
     if (!sym || !interval) return () => {};
-    const sock = new ReconnectingSocket(`${this.wsUrl}/${sym}@kline_${interval}`, {
-      onMessage: (raw) => {
-        let msg: { E?: number; k: { t: number; o: string; h: string; l: string; c: string; v: string; x: boolean } };
-        try { msg = JSON.parse(raw); } catch { return; }
-        const k = msg.k;
-        if (!k) return;
-        const receivedAt = Date.now();
-        const eventMs = msg.E ?? receivedAt;
-        this.clock.lastUpdate = receivedAt;
-        this.clock.lastEventTime = Math.floor(eventMs / 1000);
-        this.clock.latencyMs = Math.max(0, receivedAt - eventMs);
-        onUpdate({ symbol: i.symbol, timeframe: tf, candle: { time: Math.floor(k.t / 1000), open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v }, closed: k.x, receivedAt, eventTime: Math.floor(eventMs / 1000) });
+    const sock = new ReconnectingSocket(
+      `${this.wsUrl}/${sym}@kline_${interval}`,
+      {
+        onMessage: (raw) => {
+          let msg: { E?: number; k: { t: number; o: string; h: string; l: string; c: string; v: string; x: boolean } };
+          try {
+            msg = JSON.parse(raw);
+          } catch {
+            return;
+          }
+          const k = msg.k;
+          if (!k) return;
+          const receivedAt = Date.now();
+          const eventMs = msg.E ?? receivedAt;
+          this.clock.lastUpdate = receivedAt;
+          this.clock.lastEventTime = Math.floor(eventMs / 1000);
+          this.clock.latencyMs = Math.max(0, receivedAt - eventMs);
+          onUpdate({
+            symbol: i.symbol,
+            timeframe: tf,
+            candle: { time: Math.floor(k.t / 1000), open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v },
+            closed: k.x,
+            receivedAt,
+            eventTime: Math.floor(eventMs / 1000),
+          });
+        },
+        onClose: (reason) => this.fail(`ws ${reason}`),
       },
-      onClose: (reason) => this.fail(`ws ${reason}`),
-    }, { WebSocketCtor: this.WebSocketCtor });
+      { WebSocketCtor: this.WebSocketCtor },
+    );
     sock.open();
     return () => sock.close();
   }
 
-  private fail(message: string) { this.clock.lastError = message; this.clock.lastErrorAt = Date.now(); }
+  private fail(message: string) {
+    this.clock.lastError = message;
+    this.clock.lastErrorAt = Date.now();
+  }
 
   status(): ProviderStatus {
-    return buildStatus(this.id, this.clock, { licensed: false, message: this.clock.lastUpdate && !this.clock.lastErrorAt ? BINANCE_MESSAGE : undefined });
+    return buildStatus(this.id, this.clock, {
+      licensed: false,
+      message: this.clock.lastUpdate && !this.clock.lastErrorAt ? BINANCE_MESSAGE : undefined,
+    });
   }
 }

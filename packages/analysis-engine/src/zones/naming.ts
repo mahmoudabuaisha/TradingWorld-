@@ -1,6 +1,9 @@
 import type { Factor, Direction, ZoneOrigin, Sweep } from "../types.js";
 
-interface NameParts { en: string; ar: string }
+interface NameParts {
+  en: string;
+  ar: string;
+}
 
 /**
  * Analytical names, never "Zone 1". Composed from the strongest present factors.
@@ -24,7 +27,10 @@ export function nameZone(direction: Direction, origin: ZoneOrigin, factors: Fact
 
   const top = dedupe(parts).slice(0, 3);
   if (top.length === 0) {
-    const base = origin === "SWEEP_RECLAIM" ? { en: "Liquidity Reclaim", ar: "استعادة سيولة" } : { en: `${dirEn} ${origin.replace("_", " ")}`, ar: `${origin} ${dirAr}` };
+    const base =
+      origin === "SWEEP_RECLAIM"
+        ? { en: "Liquidity Reclaim", ar: "استعادة سيولة" }
+        : { en: `${dirEn} ${origin.replace("_", " ")}`, ar: `${origin} ${dirAr}` };
     top.push(base);
   }
   const kind = direction === "bullish" ? { en: "Demand", ar: "طلب" } : { en: "Supply", ar: "عرض" };

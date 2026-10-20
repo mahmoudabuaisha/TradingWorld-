@@ -32,7 +32,11 @@ export class RateBudget {
       }
       const wait = Math.max(25, this.stamps[0]! + this.windowMs - this.now());
       this.waiting++;
-      try { await this.sleep(wait); } finally { this.waiting--; }
+      try {
+        await this.sleep(wait);
+      } finally {
+        this.waiting--;
+      }
     }
   }
 

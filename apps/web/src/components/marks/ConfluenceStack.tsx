@@ -7,15 +7,42 @@ import type { Factor } from "@tradingworld/analysis-engine";
  * height of the pile, read off a dimension line. Absent factors are dashed, empty layers.
  * In what-if mode the trader can lift a layer to see what the score would be without it (a simulation, labelled).
  */
-export function ConfluenceStack({ factors, score, direction, locale, scale = 2.2, minH = 22, offH = 16, interactive = true }: {
-  factors: Factor[]; score: number; direction: "bullish" | "bearish"; locale: "ar" | "en"; scale?: number; minH?: number; offH?: number; interactive?: boolean;
+export function ConfluenceStack({
+  factors,
+  score,
+  direction,
+  locale,
+  scale = 2.2,
+  minH = 22,
+  offH = 16,
+  interactive = true,
+}: {
+  factors: Factor[];
+  score: number;
+  direction: "bullish" | "bearish";
+  locale: "ar" | "en";
+  scale?: number;
+  minH?: number;
+  offH?: number;
+  interactive?: boolean;
 }) {
   const [lifted, setLifted] = useState<Set<string>>(new Set());
   const whatIf = useMemo(() => factors.reduce((s, f) => s + (f.present && !lifted.has(f.key) ? f.contribution : 0), 0), [factors, lifted]);
   const modified = lifted.size > 0;
-  const tone = direction === "bullish" ? { border: "border-up", wash: "bg-up-wash", text: "text-up-ink" } : { border: "border-down", wash: "bg-down-wash", text: "text-down-ink" };
+  const tone =
+    direction === "bullish"
+      ? { border: "border-up", wash: "bg-up-wash", text: "text-up-ink" }
+      : { border: "border-down", wash: "bg-down-wash", text: "text-down-ink" };
   const L = (ar: string, en: string) => (locale === "ar" ? ar : en);
-  const toggle = (key: string) => { if (!interactive) return; setLifted((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; }); };
+  const toggle = (key: string) => {
+    if (!interactive) return;
+    setLifted((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  };
   let idx = 0;
   return (
     <div>
@@ -47,13 +74,23 @@ export function ConfluenceStack({ factors, score, direction, locale, scale = 2.2
           <span className="absolute inset-y-0 start-1/2 w-px bg-ink" aria-hidden="true" />
           <span className="absolute top-0 start-1/2 h-px w-2.5 -translate-x-1/2 bg-ink" aria-hidden="true" />
           <span className="absolute bottom-0 start-1/2 h-px w-2.5 -translate-x-1/2 bg-ink" aria-hidden="true" />
-          <span className="mono relative bg-sheet px-0.5 py-1 text-xs font-semibold [writing-mode:vertical-rl] rotate-180">{modified ? whatIf : score} / 100</span>
+          <span className="mono relative bg-sheet px-0.5 py-1 text-xs font-semibold [writing-mode:vertical-rl] rotate-180">
+            {modified ? whatIf : score} / 100
+          </span>
         </div>
       </div>
       {interactive && (
         <div className="mt-2 flex items-center justify-between text-[11px] text-ink-3">
-          <span>{modified ? L(`ماذا لو: ${whatIf} بدل ${score} الفعلية`, `What if: ${whatIf} instead of the actual ${score}`) : L("اضغط على طبقة لترى الدرجة بدونها", "Lift a layer to see the score without it")}</span>
-          {modified && <button type="button" className="underline hover:text-ink" onClick={() => setLifted(new Set())}>{L("إعادة", "Reset")}</button>}
+          <span>
+            {modified
+              ? L(`ماذا لو: ${whatIf} بدل ${score} الفعلية`, `What if: ${whatIf} instead of the actual ${score}`)
+              : L("اضغط على طبقة لترى الدرجة بدونها", "Lift a layer to see the score without it")}
+          </span>
+          {modified && (
+            <button type="button" className="underline hover:text-ink" onClick={() => setLifted(new Set())}>
+              {L("إعادة", "Reset")}
+            </button>
+          )}
         </div>
       )}
     </div>

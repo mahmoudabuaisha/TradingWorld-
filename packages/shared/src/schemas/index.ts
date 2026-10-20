@@ -40,37 +40,59 @@ export const zoneFeedbackSchema = z.object({
   useful: z.boolean(),
   /** the factor that convinced the user most — must be present on that zone (checked by the API) */
   bestFactor: z.enum(FACTOR_KEYS).optional(),
-  comment: z.string().max(FEEDBACK_COMMENT_MAX * 2).optional()
-    // stripping control characters is the point of this pattern
-    // eslint-disable-next-line no-control-regex
-    .transform((s) => (s === undefined ? undefined : s.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, FEEDBACK_COMMENT_MAX) || undefined)),
+  comment: z
+    .string()
+    .max(FEEDBACK_COMMENT_MAX * 2)
+    .optional()
+    .transform((s) =>
+      s === undefined
+        ? undefined
+        : s
+            // stripping control characters is the point of this pattern
+            // eslint-disable-next-line no-control-regex
+            .replace(/[\u0000-\u001f\u007f]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, FEEDBACK_COMMENT_MAX) || undefined,
+    ),
 });
 export type ZoneFeedbackInput = z.infer<typeof zoneFeedbackSchema>;
 
 /** UI-01: a chart drawing anchored to (time, price). The point count must match the tool. */
 const drawingPoint = z.object({ time: z.number().int().min(946_684_800).max(4_102_444_800), price: z.number().finite().positive() });
-export const drawingCreateSchema = z.object({
-  symbol: z.string().min(3).max(20),
-  kind: z.enum(DRAWING_KINDS),
-  points: z.array(drawingPoint).min(1).max(2),
-}).refine((d) => d.points.length === DRAWING_POINTS[d.kind], { message: "point count does not match the drawing kind", path: ["points"] });
+export const drawingCreateSchema = z
+  .object({
+    symbol: z.string().min(3).max(20),
+    kind: z.enum(DRAWING_KINDS),
+    points: z.array(drawingPoint).min(1).max(2),
+  })
+  .refine((d) => d.points.length === DRAWING_POINTS[d.kind], { message: "point count does not match the drawing kind", path: ["points"] });
 export const drawingUpdateSchema = z.object({ points: z.array(drawingPoint).min(1).max(2) });
 
-export const alertCreateSchema = z.object({
-  symbol: z.string().min(3).max(20),
-  kind: z.enum(["price_above", "price_below", "zone_enter"]),
-  price: z.number().positive().optional(),
-  /** zone_enter: the tracked zone key (zoneTrackKey) — kept for linking back to the zone */
-  zoneId: z.string().max(200).optional(),
-  /** zone_enter: the zone's bounds, so the alert can be watched from prices alone */
-  zoneTop: z.number().positive().optional(),
-  zoneBottom: z.number().positive().optional(),
-  note: z.string().max(200).optional(),
-}).refine((a) => a.kind !== "zone_enter" || (a.zoneTop !== undefined && a.zoneBottom !== undefined && a.zoneTop > a.zoneBottom), { message: "zone_enter needs zoneTop > zoneBottom", path: ["zoneTop"] });
+export const alertCreateSchema = z
+  .object({
+    symbol: z.string().min(3).max(20),
+    kind: z.enum(["price_above", "price_below", "zone_enter"]),
+    price: z.number().positive().optional(),
+    /** zone_enter: the tracked zone key (zoneTrackKey) — kept for linking back to the zone */
+    zoneId: z.string().max(200).optional(),
+    /** zone_enter: the zone's bounds, so the alert can be watched from prices alone */
+    zoneTop: z.number().positive().optional(),
+    zoneBottom: z.number().positive().optional(),
+    note: z.string().max(200).optional(),
+  })
+  .refine((a) => a.kind !== "zone_enter" || (a.zoneTop !== undefined && a.zoneBottom !== undefined && a.zoneTop > a.zoneBottom), {
+    message: "zone_enter needs zoneTop > zoneBottom",
+    path: ["zoneTop"],
+  });
 
 /** NOTIF-01: a browser PushSubscription as serialised by PushSubscription.toJSON(). */
 export const pushSubscriptionSchema = z.object({
-  endpoint: z.string().url().max(2000).refine((u) => u.startsWith("https://"), "push endpoints are https"),
+  endpoint: z
+    .string()
+    .url()
+    .max(2000)
+    .refine((u) => u.startsWith("https://"), "push endpoints are https"),
   keys: z.object({ p256dh: z.string().min(10).max(300), auth: z.string().min(8).max(100) }),
 });
 export const notificationPrefsSchema = z.object({ push: z.boolean().optional(), email: z.boolean().optional() });

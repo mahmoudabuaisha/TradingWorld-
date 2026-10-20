@@ -4,7 +4,8 @@ import { AppShell } from "@/components/shell/AppShell";
 
 export const metadata: Metadata = {
   title: "TradingWorld",
-  description: "Explainable market analysis engine, chart, journal, academy and community for traders. Not a broker, not signals, no profit promises.",
+  description:
+    "Explainable market analysis engine, chart, journal, academy and community for traders. Not a broker, not signals, no profit promises.",
 };
 export const viewport: Viewport = { themeColor: "#13181b", width: "device-width", initialScale: 1 };
 
@@ -14,8 +15,12 @@ const themeScript = `(function(){try{var s=JSON.parse(localStorage.getItem('tw-a
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ar" dir="rtl" data-theme="dark" suppressHydrationWarning>
-      <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
-      <body><AppShell>{children}</AppShell></body>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body>
+        <AppShell>{children}</AppShell>
+      </body>
     </html>
   );
 }

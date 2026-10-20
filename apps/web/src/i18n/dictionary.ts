@@ -70,7 +70,10 @@ const dict = {
     signinOpen: { ar: "سجّل الدخول لعرض صفقاتك المفتوحة.", en: "Sign in to see your open trades." },
     loading: { ar: "المسّاح يقرأ الأسواق…", en: "Surveying the markets…" },
     offline: { ar: "تعذر الوصول إلى الـ API. شغّل الخادم ثم أعد المحاولة.", en: "Could not reach the API. Start the server and retry." },
-    goals: { ar: "الأهداف هنا عملية: عدد التحليلات، الالتزام بسقف المخاطرة، إكمال الروتين. لا هدف ربح على هذه الورقة.", en: "Goals here are practical: analyses done, risk cap respected, routine completed. No profit target on this sheet." },
+    goals: {
+      ar: "الأهداف هنا عملية: عدد التحليلات، الالتزام بسقف المخاطرة، إكمال الروتين. لا هدف ربح على هذه الورقة.",
+      en: "Goals here are practical: analyses done, risk cap respected, routine completed. No profit target on this sheet.",
+    },
     weekAbbr: { ar: "WEEK", en: "WEEK" },
   },
   common: {

@@ -61,7 +61,12 @@ export default async function adminRoutes(app: FastifyInstance, ctx: AppContext)
     const q = req.query as { engineVersion?: string; scoringVersion?: string; includeDemo?: string; limit?: string };
     const engineVersion = q.engineVersion ?? ENGINE_VERSION;
     const scoringVersion = q.scoringVersion ?? SCORING_VERSION;
-    const samples = await ctx.outcomes.dataset({ engineVersion, scoringVersion, includeDemo: ["1", "true"].includes(q.includeDemo ?? ""), limit: q.limit ? Math.min(Number(q.limit), 100_000) : undefined });
+    const samples = await ctx.outcomes.dataset({
+      engineVersion,
+      scoringVersion,
+      includeDemo: ["1", "true"].includes(q.includeDemo ?? ""),
+      limit: q.limit ? Math.min(Number(q.limit), 100_000) : undefined,
+    });
     return { engine_version: engineVersion, scoring_version: scoringVersion, n_folds: 5, samples };
   });
 
@@ -78,12 +83,22 @@ export default async function adminRoutes(app: FastifyInstance, ctx: AppContext)
     const body = (req.body ?? {}) as { kind?: "cycle" | "backfill" | "catchup" | "gaps" | "aggregate"; symbol?: string; bars?: number };
     const kind = body.kind ?? "cycle";
     if (kind !== "cycle" && !body.symbol) return reply.code(400).send({ error: "SYMBOL_REQUIRED" });
-    await ctx.repos.audit.append({ actorId: req.user.id, action: "backfill.trigger", target: body.symbol, meta: { kind, bars: body.bars } });
-    const work = kind === "cycle" ? ctx.backfill.runOnce()
-      : kind === "backfill" ? ctx.backfill.backfill(body.symbol!, undefined, body.bars)
-      : kind === "catchup" ? ctx.backfill.catchUp(body.symbol!)
-      : kind === "gaps" ? ctx.backfill.repairGaps(body.symbol!)
-      : ctx.backfill.aggregateDerived(body.symbol!, "full");
+    await ctx.repos.audit.append({
+      actorId: req.user.id,
+      action: "backfill.trigger",
+      target: body.symbol,
+      meta: { kind, bars: body.bars },
+    });
+    const work =
+      kind === "cycle"
+        ? ctx.backfill.runOnce()
+        : kind === "backfill"
+          ? ctx.backfill.backfill(body.symbol!, undefined, body.bars)
+          : kind === "catchup"
+            ? ctx.backfill.catchUp(body.symbol!)
+            : kind === "gaps"
+              ? ctx.backfill.repairGaps(body.symbol!)
+              : ctx.backfill.aggregateDerived(body.symbol!, "full");
     void work.catch((e) => app.log.warn(`[backfill] ${(e as Error).message}`));
     return { accepted: true, kind, symbol: body.symbol };
   });
@@ -96,7 +111,10 @@ export default async function adminRoutes(app: FastifyInstance, ctx: AppContext)
       for (const f of e.zone.factors) {
         const s = (stats[f.key] ??= { present: 0, total: 0, avgScoreWhenPresent: 0 });
         s.total++;
-        if (f.present) { s.avgScoreWhenPresent = (s.avgScoreWhenPresent * s.present + e.zone.score) / (s.present + 1); s.present++; }
+        if (f.present) {
+          s.avgScoreWhenPresent = (s.avgScoreWhenPresent * s.present + e.zone.score) / (s.present + 1);
+          s.present++;
+        }
       }
     }
     const byStatus: Record<string, number> = {};

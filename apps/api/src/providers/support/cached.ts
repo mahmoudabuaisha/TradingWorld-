@@ -19,7 +19,11 @@ export interface CachedProviderOptions {
   now?: () => number;
 }
 
-interface Meta { fetchedAt: number; streaming: number; lastLiveWrite: number }
+interface Meta {
+  fetchedAt: number;
+  streaming: number;
+  lastLiveWrite: number;
+}
 
 export const defaultRefreshSeconds = (tf: Timeframe): number => Math.min(300, Math.max(15, Math.round(TIMEFRAME_SECONDS[tf] / 4)));
 
@@ -53,7 +57,10 @@ export class CachedProvider implements MarketDataProvider {
   private readonly liveWriteMs: number;
   private readonly now: () => number;
 
-  constructor(private readonly inner: MarketDataProvider, opts: CachedProviderOptions = {}) {
+  constructor(
+    private readonly inner: MarketDataProvider,
+    opts: CachedProviderOptions = {},
+  ) {
     this.id = inner.id;
     this.store = opts.store ?? new MemoryCandleStore();
     this.refresh = opts.refreshSeconds ?? defaultRefreshSeconds;
@@ -64,11 +71,19 @@ export class CachedProvider implements MarketDataProvider {
     this.now = opts.now ?? Date.now;
   }
 
-  supports(i: Instrument): boolean { return this.inner.supports(i); }
-  status() { return this.inner.status(); }
-  lastSeen(symbol: string): LastSeen | undefined { return this.seen.get(symbol) ?? this.inner.lastSeen?.(symbol); }
+  supports(i: Instrument): boolean {
+    return this.inner.supports(i);
+  }
+  status() {
+    return this.inner.status();
+  }
+  lastSeen(symbol: string): LastSeen | undefined {
+    return this.seen.get(symbol) ?? this.inner.lastSeen?.(symbol);
+  }
   /** series this process has touched (coverage itself lives in the store: `store.series()`) */
-  stats() { return { series: this.meta.size, store: this.store.kind }; }
+  stats() {
+    return { series: this.meta.size, store: this.store.kind };
+  }
 
   async getCandles(i: Instrument, tf: Timeframe, limit: number, to?: number): Promise<Candle[]> {
     if (to !== undefined) return this.inner.getCandles(i, tf, limit, to);
@@ -114,11 +129,16 @@ export class CachedProvider implements MarketDataProvider {
       const now = this.now();
       if (u.closed || now - meta.lastLiveWrite >= this.liveWriteMs) {
         meta.lastLiveWrite = now;
-        void this.store.upsert(i.symbol, tf, [u.candle], this.inner.id).catch(() => { /* status() of the store layer reports persistent failures */ });
+        void this.store.upsert(i.symbol, tf, [u.candle], this.inner.id).catch(() => {
+          /* status() of the store layer reports persistent failures */
+        });
       }
       onUpdate(u);
     });
-    return () => { off(); meta.streaming = Math.max(0, meta.streaming - 1); };
+    return () => {
+      off();
+      meta.streaming = Math.max(0, meta.streaming - 1);
+    };
   }
 
   private note(symbol: string, candles: Candle[]) {

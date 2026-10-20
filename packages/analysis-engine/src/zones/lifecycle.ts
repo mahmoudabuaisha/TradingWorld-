@@ -38,12 +38,20 @@ export function evaluateLifecycle(zone: Zone, candles: Candle[], atr: number): L
       return { status: "INVALIDATED", tests, firstTestIndex, lastTestIndex, reacted, reactedIndex, invalidatedIndex: i };
     }
     if (overlaps) {
-      if (!inside) { tests++; lastTestIndex = i; firstTestIndex ??= i; inside = true; }
+      if (!inside) {
+        tests++;
+        lastTestIndex = i;
+        firstTestIndex ??= i;
+        inside = true;
+      }
     } else {
       inside = false;
       if (tests > 0 && lastTestIndex !== undefined) {
         const away = zone.direction === "bullish" ? c.close - zone.top : zone.bottom - c.close;
-        if (away >= atr && !reacted) { reacted = true; reactedIndex = i; }
+        if (away >= atr && !reacted) {
+          reacted = true;
+          reactedIndex = i;
+        }
       }
     }
   }
@@ -53,7 +61,8 @@ export function evaluateLifecycle(zone: Zone, candles: Candle[], atr: number): L
   else if (tests > 0) status = "TESTED";
   else if (confirmed) {
     const last = candles[candles.length - 1];
-    if (last) { // no candles after creation yet → stays CONFIRMED
+    if (last) {
+      // no candles after creation yet → stays CONFIRMED
       const away = zone.direction === "bullish" ? last.close - zone.top : zone.bottom - last.close;
       status = away > 0 ? "ACTIVE" : "CONFIRMED";
     }

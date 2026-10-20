@@ -8,7 +8,16 @@ import { buildStatus, describeError, type FeedClock } from "./support/status.js"
 
 /** Native Twelve Data intervals. 3m and 12h are derived from 1m / 4h (see DERIVED). */
 const TF_MAP: Partial<Record<Timeframe, string>> = {
-  "1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min", "1h": "1h", "2h": "2h", "4h": "4h", "1d": "1day", "1w": "1week", "1M": "1month",
+  "1m": "1min",
+  "5m": "5min",
+  "15m": "15min",
+  "30m": "30min",
+  "1h": "1h",
+  "2h": "2h",
+  "4h": "4h",
+  "1d": "1day",
+  "1w": "1week",
+  "1M": "1month",
 };
 const DERIVED: Partial<Record<Timeframe, Timeframe>> = { "3m": "1m", "12h": "4h" };
 
@@ -28,7 +37,13 @@ export interface TwelveDataOptions {
 }
 
 export class TwelveDataError extends Error {
-  constructor(message: string, public readonly code?: number) { super(message); this.name = "TwelveDataError"; }
+  constructor(
+    message: string,
+    public readonly code?: number,
+  ) {
+    super(message);
+    this.name = "TwelveDataError";
+  }
 }
 
 /** "2024-01-05" (daily+) or "2024-01-05 14:30:00" (intraday, in the requested timezone = UTC) → unix seconds. */
@@ -53,7 +68,14 @@ export function parseTimeSeries(json: unknown): Candle[] {
   if (j.status === "error" || (!j.values && j.message)) throw new TwelveDataError(`TwelveData: ${j.message ?? "error"}`, j.code);
   if (!Array.isArray(j.values)) throw new TwelveDataError("TwelveData: no values");
   return j.values
-    .map((v) => ({ time: parseTwelveDateTime(v.datetime), open: +v.open, high: +v.high, low: +v.low, close: +v.close, volume: v.volume !== undefined && v.volume !== "" ? +v.volume : undefined }))
+    .map((v) => ({
+      time: parseTwelveDateTime(v.datetime),
+      open: +v.open,
+      high: +v.high,
+      low: +v.low,
+      close: +v.close,
+      volume: v.volume !== undefined && v.volume !== "" ? +v.volume : undefined,
+    }))
     .filter((c) => Number.isFinite(c.open) && Number.isFinite(c.close))
     .sort((a, b) => a.time - b.time);
 }
@@ -63,12 +85,22 @@ class TwelveDataSocket {
   private readonly sock: ReconnectingSocket;
   private readonly handlers = new Map<string, Set<(price: number, ts: number) => void>>();
 
-  constructor(url: string, Ctor: typeof WebSocket | undefined, private readonly onEvent: (e: { type: "price" | "error" | "close"; ts?: number; message?: string }) => void) {
-    this.sock = new ReconnectingSocket(url, {
-      onOpen: (send) => { if (this.handlers.size) send({ action: "subscribe", params: { symbols: [...this.handlers.keys()].join(",") } }); },
-      onMessage: (raw) => this.handle(raw),
-      onClose: (reason) => this.onEvent({ type: "close", message: reason }),
-    }, { WebSocketCtor: Ctor, heartbeat: { everyMs: 10_000, payload: { action: "heartbeat" } } });
+  constructor(
+    url: string,
+    Ctor: typeof WebSocket | undefined,
+    private readonly onEvent: (e: { type: "price" | "error" | "close"; ts?: number; message?: string }) => void,
+  ) {
+    this.sock = new ReconnectingSocket(
+      url,
+      {
+        onOpen: (send) => {
+          if (this.handlers.size) send({ action: "subscribe", params: { symbols: [...this.handlers.keys()].join(",") } });
+        },
+        onMessage: (raw) => this.handle(raw),
+        onClose: (reason) => this.onEvent({ type: "close", message: reason }),
+      },
+      { WebSocketCtor: Ctor, heartbeat: { everyMs: 10_000, payload: { action: "heartbeat" } } },
+    );
     this.sock.open();
   }
 
@@ -82,13 +114,20 @@ class TwelveDataSocket {
     set.add(handler);
     return () => {
       set!.delete(handler);
-      if (!set!.size) { this.handlers.delete(symbol); this.sock.send({ action: "unsubscribe", params: { symbols: symbol } }); }
+      if (!set!.size) {
+        this.handlers.delete(symbol);
+        this.sock.send({ action: "unsubscribe", params: { symbols: symbol } });
+      }
     };
   }
 
   private handle(raw: string) {
     let msg: { event?: string; symbol?: string; price?: number | string; timestamp?: number | string; fails?: { symbol: string }[] };
-    try { msg = JSON.parse(raw); } catch { return; }
+    try {
+      msg = JSON.parse(raw);
+    } catch {
+      return;
+    }
     if (msg.event === "price" && msg.symbol) {
       const price = Number(msg.price);
       const ts = Number(msg.timestamp);
@@ -101,7 +140,9 @@ class TwelveDataSocket {
     }
   }
 
-  close() { this.sock.close(); }
+  close() {
+    this.sock.close();
+  }
 }
 
 /**
@@ -128,7 +169,9 @@ export class TwelveDataProvider implements MarketDataProvider {
     this.clock = { transport: opts.useWebSocket ? "ws" : "poll", pollSeconds: opts.pollSeconds ?? 15 };
   }
 
-  supports(i: Instrument): boolean { return !!i.providerSymbols.twelvedata; }
+  supports(i: Instrument): boolean {
+    return !!i.providerSymbols.twelvedata;
+  }
 
   async getCandles(i: Instrument, tf: Timeframe, limit: number, to?: number): Promise<Candle[]> {
     const lower = DERIVED[tf];
@@ -184,10 +227,13 @@ export class TwelveDataProvider implements MarketDataProvider {
         if (!last) return;
         const receivedAt = this.now();
         const prev = tail[tail.length - 2];
-        if (lastTime !== undefined && last.time > lastTime && prev) onUpdate({ symbol: i.symbol, timeframe: tf, candle: prev, closed: true, receivedAt, eventTime: prev.time });
+        if (lastTime !== undefined && last.time > lastTime && prev)
+          onUpdate({ symbol: i.symbol, timeframe: tf, candle: prev, closed: true, receivedAt, eventTime: prev.time });
         onUpdate({ symbol: i.symbol, timeframe: tf, candle: last, closed: false, receivedAt, eventTime: last.time });
         lastTime = last.time;
-      } catch { /* status() carries the error; keep polling */ }
+      } catch {
+        /* status() carries the error; keep polling */
+      }
     };
     const timer = setInterval(() => void tick(), (this.opts.pollSeconds ?? 15) * 1000);
     return () => clearInterval(timer);
@@ -197,26 +243,49 @@ export class TwelveDataProvider implements MarketDataProvider {
   private streamSubscribe(i: Instrument, tf: Timeframe, onUpdate: (u: CandleUpdate) => void): () => void {
     const sym = i.providerSymbols.twelvedata;
     if (!sym) return () => {};
-    const socket = (this.socket ??= new TwelveDataSocket(`${this.wsUrl}?apikey=${encodeURIComponent(this.opts.apiKey)}`, this.opts.WebSocketCtor, (e) => {
-      if (e.type === "price" && e.ts !== undefined) { const receivedAt = this.now(); this.clock.lastUpdate = receivedAt; this.clock.lastEventTime = e.ts; this.clock.latencyMs = Math.max(0, receivedAt - e.ts * 1000); }
-      else this.fail(e.message ?? e.type);
-    }));
+    const socket = (this.socket ??= new TwelveDataSocket(
+      `${this.wsUrl}?apikey=${encodeURIComponent(this.opts.apiKey)}`,
+      this.opts.WebSocketCtor,
+      (e) => {
+        if (e.type === "price" && e.ts !== undefined) {
+          const receivedAt = this.now();
+          this.clock.lastUpdate = receivedAt;
+          this.clock.lastEventTime = e.ts;
+          this.clock.latencyMs = Math.max(0, receivedAt - e.ts * 1000);
+        } else this.fail(e.message ?? e.type);
+      },
+    ));
     const agg = new TickAggregator(tf);
     let active = true;
-    void this.getCandles(i, tf, 1).then((c) => { if (active && c[0]) agg.seed(c[0]); }).catch(() => { /* seeded by the first tick instead */ });
+    void this.getCandles(i, tf, 1)
+      .then((c) => {
+        if (active && c[0]) agg.seed(c[0]);
+      })
+      .catch(() => {
+        /* seeded by the first tick instead */
+      });
     const off = socket.subscribe(sym, (price, ts) => {
       if (!active) return;
       const receivedAt = this.now();
-      for (const u of agg.tick(price, ts)) onUpdate({ symbol: i.symbol, timeframe: tf, candle: u.candle, closed: u.closed, receivedAt, eventTime: ts });
+      for (const u of agg.tick(price, ts))
+        onUpdate({ symbol: i.symbol, timeframe: tf, candle: u.candle, closed: u.closed, receivedAt, eventTime: ts });
     });
-    return () => { active = false; off(); };
+    return () => {
+      active = false;
+      off();
+    };
   }
 
-  private fail(message: string) { this.clock.lastError = message; this.clock.lastErrorAt = this.now(); }
+  private fail(message: string) {
+    this.clock.lastError = message;
+    this.clock.lastErrorAt = this.now();
+  }
 
   status(): ProviderStatus {
     return buildStatus(this.id, this.clock, { licensed: true, plan: this.opts.plan, budget: this.budget.snapshot() }, this.now());
   }
 
-  close() { this.socket?.close(); }
+  close() {
+    this.socket?.close();
+  }
 }

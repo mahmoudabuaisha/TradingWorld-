@@ -13,17 +13,39 @@ export type ServerMessage =
 
 /** Minimal auto-reconnecting subscription client for /ws. */
 /** `token` identifies the socket, so the server can deliver this user's alerts and notifications (and nobody else's). */
-export function subscribeMarket(symbol: string, timeframe: Timeframe, onMessage: (m: ServerMessage) => void, flags: { includeLowQuality?: boolean; includeInvalidated?: boolean; token?: string } = {}): () => void {
+export function subscribeMarket(
+  symbol: string,
+  timeframe: Timeframe,
+  onMessage: (m: ServerMessage) => void,
+  flags: { includeLowQuality?: boolean; includeInvalidated?: boolean; token?: string } = {},
+): () => void {
   let ws: WebSocket | undefined;
   let closed = false;
   let retry = 1000;
   const connect = () => {
     ws = new WebSocket(WS_URL);
-    ws.onopen = () => { retry = 1000; ws?.send(JSON.stringify({ type: "subscribe", symbol, timeframe, ...flags })); };
-    ws.onmessage = (ev) => { try { onMessage(JSON.parse(ev.data) as ServerMessage); } catch { /* ignore */ } };
-    ws.onclose = () => { if (!closed) { setTimeout(connect, retry); retry = Math.min(retry * 2, 15_000); } };
+    ws.onopen = () => {
+      retry = 1000;
+      ws?.send(JSON.stringify({ type: "subscribe", symbol, timeframe, ...flags }));
+    };
+    ws.onmessage = (ev) => {
+      try {
+        onMessage(JSON.parse(ev.data) as ServerMessage);
+      } catch {
+        /* ignore */
+      }
+    };
+    ws.onclose = () => {
+      if (!closed) {
+        setTimeout(connect, retry);
+        retry = Math.min(retry * 2, 15_000);
+      }
+    };
     ws.onerror = () => ws?.close();
   };
   connect();
-  return () => { closed = true; ws?.close(); };
+  return () => {
+    closed = true;
+    ws?.close();
+  };
 }

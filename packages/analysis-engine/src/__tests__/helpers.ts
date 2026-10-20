@@ -10,7 +10,14 @@ export function flat(n: number, price: number, start = 1_700_000_000, step = 300
   const out: Candle[] = [];
   for (let i = 0; i < n; i++) {
     const wiggle = (i % 2 === 0 ? 1 : -1) * price * 0.0005;
-    out.push({ time: start + i * step, open: price, high: price + Math.abs(wiggle) * 2, low: price - Math.abs(wiggle) * 2, close: price + wiggle, volume: 100 });
+    out.push({
+      time: start + i * step,
+      open: price,
+      high: price + Math.abs(wiggle) * 2,
+      low: price - Math.abs(wiggle) * 2,
+      close: price + wiggle,
+      volume: 100,
+    });
   }
   return out;
 }

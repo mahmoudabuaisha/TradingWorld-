@@ -9,7 +9,13 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** Weekday (0 = Sunday) and minutes since midnight in a time zone, DST-correct via Intl. */
 export function localClock(ms: number, timeZone: string): { weekday: number; minutes: number } {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(ms));
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
   const hour = Number(get("hour")) % 24;
   return { weekday: DAYS.indexOf(get("weekday")), minutes: hour * 60 + Number(get("minute")) };
@@ -30,7 +36,8 @@ export function marketState(instrument: Pick<Instrument, "assetClass" | "session
     case "commodity": {
       const { weekday, minutes } = localClock(nowMs, "America/New_York");
       const rollover = 17 * 60;
-      if (weekday === 6 || (weekday === 0 && minutes < rollover) || (weekday === 5 && minutes >= rollover)) return { open: false, reason: "weekend" };
+      if (weekday === 6 || (weekday === 0 && minutes < rollover) || (weekday === 5 && minutes >= rollover))
+        return { open: false, reason: "weekend" };
       return { open: true };
     }
     default: {

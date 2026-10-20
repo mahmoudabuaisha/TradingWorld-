@@ -41,7 +41,17 @@ CREATE TABLE IF NOT EXISTS market.backfills (
 `;
 
 export interface BackfillRunRow {
-  id: number; symbol: string; timeframe: string; kind: string; from?: number; to?: number; bars: number; status: string; error?: string; startedAt: number; finishedAt?: number;
+  id: number;
+  symbol: string;
+  timeframe: string;
+  kind: string;
+  from?: number;
+  to?: number;
+  bars: number;
+  status: string;
+  error?: string;
+  startedAt: number;
+  finishedAt?: number;
 }
 
 const UPSERT_BATCH = 5000;
@@ -70,14 +80,18 @@ export class TimescaleCandleStore implements CandleStore {
     const bound = to !== undefined ? ` AND time < to_timestamp($4)` : "";
     if (to !== undefined) params.push(to);
     const { rows } = await this.pool.query<{ t: string; open: number; high: number; low: number; close: number; volume: number | null }>(
-      `SELECT extract(epoch FROM time)::bigint AS t, open, high, low, close, volume FROM market.candles WHERE symbol = $1 AND timeframe = $2${bound} ORDER BY time DESC LIMIT $3`, params);
+      `SELECT extract(epoch FROM time)::bigint AS t, open, high, low, close, volume FROM market.candles WHERE symbol = $1 AND timeframe = $2${bound} ORDER BY time DESC LIMIT $3`,
+      params,
+    );
     return rows.reverse().map(toCandle);
   }
 
   async readRange(symbol: string, tf: Timeframe, from: number, to: number): Promise<Candle[]> {
     await this.ensureSchema();
     const { rows } = await this.pool.query<{ t: string; open: number; high: number; low: number; close: number; volume: number | null }>(
-      `SELECT extract(epoch FROM time)::bigint AS t, open, high, low, close, volume FROM market.candles WHERE symbol = $1 AND timeframe = $2 AND time >= to_timestamp($3) AND time < to_timestamp($4) ORDER BY time ASC`, [symbol, tf, from, to]);
+      `SELECT extract(epoch FROM time)::bigint AS t, open, high, low, close, volume FROM market.candles WHERE symbol = $1 AND timeframe = $2 AND time >= to_timestamp($3) AND time < to_timestamp($4) ORDER BY time ASC`,
+      [symbol, tf, from, to],
+    );
     return rows.map(toCandle);
   }
 
@@ -95,7 +109,18 @@ export class TimescaleCandleStore implements CandleStore {
          FROM unnest($4::bigint[], $5::float8[], $6::float8[], $7::float8[], $8::float8[], $9::float8[]) AS u(t, o, h, l, c, v)
          ON CONFLICT (symbol, timeframe, time) DO UPDATE
            SET open = EXCLUDED.open, high = EXCLUDED.high, low = EXCLUDED.low, close = EXCLUDED.close, volume = EXCLUDED.volume, provider = EXCLUDED.provider, received_at = now()${guard}`,
-        [symbol, tf, source, batch.map((c) => c.time), batch.map((c) => c.open), batch.map((c) => c.high), batch.map((c) => c.low), batch.map((c) => c.close), batch.map((c) => c.volume ?? null)]);
+        [
+          symbol,
+          tf,
+          source,
+          batch.map((c) => c.time),
+          batch.map((c) => c.open),
+          batch.map((c) => c.high),
+          batch.map((c) => c.low),
+          batch.map((c) => c.close),
+          batch.map((c) => c.volume ?? null),
+        ],
+      );
       written += res.rowCount ?? 0;
     }
     return written;
@@ -104,7 +129,9 @@ export class TimescaleCandleStore implements CandleStore {
   async range(symbol: string, tf: Timeframe): Promise<SeriesRange | undefined> {
     await this.ensureSchema();
     const { rows } = await this.pool.query<{ first: string | null; last: string | null; count: string }>(
-      `SELECT extract(epoch FROM min(time))::bigint AS first, extract(epoch FROM max(time))::bigint AS last, count(*) AS count FROM market.candles WHERE symbol = $1 AND timeframe = $2`, [symbol, tf]);
+      `SELECT extract(epoch FROM min(time))::bigint AS first, extract(epoch FROM max(time))::bigint AS last, count(*) AS count FROM market.candles WHERE symbol = $1 AND timeframe = $2`,
+      [symbol, tf],
+    );
     const r = rows[0];
     if (!r || r.first === null || r.last === null) return undefined;
     return { symbol, timeframe: tf, first: Number(r.first), last: Number(r.last), count: Number(r.count) };
@@ -113,30 +140,88 @@ export class TimescaleCandleStore implements CandleStore {
   async series(): Promise<SeriesRange[]> {
     await this.ensureSchema();
     const { rows } = await this.pool.query<{ symbol: string; timeframe: Timeframe; first: string; last: string; count: string }>(
-      `SELECT symbol, timeframe, extract(epoch FROM min(time))::bigint AS first, extract(epoch FROM max(time))::bigint AS last, count(*) AS count FROM market.candles GROUP BY symbol, timeframe ORDER BY symbol, timeframe`);
-    return rows.map((r) => ({ symbol: r.symbol, timeframe: r.timeframe, first: Number(r.first), last: Number(r.last), count: Number(r.count) }));
+      `SELECT symbol, timeframe, extract(epoch FROM min(time))::bigint AS first, extract(epoch FROM max(time))::bigint AS last, count(*) AS count FROM market.candles GROUP BY symbol, timeframe ORDER BY symbol, timeframe`,
+    );
+    return rows.map((r) => ({
+      symbol: r.symbol,
+      timeframe: r.timeframe,
+      first: Number(r.first),
+      last: Number(r.last),
+      count: Number(r.count),
+    }));
   }
 
   // ── backfill run log ────────────────────────────────────────────────────────
-  async logRun(run: { symbol: string; timeframe: string; kind: string; from?: number; to?: number; bars: number; status: string; error?: string; startedAt: number; finishedAt?: number }): Promise<void> {
+  async logRun(run: {
+    symbol: string;
+    timeframe: string;
+    kind: string;
+    from?: number;
+    to?: number;
+    bars: number;
+    status: string;
+    error?: string;
+    startedAt: number;
+    finishedAt?: number;
+  }): Promise<void> {
     await this.ensureSchema();
     await this.pool.query(
       `INSERT INTO market.backfills (symbol, timeframe, kind, from_time, to_time, bars, status, error, started_at, finished_at)
        VALUES ($1, $2, $3, to_timestamp($4), to_timestamp($5), $6, $7, $8, to_timestamp($9), to_timestamp($10))`,
-      [run.symbol, run.timeframe, run.kind, run.from ?? null, run.to ?? null, run.bars, run.status, run.error ?? null, run.startedAt / 1000, run.finishedAt ? run.finishedAt / 1000 : null]);
+      [
+        run.symbol,
+        run.timeframe,
+        run.kind,
+        run.from ?? null,
+        run.to ?? null,
+        run.bars,
+        run.status,
+        run.error ?? null,
+        run.startedAt / 1000,
+        run.finishedAt ? run.finishedAt / 1000 : null,
+      ],
+    );
   }
 
   async recentRuns(limit = 50): Promise<BackfillRunRow[]> {
     await this.ensureSchema();
-    const { rows } = await this.pool.query<{ id: string; symbol: string; timeframe: string; kind: string; from_time: Date | null; to_time: Date | null; bars: number; status: string; error: string | null; started_at: Date; finished_at: Date | null }>(
-      `SELECT * FROM market.backfills ORDER BY started_at DESC LIMIT $1`, [limit]);
-    return rows.map((r) => ({ id: Number(r.id), symbol: r.symbol, timeframe: r.timeframe, kind: r.kind, from: r.from_time ? Math.floor(r.from_time.getTime() / 1000) : undefined, to: r.to_time ? Math.floor(r.to_time.getTime() / 1000) : undefined, bars: r.bars, status: r.status, error: r.error ?? undefined, startedAt: r.started_at.getTime(), finishedAt: r.finished_at ? r.finished_at.getTime() : undefined }));
+    const { rows } = await this.pool.query<{
+      id: string;
+      symbol: string;
+      timeframe: string;
+      kind: string;
+      from_time: Date | null;
+      to_time: Date | null;
+      bars: number;
+      status: string;
+      error: string | null;
+      started_at: Date;
+      finished_at: Date | null;
+    }>(`SELECT * FROM market.backfills ORDER BY started_at DESC LIMIT $1`, [limit]);
+    return rows.map((r) => ({
+      id: Number(r.id),
+      symbol: r.symbol,
+      timeframe: r.timeframe,
+      kind: r.kind,
+      from: r.from_time ? Math.floor(r.from_time.getTime() / 1000) : undefined,
+      to: r.to_time ? Math.floor(r.to_time.getTime() / 1000) : undefined,
+      bars: r.bars,
+      status: r.status,
+      error: r.error ?? undefined,
+      startedAt: r.started_at.getTime(),
+      finishedAt: r.finished_at ? r.finished_at.getTime() : undefined,
+    }));
   }
 
   /** test helper */
-  async truncate(): Promise<void> { await this.ensureSchema(); await this.pool.query(`TRUNCATE market.candles, market.backfills`); }
+  async truncate(): Promise<void> {
+    await this.ensureSchema();
+    await this.pool.query(`TRUNCATE market.candles, market.backfills`);
+  }
 
-  async close(): Promise<void> { await this.pool.end(); }
+  async close(): Promise<void> {
+    await this.pool.end();
+  }
 }
 
 function toCandle(r: { t: string; open: number; high: number; low: number; close: number; volume: number | null }): Candle {

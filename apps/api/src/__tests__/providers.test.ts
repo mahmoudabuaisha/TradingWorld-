@@ -16,8 +16,10 @@ const BTCUSD = findInstrument("BTCUSD")!;
 const US100 = findInstrument("US100")!;
 const USOIL = findInstrument("USOIL")!;
 
-const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-const fetchMock = (handler: (url: URL) => unknown) => vi.fn(async (input: string | URL | Request) => jsonResponse(handler(new URL(String(input))))) as unknown as typeof fetch;
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+const fetchMock = (handler: (url: URL) => unknown) =>
+  vi.fn(async (input: string | URL | Request) => jsonResponse(handler(new URL(String(input))))) as unknown as typeof fetch;
 
 /** Minimal WebSocket double: records sent frames and lets the test drive open / message / close. */
 class FakeSocket {
@@ -28,14 +30,31 @@ class FakeSocket {
   onmessage: ((ev: { data: string }) => void) | null = null;
   onerror: (() => void) | null = null;
   onclose: ((ev: { code?: number }) => void) | null = null;
-  constructor(public url: string) { FakeSocket.instances.push(this); }
-  send(d: string) { this.sent.push(d); }
-  close() { this.readyState = 3; this.onclose?.({ code: 1000 }); }
+  constructor(public url: string) {
+    FakeSocket.instances.push(this);
+  }
+  send(d: string) {
+    this.sent.push(d);
+  }
+  close() {
+    this.readyState = 3;
+    this.onclose?.({ code: 1000 });
+  }
   // test helpers
-  serverOpen() { this.readyState = 1; this.onopen?.(); }
-  serverMessage(o: unknown) { this.onmessage?.({ data: typeof o === "string" ? o : JSON.stringify(o) }); }
-  serverDrop() { this.readyState = 3; this.onclose?.({ code: 1006 }); }
-  frames() { return this.sent.map((s) => JSON.parse(s) as Record<string, unknown>); }
+  serverOpen() {
+    this.readyState = 1;
+    this.onopen?.();
+  }
+  serverMessage(o: unknown) {
+    this.onmessage?.({ data: typeof o === "string" ? o : JSON.stringify(o) });
+  }
+  serverDrop() {
+    this.readyState = 3;
+    this.onclose?.({ code: 1006 });
+  }
+  frames() {
+    return this.sent.map((s) => JSON.parse(s) as Record<string, unknown>);
+  }
 }
 const FakeSocketCtor = FakeSocket as unknown as typeof WebSocket;
 
@@ -48,10 +67,21 @@ const TD_SERIES = {
   ],
   status: "ok",
 };
-const TD_ERROR = { code: 429, message: "You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8.", status: "error" };
+const TD_ERROR = {
+  code: 429,
+  message: "You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8.",
+  status: "error",
+};
 
 function series(n: number, start = 1_760_000_000, step = 300, price = 100): Candle[] {
-  return Array.from({ length: n }, (_, i) => ({ time: start + i * step, open: price + i, high: price + i + 1, low: price + i - 1, close: price + i + 0.5, volume: 1 }));
+  return Array.from({ length: n }, (_, i) => ({
+    time: start + i * step,
+    open: price + i,
+    high: price + i + 1,
+    low: price + i - 1,
+    close: price + i + 0.5,
+    volume: 1,
+  }));
 }
 
 /** Scripted inner provider for CachedProvider / registry tests. */
@@ -59,24 +89,64 @@ class FakeProvider implements MarketDataProvider {
   calls: { limit: number; to?: number }[] = [];
   listeners: ((u: CandleUpdate) => void)[] = [];
   statusValue: ProviderStatus;
-  constructor(public readonly id: "twelvedata" | "polygon" | "binance", private data: Candle[], status?: Partial<ProviderStatus>) {
-    this.statusValue = { id, live: true, state: "DELAYED", transport: "poll", licensed: true, pollSeconds: 15, lastUpdate: Date.now(), ...status };
+  constructor(
+    public readonly id: "twelvedata" | "polygon" | "binance",
+    private data: Candle[],
+    status?: Partial<ProviderStatus>,
+  ) {
+    this.statusValue = {
+      id,
+      live: true,
+      state: "DELAYED",
+      transport: "poll",
+      licensed: true,
+      pollSeconds: 15,
+      lastUpdate: Date.now(),
+      ...status,
+    };
   }
-  supports(i: Instrument) { return !!i.providerSymbols[this.id]; }
-  async getCandles(_i: Instrument, _tf: string, limit: number, to?: number) { this.calls.push({ limit, to }); return this.data.slice(-limit); }
-  subscribe(_i: Instrument, _tf: string, on: (u: CandleUpdate) => void) { this.listeners.push(on); return () => { this.listeners = this.listeners.filter((l) => l !== on); }; }
-  status() { return this.statusValue; }
-  push(candle: Candle, closed = false) { for (const l of this.listeners) l({ symbol: "EURUSD", timeframe: "5m", candle, closed, receivedAt: Date.now(), eventTime: candle.time }); }
+  supports(i: Instrument) {
+    return !!i.providerSymbols[this.id];
+  }
+  async getCandles(_i: Instrument, _tf: string, limit: number, to?: number) {
+    this.calls.push({ limit, to });
+    return this.data.slice(-limit);
+  }
+  subscribe(_i: Instrument, _tf: string, on: (u: CandleUpdate) => void) {
+    this.listeners.push(on);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== on);
+    };
+  }
+  status() {
+    return this.statusValue;
+  }
+  push(candle: Candle, closed = false) {
+    for (const l of this.listeners)
+      l({ symbol: "EURUSD", timeframe: "5m", candle, closed, receivedAt: Date.now(), eventTime: candle.time });
+  }
 }
 
-afterEach(() => { vi.useRealTimers(); FakeSocket.instances = []; });
+afterEach(() => {
+  vi.useRealTimers();
+  FakeSocket.instances = [];
+});
 
 describe("RateBudget", () => {
   it("lets `limit` calls through per window and makes the next one wait for the oldest to expire", async () => {
     let t = 0;
     const sleeps: number[] = [];
-    const b = new RateBudget(2, 60_000, () => t, async (ms) => { sleeps.push(ms); t += ms; });
-    await b.take(); await b.take();
+    const b = new RateBudget(
+      2,
+      60_000,
+      () => t,
+      async (ms) => {
+        sleeps.push(ms);
+        t += ms;
+      },
+    );
+    await b.take();
+    await b.take();
     expect(b.snapshot()).toMatchObject({ used: 2, limit: 2, waiting: 0 });
     await b.take();
     expect(sleeps.length).toBeGreaterThan(0);
@@ -88,8 +158,11 @@ describe("RateBudget", () => {
 describe("TickAggregator", () => {
   it("folds ticks into the timeframe and emits the finished candle before the new one", () => {
     const a = new TickAggregator("5m");
-    expect(a.tick(100, 1_760_000_010)).toEqual([{ candle: { time: 1_760_000_000 - 1_760_000_000 % 300, open: 100, high: 100, low: 100, close: 100, volume: 0 }, closed: false }]);
-    a.tick(101, 1_760_000_020); a.tick(99, 1_760_000_030);
+    expect(a.tick(100, 1_760_000_010)).toEqual([
+      { candle: { time: 1_760_000_000 - (1_760_000_000 % 300), open: 100, high: 100, low: 100, close: 100, volume: 0 }, closed: false },
+    ]);
+    a.tick(101, 1_760_000_020);
+    a.tick(99, 1_760_000_030);
     const cur = a.candle!;
     expect([cur.high, cur.low, cur.close]).toEqual([101, 99, 99]);
     const roll = a.tick(99.5, cur.time + 300);
@@ -99,8 +172,8 @@ describe("TickAggregator", () => {
     expect(a.tick(50, cur.time - 10)).toEqual([]); // late tick for a finished bucket is ignored
   });
   it("merges lower-timeframe bars and honours a seed", () => {
-    const a = new TickAggregator("15m", { time: 1_760_000_100 - 1_760_000_100 % 900, open: 10, high: 12, low: 9, close: 11, volume: 5 });
-    const [u] = a.bar({ time: 1_760_000_100 - 1_760_000_100 % 900 + 60, open: 11, high: 13, low: 10.5, close: 12.5, volume: 2 });
+    const a = new TickAggregator("15m", { time: 1_760_000_100 - (1_760_000_100 % 900), open: 10, high: 12, low: 9, close: 11, volume: 5 });
+    const [u] = a.bar({ time: 1_760_000_100 - (1_760_000_100 % 900) + 60, open: 11, high: 13, low: 10.5, close: 12.5, volume: 2 });
     expect(u!.candle).toMatchObject({ open: 10, high: 13, low: 9, close: 12.5, volume: 7 });
   });
 });
@@ -140,7 +213,10 @@ describe("CachedProvider", () => {
     expect(seen.length).toBe(2);
   });
   it("mergeCandles upserts by time and keeps order", () => {
-    const out = mergeCandles(series(3), [{ time: 1_760_000_300, open: 1, high: 2, low: 0, close: 1.5, volume: 9 }, { time: 1_760_000_900, open: 5, high: 6, low: 4, close: 5.5 }]);
+    const out = mergeCandles(series(3), [
+      { time: 1_760_000_300, open: 1, high: 2, low: 0, close: 1.5, volume: 9 },
+      { time: 1_760_000_900, open: 5, high: 6, low: 4, close: 5.5 },
+    ]);
     expect(out.map((c) => c.time)).toEqual([1_760_000_000, 1_760_000_300, 1_760_000_600, 1_760_000_900]);
     expect(out[1]!.close).toBe(1.5);
   });
@@ -151,16 +227,46 @@ describe("Twelve Data", () => {
     expect(parseTwelveDateTime("2026-10-16")).toBe(Date.UTC(2026, 9, 16) / 1000);
     expect(parseTwelveDateTime("2026-10-19 12:05:00")).toBe(Date.UTC(2026, 9, 19, 12, 5) / 1000);
     const c = parseTimeSeries(TD_SERIES);
-    expect(c.map((x) => x.time)).toEqual([Date.UTC(2026, 9, 19, 12, 0) / 1000, Date.UTC(2026, 9, 19, 12, 5) / 1000, Date.UTC(2026, 9, 19, 12, 10) / 1000]);
+    expect(c.map((x) => x.time)).toEqual([
+      Date.UTC(2026, 9, 19, 12, 0) / 1000,
+      Date.UTC(2026, 9, 19, 12, 5) / 1000,
+      Date.UTC(2026, 9, 19, 12, 10) / 1000,
+    ]);
     expect(c[2]).toMatchObject({ open: 1.085, close: 1.0855, volume: undefined });
-    expect(parseTimeSeries({ values: [{ datetime: "2026-10-16", open: "1", high: "2", low: "0.5", close: "1.5", volume: "12345" }] })[0]!.volume).toBe(12345);
+    expect(
+      parseTimeSeries({ values: [{ datetime: "2026-10-16", open: "1", high: "2", low: "0.5", close: "1.5", volume: "12345" }] })[0]!.volume,
+    ).toBe(12345);
     expect(() => parseTimeSeries(TD_ERROR)).toThrow(TwelveDataError);
-    try { parseTimeSeries(TD_ERROR); } catch (e) { expect((e as TwelveDataError).code).toBe(429); }
+    try {
+      parseTimeSeries(TD_ERROR);
+    } catch (e) {
+      expect((e as TwelveDataError).code).toBe(429);
+    }
   });
 
   it("requests the right interval, spends one credit per call and derives 3m from 1m", async () => {
     const urls: URL[] = [];
-    const p = new TwelveDataProvider({ apiKey: "k", creditsPerMinute: 100, fetchImpl: fetchMock((u) => { urls.push(u); return u.searchParams.get("interval") === "1min" ? { values: series(30, 1_760_000_000, 60).reverse().map((c) => ({ datetime: new Date(c.time * 1000).toISOString().slice(0, 19).replace("T", " "), open: String(c.open), high: String(c.high), low: String(c.low), close: String(c.close) })), status: "ok" } : TD_SERIES; }) });
+    const p = new TwelveDataProvider({
+      apiKey: "k",
+      creditsPerMinute: 100,
+      fetchImpl: fetchMock((u) => {
+        urls.push(u);
+        return u.searchParams.get("interval") === "1min"
+          ? {
+              values: series(30, 1_760_000_000, 60)
+                .reverse()
+                .map((c) => ({
+                  datetime: new Date(c.time * 1000).toISOString().slice(0, 19).replace("T", " "),
+                  open: String(c.open),
+                  high: String(c.high),
+                  low: String(c.low),
+                  close: String(c.close),
+                })),
+              status: "ok",
+            }
+          : TD_SERIES;
+      }),
+    });
     const c = await p.getCandles(EURUSD, "5m", 200);
     expect(c.length).toBe(3);
     expect(urls[0]!.searchParams.get("symbol")).toBe("EUR/USD");
@@ -191,7 +297,10 @@ describe("Twelve Data", () => {
     await vi.advanceTimersByTimeAsync(15_000);
     expect(got.length).toBe(1);
     expect(got[0]!.closed).toBe(false);
-    payload = { ...TD_SERIES, values: [{ datetime: "2026-10-19 12:15:00", open: "1.0855", high: "1.0860", low: "1.0850", close: "1.0858" }, ...TD_SERIES.values] };
+    payload = {
+      ...TD_SERIES,
+      values: [{ datetime: "2026-10-19 12:15:00", open: "1.0855", high: "1.0860", low: "1.0850", close: "1.0858" }, ...TD_SERIES.values],
+    };
     await vi.advanceTimersByTimeAsync(15_000);
     expect(got.slice(1).map((u) => u.closed)).toEqual([true, false]);
     expect(got[1]!.candle.time).toBe(Date.UTC(2026, 9, 19, 12, 10) / 1000);
@@ -201,7 +310,14 @@ describe("Twelve Data", () => {
   it("streams prices over one WebSocket, folds them into candles, and resubscribes after a drop", async () => {
     vi.useFakeTimers();
     let t = Date.UTC(2026, 9, 19, 12, 0, 10);
-    const p = new TwelveDataProvider({ apiKey: "k", creditsPerMinute: 100, useWebSocket: true, WebSocketCtor: FakeSocketCtor, now: () => t, fetchImpl: fetchMock(() => TD_SERIES) });
+    const p = new TwelveDataProvider({
+      apiKey: "k",
+      creditsPerMinute: 100,
+      useWebSocket: true,
+      WebSocketCtor: FakeSocketCtor,
+      now: () => t,
+      fetchImpl: fetchMock(() => TD_SERIES),
+    });
     const got: CandleUpdate[] = [];
     p.subscribe(EURUSD, "1m", (u) => got.push(u));
     const ws = FakeSocket.instances[0]!;
@@ -238,7 +354,14 @@ describe("Polygon", () => {
   });
 
   it("parses aggregates (ms → s) and reports API errors", () => {
-    const c = parseAggregates({ ticker: "C:EURUSD", status: "OK", results: [{ v: 1000, o: 1.084, c: 1.0845, h: 1.0847, l: 1.0838, t: 1_760_875_500_000 }, { v: 900, o: 1.083, c: 1.084, h: 1.0842, l: 1.0829, t: 1_760_875_200_000 }] });
+    const c = parseAggregates({
+      ticker: "C:EURUSD",
+      status: "OK",
+      results: [
+        { v: 1000, o: 1.084, c: 1.0845, h: 1.0847, l: 1.0838, t: 1_760_875_500_000 },
+        { v: 900, o: 1.083, c: 1.084, h: 1.0842, l: 1.0829, t: 1_760_875_200_000 },
+      ],
+    });
     expect(c.map((x) => x.time)).toEqual([1_760_875_200, 1_760_875_500]);
     expect(c[1]).toMatchObject({ open: 1.084, close: 1.0845, volume: 1000 });
     expect(parseAggregates({ status: "OK", resultsCount: 0 })).toEqual([]);
@@ -248,7 +371,21 @@ describe("Polygon", () => {
   it("requests the aggregate range for the timeframe and budgets the call", async () => {
     const urls: URL[] = [];
     const now = 1_760_875_800_000;
-    const p = new PolygonProvider({ apiKey: "pk", requestsPerMinute: 100, now: () => now, fetchImpl: fetchMock((u) => { urls.push(u); return { status: "OK", results: [{ o: 1, h: 2, l: 0.5, c: 1.5, v: 1, t: now - 600_000 }, { o: 1.5, h: 2, l: 1, c: 1.8, v: 1, t: now - 300_000 }] }; }) });
+    const p = new PolygonProvider({
+      apiKey: "pk",
+      requestsPerMinute: 100,
+      now: () => now,
+      fetchImpl: fetchMock((u) => {
+        urls.push(u);
+        return {
+          status: "OK",
+          results: [
+            { o: 1, h: 2, l: 0.5, c: 1.5, v: 1, t: now - 600_000 },
+            { o: 1.5, h: 2, l: 1, c: 1.8, v: 1, t: now - 300_000 },
+          ],
+        };
+      }),
+    });
     const c = await p.getCandles(EURUSD, "5m", 100);
     expect(c.length).toBe(2);
     expect(urls[0]!.pathname).toMatch(/\/v2\/aggs\/ticker\/C%3AEURUSD\/range\/5\/minute\/\d+\/1760875800000$/);
@@ -259,7 +396,14 @@ describe("Polygon", () => {
 
   it("authenticates the cluster socket, subscribes after auth_success and folds minute aggregates", async () => {
     const t = Date.UTC(2026, 9, 19, 12, 0, 0);
-    const p = new PolygonProvider({ apiKey: "pk", requestsPerMinute: 100, useWebSocket: true, WebSocketCtor: FakeSocketCtor, now: () => t, fetchImpl: fetchMock(() => ({ status: "OK", results: [] })) });
+    const p = new PolygonProvider({
+      apiKey: "pk",
+      requestsPerMinute: 100,
+      useWebSocket: true,
+      WebSocketCtor: FakeSocketCtor,
+      now: () => t,
+      fetchImpl: fetchMock(() => ({ status: "OK", results: [] })),
+    });
     const got: CandleUpdate[] = [];
     p.subscribe(EURUSD, "5m", (u) => got.push(u));
     const ws = FakeSocket.instances[0]!;
@@ -279,10 +423,10 @@ describe("Polygon", () => {
 
 describe("market hours", () => {
   it("knows weekends, the FX week and exchange hours (DST-aware)", () => {
-    const sat = Date.UTC(2026, 9, 17, 12);            // Saturday
-    const wed = Date.UTC(2026, 9, 21, 14);            // Wednesday 10:00 New York (EDT)
-    const friLate = Date.UTC(2026, 9, 23, 21, 30);    // Friday 17:30 New York → FX closed
-    const sunEve = Date.UTC(2026, 9, 18, 22, 30);     // Sunday 18:30 New York → FX open
+    const sat = Date.UTC(2026, 9, 17, 12); // Saturday
+    const wed = Date.UTC(2026, 9, 21, 14); // Wednesday 10:00 New York (EDT)
+    const friLate = Date.UTC(2026, 9, 23, 21, 30); // Friday 17:30 New York → FX closed
+    const sunEve = Date.UTC(2026, 9, 18, 22, 30); // Sunday 18:30 New York → FX open
     expect(marketState(EURUSD, sat)).toEqual({ open: false, reason: "weekend" });
     expect(marketState(EURUSD, wed)).toEqual({ open: true });
     expect(marketState(EURUSD, friLate).open).toBe(false);
@@ -305,7 +449,10 @@ describe("ProviderRegistry", () => {
 
   it("routes by asset class, warns about missing keys and falls back to demo", () => {
     const td = new FakeProvider("twelvedata", series(100));
-    const reg = new ProviderRegistry(loadConfig({ ...base, MARKET_DATA_ROUTES: "forex=twelvedata,metal=twelvedata,crypto=binance,stock=polygon" }), { providers: { twelvedata: td } });
+    const reg = new ProviderRegistry(
+      loadConfig({ ...base, MARKET_DATA_ROUTES: "forex=twelvedata,metal=twelvedata,crypto=binance,stock=polygon" }),
+      { providers: { twelvedata: td } },
+    );
     expect(reg.for(EURUSD).id).toBe("twelvedata");
     expect(reg.for(BTCUSD).id).toBe("binance");
     expect(reg.for(US100).id).toBe("demo");
@@ -325,8 +472,19 @@ describe("ProviderRegistry", () => {
     const wed = Date.UTC(2026, 9, 21, 14);
     const sat = Date.UTC(2026, 9, 17, 12);
     const td = new FakeProvider("twelvedata", series(100), { lastUpdate: wed - 5_000 });
-    const reg = new ProviderRegistry(loadConfig({ ...base, MARKET_DATA_ROUTES: "forex=twelvedata" }), { providers: { twelvedata: td }, now: () => wed });
-    expect(reg.feed(EURUSD)).toMatchObject({ provider: "twelvedata", state: "DELAYED", transport: "poll", licensed: true, marketOpen: true, delaySeconds: 15, ageSeconds: 5 });
+    const reg = new ProviderRegistry(loadConfig({ ...base, MARKET_DATA_ROUTES: "forex=twelvedata" }), {
+      providers: { twelvedata: td },
+      now: () => wed,
+    });
+    expect(reg.feed(EURUSD)).toMatchObject({
+      provider: "twelvedata",
+      state: "DELAYED",
+      transport: "poll",
+      licensed: true,
+      marketOpen: true,
+      delaySeconds: 15,
+      ageSeconds: 5,
+    });
     expect(reg.feed(EURUSD, sat)).toMatchObject({ state: "CLOSED", marketOpen: false });
     td.statusValue = { ...td.statusValue, lastUpdate: wed - 10 * 60_000 };
     expect(reg.feed(EURUSD).state).toBe("STALE");

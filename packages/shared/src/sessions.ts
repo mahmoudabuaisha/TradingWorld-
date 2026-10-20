@@ -4,7 +4,7 @@ export type SessionName = "ASIA" | "LONDON" | "NEW_YORK" | "OFF";
 export interface SessionWindow {
   name: SessionName;
   startHourUtc: number; // inclusive
-  endHourUtc: number;   // exclusive
+  endHourUtc: number; // exclusive
   label: string;
   labelAr: string;
 }

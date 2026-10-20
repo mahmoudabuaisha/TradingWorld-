@@ -18,7 +18,15 @@ export interface GroundingPayload {
   liquidity: { label: string; side: string; price: number; swept: boolean }[];
   sweeps: { side: string; level: number; reclaimed: boolean; displacementAfter: boolean; time: number }[];
   zones: {
-    id: string; name: string; direction: string; top: number; bottom: number; score: number; quality: string; status: string; tests: number;
+    id: string;
+    name: string;
+    direction: string;
+    top: number;
+    bottom: number;
+    score: number;
+    quality: string;
+    status: string;
+    tests: number;
     factors: { key: string; present: boolean; contribution: number; evidence?: string }[];
     invalidation: number;
   }[];
@@ -33,13 +41,30 @@ export function buildGrounding(result: AnalysisResult, locale: "ar" | "en" = "en
     timeframe: result.timeframe,
     lastPrice: result.lastPrice,
     regime: result.base.regime,
-    htf: result.htf.map((h) => ({ timeframe: h.timeframe, bias: h.bias, regime: h.regime, keyLevels: h.keyLevels.slice(0, 6).map((k) => ({ label: k.label, price: k.price })) })),
+    htf: result.htf.map((h) => ({
+      timeframe: h.timeframe,
+      bias: h.bias,
+      regime: h.regime,
+      keyLevels: h.keyLevels.slice(0, 6).map((k) => ({ label: k.label, price: k.price })),
+    })),
     session: result.session,
-    structureEvents: result.base.structure.events.slice(-8).map((e) => ({ kind: e.kind, direction: e.direction, level: e.level, time: e.time })),
+    structureEvents: result.base.structure.events
+      .slice(-8)
+      .map((e) => ({ kind: e.kind, direction: e.direction, level: e.level, time: e.time })),
     liquidity: result.base.liquidity.slice(0, 12).map((l) => ({ label: l.label, side: l.side, price: l.price, swept: l.swept })),
-    sweeps: result.base.sweeps.slice(-6).map((s) => ({ side: s.side, level: s.level, reclaimed: s.reclaimed, displacementAfter: s.displacementAfter, time: s.time })),
+    sweeps: result.base.sweeps
+      .slice(-6)
+      .map((s) => ({ side: s.side, level: s.level, reclaimed: s.reclaimed, displacementAfter: s.displacementAfter, time: s.time })),
     zones: result.zones.map((z) => ({
-      id: z.id, name: locale === "ar" ? z.nameAr : z.name, direction: z.direction, top: z.top, bottom: z.bottom, score: z.score, quality: z.quality, status: z.status, tests: z.tests,
+      id: z.id,
+      name: locale === "ar" ? z.nameAr : z.name,
+      direction: z.direction,
+      top: z.top,
+      bottom: z.bottom,
+      score: z.score,
+      quality: z.quality,
+      status: z.status,
+      tests: z.tests,
       factors: z.factors.map((f) => ({ key: f.key, present: f.present, contribution: f.contribution, evidence: f.evidence?.[locale] })),
       invalidation: z.invalidation.price,
     })),
@@ -92,11 +117,19 @@ export function answerDeterministic(result: AnalysisResult, question: string, lo
   const asksLiquidity = /liquidity|سيولة/.test(q);
 
   if (asksHtf) {
-    const lines = result.htf.map((h) => `${h.timeframe}: ${h.bias} / ${h.regime} — ${h.keyLevels.slice(0, 3).map((k) => `${k.label} ${k.price}`).join(", ")}`);
+    const lines = result.htf.map(
+      (h) =>
+        `${h.timeframe}: ${h.bias} / ${h.regime} — ${h.keyLevels
+          .slice(0, 3)
+          .map((k) => `${k.label} ${k.price}`)
+          .join(", ")}`,
+    );
     return L("سياق الفريمات الأعلى:\n", "Higher-timeframe context:\n") + lines.join("\n");
   }
   if (asksLiquidity) {
-    const pools = result.base.liquidity.slice(0, 8).map((p) => `• ${p.label} @ ${p.price} (${p.side}${p.swept ? L("، تم سحبها", ", swept") : ""})`);
+    const pools = result.base.liquidity
+      .slice(0, 8)
+      .map((p) => `• ${p.label} @ ${p.price} (${p.side}${p.swept ? L("، تم سحبها", ", swept") : ""})`);
     return L("خريطة السيولة الحالية:\n", "Current liquidity map:\n") + pools.join("\n");
   }
   if (asksCompare && result.zones.length >= 2) {
@@ -108,10 +141,14 @@ export function answerDeterministic(result: AnalysisResult, question: string, lo
     );
   }
   if (!zone) return L("لا توجد منطقة نشطة حاليًا للإجابة عنها.", "There is no active zone to answer about right now.");
-  if (asksInvalid) return `${zone.explanation.invalidation[locale]} ${L("نقاط الضعف:", "Weaknesses:")} ${zone.explanation.weaknesses.map((w) => w[locale]).join(" ") || L("لا شيء بارز.", "none notable.")}`;
+  if (asksInvalid)
+    return `${zone.explanation.invalidation[locale]} ${L("نقاط الضعف:", "Weaknesses:")} ${zone.explanation.weaknesses.map((w) => w[locale]).join(" ") || L("لا شيء بارز.", "none notable.")}`;
   if (asksWhy || asksSupport) {
     const reasons = zone.explanation.reasons.map((r, i) => `${i + 1}. ${r[locale]}`).join("\n");
-    const pts = zone.factors.filter((f) => f.present).map((f) => `${f.label[locale]}: +${f.contribution}`).join(" · ");
+    const pts = zone.factors
+      .filter((f) => f.present)
+      .map((f) => `${f.label[locale]}: +${f.contribution}`)
+      .join(" · ");
     return `${name(zone)} — ${zone.score}/100\n${zone.explanation.summary[locale]}\n${reasons}\n${pts}\n${zone.explanation.invalidation[locale]}`;
   }
   return `${result.narrative[locale]}\n\n${L("اسألني: لماذا هذه المنطقة؟ ما الذي يدعمها؟ ما الذي يبطلها؟ ماذا يحدث على الفريمات الأعلى؟", "Ask me: why this zone? what supports it? what invalidates it? what is happening on higher timeframes?")}`;

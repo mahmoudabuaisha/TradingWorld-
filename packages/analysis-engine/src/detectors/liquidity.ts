@@ -16,7 +16,10 @@ export function detectEqualLevels(swings: Swing[], atr: number, tolAtr = 0.15, t
       const cluster = [pts[i]!];
       for (let j = i + 1; j < pts.length; j++) {
         if (used.has(j)) continue;
-        if (Math.abs(pts[j]!.price - pts[i]!.price) <= tol) { cluster.push(pts[j]!); used.add(j); }
+        if (Math.abs(pts[j]!.price - pts[i]!.price) <= tol) {
+          cluster.push(pts[j]!);
+          used.add(j);
+        }
       }
       if (cluster.length >= 2) {
         used.add(i);
@@ -70,15 +73,39 @@ export function detectSweeps(candles: Candle[], pools: LiquidityPool[], displace
       if (p.side === "buy-side" && c.high > p.price) {
         const reclaimed = c.close < p.price;
         const dispAfter = displacements.some((d) => d.direction === "bearish" && d.index >= i && d.index <= i + 3);
-        sweeps.push({ id: `sw-${p.id}-${i}`, poolId: p.id, poolKind: p.kind, index: i, time: c.time, side: "buy-side", level: p.price, wickExtreme: c.high, reclaimed, displacementAfter: dispAfter });
-        p.swept = true; p.sweptIndex = i;
+        sweeps.push({
+          id: `sw-${p.id}-${i}`,
+          poolId: p.id,
+          poolKind: p.kind,
+          index: i,
+          time: c.time,
+          side: "buy-side",
+          level: p.price,
+          wickExtreme: c.high,
+          reclaimed,
+          displacementAfter: dispAfter,
+        });
+        p.swept = true;
+        p.sweptIndex = i;
         break;
       }
       if (p.side === "sell-side" && c.low < p.price) {
         const reclaimed = c.close > p.price;
         const dispAfter = displacements.some((d) => d.direction === "bullish" && d.index >= i && d.index <= i + 3);
-        sweeps.push({ id: `sw-${p.id}-${i}`, poolId: p.id, poolKind: p.kind, index: i, time: c.time, side: "sell-side", level: p.price, wickExtreme: c.low, reclaimed, displacementAfter: dispAfter });
-        p.swept = true; p.sweptIndex = i;
+        sweeps.push({
+          id: `sw-${p.id}-${i}`,
+          poolId: p.id,
+          poolKind: p.kind,
+          index: i,
+          time: c.time,
+          side: "sell-side",
+          level: p.price,
+          wickExtreme: c.low,
+          reclaimed,
+          displacementAfter: dispAfter,
+        });
+        p.swept = true;
+        p.sweptIndex = i;
         break;
       }
     }

@@ -18,8 +18,16 @@ const cfg = loadConfig();
 const store = createCandleStore(cfg);
 const registry = new ProviderRegistry(cfg, { store });
 const service = new BackfillService(registry, store, {
-  baseTimeframe: cfg.BACKFILL_BASE_TIMEFRAME, bars: barsArg ? Number(barsArg) : cfg.BACKFILL_BARS, pageSize: cfg.BACKFILL_PAGE_SIZE, includeDemo: cfg.BACKFILL_INCLUDE_DEMO || symbolArg !== "all",
-  symbols: symbolArg === "all" ? cfg.BACKFILL_SYMBOLS?.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean) : [symbolArg.toUpperCase()],
+  baseTimeframe: cfg.BACKFILL_BASE_TIMEFRAME,
+  bars: barsArg ? Number(barsArg) : cfg.BACKFILL_BARS,
+  pageSize: cfg.BACKFILL_PAGE_SIZE,
+  includeDemo: cfg.BACKFILL_INCLUDE_DEMO || symbolArg !== "all",
+  symbols:
+    symbolArg === "all"
+      ? cfg.BACKFILL_SYMBOLS?.split(",")
+          .map((s) => s.trim().toUpperCase())
+          .filter(Boolean)
+      : [symbolArg.toUpperCase()],
   log: (m) => console.log("  ·", m),
 });
 const stamp = (s?: number) => (s ? new Date(s * 1000).toISOString().slice(0, 16).replace("T", " ") + "Z" : "—");
@@ -27,15 +35,22 @@ const stamp = (s?: number) => (s ? new Date(s * 1000).toISOString().slice(0, 16)
 console.log(`store    : ${store.kind}${store.kind === "memory" ? " (nothing persists — set CANDLE_STORE=timescale + DATABASE_URL)" : ""}`);
 console.log("routes   :", Object.keys(registry.routes).length ? registry.routes : "(all demo)");
 for (const w of registry.warnings) console.log("warning  :", w);
-if (symbolArg !== "all" && !findInstrument(symbolArg)) { console.error(`unknown symbol ${symbolArg}; known: ${DEFAULT_INSTRUMENTS.map((i) => i.symbol).join(", ")}`); process.exit(1); }
+if (symbolArg !== "all" && !findInstrument(symbolArg)) {
+  console.error(`unknown symbol ${symbolArg}; known: ${DEFAULT_INSTRUMENTS.map((i) => i.symbol).join(", ")}`);
+  process.exit(1);
+}
 const targets = service.instruments();
-if (!targets.length) { console.error("nothing to do: no instrument is routed to a real source (set MARKET_DATA_ROUTES, or BACKFILL_INCLUDE_DEMO=true)"); process.exit(1); }
+if (!targets.length) {
+  console.error("nothing to do: no instrument is routed to a real source (set MARKET_DATA_ROUTES, or BACKFILL_INCLUDE_DEMO=true)");
+  process.exit(1);
+}
 console.log(`targets  : ${targets.map((i) => `${i.symbol}←${registry.for(i).id}`).join("  ")}`);
 
 let failed = false;
 try {
   if (cycle) {
-    for (const r of await service.runOnce()) console.log(`  ${r.kind.padEnd(9)} ${r.symbol} ${r.timeframe}: ${r.status} · ${r.bars} bars${r.error ? ` · ${r.error}` : ""}`);
+    for (const r of await service.runOnce())
+      console.log(`  ${r.kind.padEnd(9)} ${r.symbol} ${r.timeframe}: ${r.status} · ${r.bars} bars${r.error ? ` · ${r.error}` : ""}`);
   } else {
     for (const i of targets) {
       const b = await service.backfill(i.symbol);
@@ -47,7 +62,10 @@ try {
     }
   }
   console.log("coverage :");
-  for (const s of await store.series()) console.log(`  ${s.symbol.padEnd(7)} ${s.timeframe.padEnd(3)} ${String(s.count).padStart(6)} bars  ${stamp(s.first)} → ${stamp(s.last)}`);
+  for (const s of await store.series())
+    console.log(
+      `  ${s.symbol.padEnd(7)} ${s.timeframe.padEnd(3)} ${String(s.count).padStart(6)} bars  ${stamp(s.first)} → ${stamp(s.last)}`,
+    );
 } catch (e) {
   failed = true;
   console.error("FAIL     :", (e as Error).message);

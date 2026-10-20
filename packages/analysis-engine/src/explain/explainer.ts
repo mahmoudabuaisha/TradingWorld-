@@ -26,11 +26,22 @@ export function explainZone(
       weaknesses.push({ ar: `لا يوجد ${f.label.ar} يدعم المنطقة.`, en: `No ${f.label.en.toLowerCase()} supports this zone.` });
     }
   }
-  if (tests >= 2) weaknesses.push({ ar: `تم اختبار المنطقة ${tests} مرات، وكل اختبار يستهلك جزءًا من الأوامر المتبقية فيها.`, en: `The zone has been tested ${tests} times; each test consumes resting orders.` });
+  if (tests >= 2)
+    weaknesses.push({
+      ar: `تم اختبار المنطقة ${tests} مرات، وكل اختبار يستهلك جزءًا من الأوامر المتبقية فيها.`,
+      en: `The zone has been tested ${tests} times; each test consumes resting orders.`,
+    });
 
-  const invalidation = direction === "bullish"
-    ? { ar: `إغلاق شمعة ${timeframe} تحت ${fmt(bottom)} يلغي المنطقة.`, en: `A ${timeframe} candle close below ${fmt(bottom)} invalidates the zone.` }
-    : { ar: `إغلاق شمعة ${timeframe} فوق ${fmt(top)} يلغي المنطقة.`, en: `A ${timeframe} candle close above ${fmt(top)} invalidates the zone.` };
+  const invalidation =
+    direction === "bullish"
+      ? {
+          ar: `إغلاق شمعة ${timeframe} تحت ${fmt(bottom)} يلغي المنطقة.`,
+          en: `A ${timeframe} candle close below ${fmt(bottom)} invalidates the zone.`,
+        }
+      : {
+          ar: `إغلاق شمعة ${timeframe} فوق ${fmt(top)} يلغي المنطقة.`,
+          en: `A ${timeframe} candle close above ${fmt(top)} invalidates the zone.`,
+        };
 
   const count = present.length;
   const summary = {
@@ -41,9 +52,19 @@ export function explainZone(
 }
 
 export function describeRegime(r: Regime): { ar: string; en: string } {
-  const trend = { TRENDING_UP: ["اتجاه صاعد", "Trending up"], TRENDING_DOWN: ["اتجاه هابط", "Trending down"], RANGING: ["نطاق عرضي", "Ranging"] }[r.trend];
-  const vol = { HIGH: ["تقلب مرتفع", "high volatility"], NORMAL: ["تقلب طبيعي", "normal volatility"], LOW: ["تقلب منخفض", "low volatility"] }[r.volatility];
-  const phase = { EXPANSION: ["توسع", "expansion"], CONSOLIDATION: ["تجميع/ضغط", "consolidation"], NEUTRAL: ["محايد", "neutral phase"] }[r.phase];
+  const trend = {
+    TRENDING_UP: ["اتجاه صاعد", "Trending up"],
+    TRENDING_DOWN: ["اتجاه هابط", "Trending down"],
+    RANGING: ["نطاق عرضي", "Ranging"],
+  }[r.trend];
+  const vol = {
+    HIGH: ["تقلب مرتفع", "high volatility"],
+    NORMAL: ["تقلب طبيعي", "normal volatility"],
+    LOW: ["تقلب منخفض", "low volatility"],
+  }[r.volatility];
+  const phase = { EXPANSION: ["توسع", "expansion"], CONSOLIDATION: ["تجميع/ضغط", "consolidation"], NEUTRAL: ["محايد", "neutral phase"] }[
+    r.phase
+  ];
   return { ar: `${trend[0]} · ${vol[0]} · ${phase[0]}`, en: `${trend[1]} · ${vol[1]} · ${phase[1]}` };
 }
 
@@ -58,8 +79,12 @@ export function narrative(result: Omit<AnalysisResult, "narrative" | "disclaimer
   const htf = result.htf.map((h) => `${h.timeframe}: ${biasLabel(h.bias).en}`).join(" · ");
   const htfAr = result.htf.map((h) => `${h.timeframe}: ${biasLabel(h.bias).ar}`).join(" · ");
   const sweeps = result.base.sweeps.filter((s) => s.reclaimed).slice(-1)[0];
-  const sweepEn = sweeps ? `Most recent liquidity event: ${sweeps.side} sweep of ${sweeps.poolKind} at ${fmt(sweeps.level)}${sweeps.displacementAfter ? " followed by displacement" : ""}.` : "No recent liquidity sweep.";
-  const sweepAr = sweeps ? `آخر حدث سيولة: سحب ${sweeps.side === "buy-side" ? "سيولة الشراء" : "سيولة البيع"} عند ${sweeps.level}${sweeps.displacementAfter ? " تبعه اندفاع" : ""}.` : "لا يوجد سحب سيولة حديث.";
+  const sweepEn = sweeps
+    ? `Most recent liquidity event: ${sweeps.side} sweep of ${sweeps.poolKind} at ${fmt(sweeps.level)}${sweeps.displacementAfter ? " followed by displacement" : ""}.`
+    : "No recent liquidity sweep.";
+  const sweepAr = sweeps
+    ? `آخر حدث سيولة: سحب ${sweeps.side === "buy-side" ? "سيولة الشراء" : "سيولة البيع"} عند ${sweeps.level}${sweeps.displacementAfter ? " تبعه اندفاع" : ""}.`
+    : "لا يوجد سحب سيولة حديث.";
   const z = result.zones[0];
   const zoneEn = z ? `Strongest zone: ${z.name} (${z.score}/100, ${z.status}).` : "No zone currently meets the quality threshold.";
   const zoneAr = z ? `أقوى منطقة: ${z.nameAr} (${z.score}/100، ${z.status}).` : "لا توجد منطقة تتجاوز حد الجودة حاليًا.";

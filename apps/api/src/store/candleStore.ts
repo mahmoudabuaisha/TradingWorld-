@@ -38,7 +38,10 @@ export interface CandleStore {
   close(): Promise<void>;
 }
 
-interface MemorySeries { candles: Candle[]; sources: Map<number, CandleSource> }
+interface MemorySeries {
+  candles: Candle[];
+  sources: Map<number, CandleSource>;
+}
 
 /** Sorted-array store, capped per series. */
 export class MemoryCandleStore implements CandleStore {
@@ -47,7 +50,9 @@ export class MemoryCandleStore implements CandleStore {
 
   constructor(private readonly maxBars = 50_000) {}
 
-  private key(symbol: string, tf: Timeframe) { return `${symbol}:${tf}`; }
+  private key(symbol: string, tf: Timeframe) {
+    return `${symbol}:${tf}`;
+  }
 
   async read(symbol: string, tf: Timeframe, limit: number, to?: number): Promise<Candle[]> {
     const s = this.data.get(this.key(symbol, tf));
@@ -98,7 +103,11 @@ export class MemoryCandleStore implements CandleStore {
   }
 
   /** test visibility */
-  sourceOf(symbol: string, tf: Timeframe, time: number): CandleSource | undefined { return this.data.get(this.key(symbol, tf))?.sources.get(time); }
+  sourceOf(symbol: string, tf: Timeframe, time: number): CandleSource | undefined {
+    return this.data.get(this.key(symbol, tf))?.sources.get(time);
+  }
 
-  async close(): Promise<void> { this.data.clear(); }
+  async close(): Promise<void> {
+    this.data.clear();
+  }
 }

@@ -12,11 +12,17 @@ export interface FeedLike {
 export function feedTone(state?: FeedState, transport?: FeedTransport): string {
   if (transport === "synthetic") return "text-ink-2";
   switch (state) {
-    case "LIVE": return "text-up-ink";
-    case "DELAYED": return "text-ink";
-    case "CLOSED": return "text-ink-3";
-    case "STALE": case "OFFLINE": return "text-down-ink";
-    default: return "text-ink-3";
+    case "LIVE":
+      return "text-up-ink";
+    case "DELAYED":
+      return "text-ink";
+    case "CLOSED":
+      return "text-ink-3";
+    case "STALE":
+    case "OFFLINE":
+      return "text-down-ink";
+    default:
+      return "text-ink-3";
   }
 }
 
@@ -29,7 +35,10 @@ function age(s: number): string {
 /** "TWELVEDATA · DELAYED · 15S POLL" — source, state and how the data travels, as a surveyor's legend entry. */
 export function feedLabel(f: FeedLike): string {
   const parts = [f.provider.toUpperCase()];
-  if (f.transport === "synthetic") { parts.push("SYNTHETIC"); return parts.join(" · "); }
+  if (f.transport === "synthetic") {
+    parts.push("SYNTHETIC");
+    return parts.join(" · ");
+  }
   parts.push(f.state);
   if (f.state === "LIVE" && f.transport === "ws") parts.push("WS");
   else if (f.state === "DELAYED" && f.delaySeconds) parts.push(`${f.delaySeconds}S POLL`);

@@ -71,7 +71,14 @@ describe("engine", () => {
     const base5 = market.candles("XAUUSD", "5m", 2350, 0.0006, 1500);
     const def = analyze({ symbol: "XAUUSD", timeframe: "5m", candles: base5, htfCandles: htf, now: 1 });
     expect(def.zones.some((z) => z.status === "INVALIDATED")).toBe(false);
-    const kept = analyze({ symbol: "XAUUSD", timeframe: "5m", candles: base5, htfCandles: htf, now: 1, options: { keepInvalidatedBars: 250 } });
+    const kept = analyze({
+      symbol: "XAUUSD",
+      timeframe: "5m",
+      candles: base5,
+      htfCandles: htf,
+      now: 1,
+      options: { keepInvalidatedBars: 250 },
+    });
     const inv = kept.zones.filter((z) => z.status === "INVALIDATED");
     expect(kept.zones.length).toBeGreaterThanOrEqual(def.zones.length);
     for (const z of inv) {
@@ -91,7 +98,7 @@ describe("engine", () => {
       [102.5, 104, 102.3, 103.5], // clear of the zone, close 1.5 ≥ ATR 1 above the top → reaction
       [103.5, 105, 103, 104.5],
       [104.5, 104.6, 101, 101.2],
-      [101.2, 101.5, 98, 99],     // close < bottom → invalidated
+      [101.2, 101.5, 98, 99], // close < bottom → invalidated
     ]);
     const life = evaluateLifecycle(zone, candles, 1);
     expect(life.status).toBe("INVALIDATED");
@@ -99,7 +106,14 @@ describe("engine", () => {
     expect(life.firstTestIndex).toBe(1);
     expect(life.reacted).toBe(true);
     expect(life.reactedIndex).toBe(2);
-    const untouched = evaluateLifecycle(zone, candlesFrom([[104, 105, 103, 104], [104, 106, 103.5, 105.5]]), 1);
+    const untouched = evaluateLifecycle(
+      zone,
+      candlesFrom([
+        [104, 105, 103, 104],
+        [104, 106, 103.5, 105.5],
+      ]),
+      1,
+    );
     expect(untouched.reacted).toBe(false);
     expect(untouched.firstTestIndex).toBeUndefined();
   });
@@ -110,26 +124,54 @@ describe("engine", () => {
       [104, 105, 103, 104],
       [104, 104.5, 100.5, 101.5], // 1: first touch
       [102.5, 104, 102.3, 103.5], // 2: close 1.5 ATR above → reaction
-      [103.5, 106, 103, 105.5],   // 3: high 106 → MFE 4 ATR
+      [103.5, 106, 103, 105.5], // 3: high 106 → MFE 4 ATR
       [105.5, 105.6, 101, 101.2],
-      [101.2, 101.5, 98, 99],     // 5: close below 100 → invalidated (after the reaction)
+      [101.2, 101.5, 98, 99], // 5: close below 100 → invalidated (after the reaction)
     ]);
     expect(OUTCOME_VERSION).toBe("outcome-v1");
     const r = resolveOutcome(zone, bars, 1, 50);
-    expect(r).toMatchObject({ done: true, reason: "invalidated", label: "REACTED", finalStatus: "REACTED", firstTestIndex: 1, reactedIndex: 2, invalidatedIndex: 5, barsToOutcome: 3 });
+    expect(r).toMatchObject({
+      done: true,
+      reason: "invalidated",
+      label: "REACTED",
+      finalStatus: "REACTED",
+      firstTestIndex: 1,
+      reactedIndex: 2,
+      invalidatedIndex: 5,
+      barsToOutcome: 3,
+    });
     expect(r.mfeAtr).toBe(4);
-    expect(r.maeAtr).toBe(2);     // low 98 on the invalidation bar
+    expect(r.maeAtr).toBe(2); // low 98 on the invalidation bar
     expect(r.reactionAtr).toBe(3.5);
     // the same bars cut before the invalidation: horizon not reached → keep waiting, label so far REACTED
     expect(resolveOutcome(zone, bars.slice(0, 4), 1, 50)).toMatchObject({ done: false, label: "REACTED" });
     // horizon of 4 bars: decided at the horizon, the later invalidation is not seen
     expect(resolveOutcome(zone, bars, 1, 4)).toMatchObject({ done: true, reason: "horizon", label: "REACTED", barsObserved: 4 });
     // broken without a reaction
-    const broken = candlesFrom([[104, 105, 103, 104], [104, 104, 100.5, 101], [101, 101.2, 98.5, 99]]);
-    expect(resolveOutcome(zone, broken, 1, 50)).toMatchObject({ done: true, label: "INVALIDATED", finalStatus: "INVALIDATED", barsToOutcome: 3 });
+    const broken = candlesFrom([
+      [104, 105, 103, 104],
+      [104, 104, 100.5, 101],
+      [101, 101.2, 98.5, 99],
+    ]);
+    expect(resolveOutcome(zone, broken, 1, 50)).toMatchObject({
+      done: true,
+      label: "INVALIDATED",
+      finalStatus: "INVALIDATED",
+      barsToOutcome: 3,
+    });
     // never reached
-    const away = candlesFrom([[110, 111, 109, 110], [110, 112, 109.5, 111]]);
-    expect(resolveOutcome(zone, away, 1, 2)).toMatchObject({ done: true, reason: "horizon", label: "UNTOUCHED", mfeAtr: 0, maeAtr: 0, retests: 0 });
+    const away = candlesFrom([
+      [110, 111, 109, 110],
+      [110, 112, 109.5, 111],
+    ]);
+    expect(resolveOutcome(zone, away, 1, 2)).toMatchObject({
+      done: true,
+      reason: "horizon",
+      label: "UNTOUCHED",
+      mfeAtr: 0,
+      maeAtr: 0,
+      retests: 0,
+    });
     expect(resolveOutcome(zone, [], 1, 2)).toMatchObject({ done: false, label: "UNTOUCHED", barsObserved: 0 });
     // a confirmed zone with no later candles yet: no crash, still waiting
     const confirmedZone = { ...zone, factors: [{ key: "DISPLACEMENT", present: true }] } as unknown as Zone;

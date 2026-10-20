@@ -14,34 +14,61 @@ const BTCUSD = findInstrument("BTCUSD")!;
 const MON = Date.UTC(2026, 9, 19, 0, 0) / 1000; // Monday 2026-10-19 00:00 UTC
 
 function minuteSeries(n: number, start = MON, price = 1.08): Candle[] {
-  return Array.from({ length: n }, (_, i) => ({ time: start + i * 60, open: price + i * 0.0001, high: price + i * 0.0001 + 0.0002, low: price + i * 0.0001 - 0.0002, close: price + i * 0.0001 + 0.0001, volume: 10 }));
+  return Array.from({ length: n }, (_, i) => ({
+    time: start + i * 60,
+    open: price + i * 0.0001,
+    high: price + i * 0.0001 + 0.0002,
+    low: price + i * 0.0001 - 0.0002,
+    close: price + i * 0.0001 + 0.0001,
+    volume: 10,
+  }));
 }
 
 /** A source with a continuous 1-minute history that answers "last `limit` bars before `to`". */
 class PagedProvider implements MarketDataProvider {
   readonly id = "twelvedata" as const;
   calls: { limit: number; to?: number }[] = [];
-  constructor(private readonly history: Candle[], public nowSec: number) {}
-  supports(i: Instrument) { return !!i.providerSymbols.twelvedata; }
+  constructor(
+    private readonly history: Candle[],
+    public nowSec: number,
+  ) {}
+  supports(i: Instrument) {
+    return !!i.providerSymbols.twelvedata;
+  }
   async getCandles(_i: Instrument, _tf: Timeframe, limit: number, to?: number) {
     this.calls.push({ limit, to });
     const end = to ?? this.nowSec + 60;
     return this.history.filter((c) => c.time < end && c.time <= this.nowSec).slice(-limit);
   }
-  subscribe(_i: Instrument, _tf: Timeframe, _on: (u: CandleUpdate) => void) { return () => {}; }
-  status(): ProviderStatus { return { id: this.id, live: true, state: "DELAYED", transport: "poll", licensed: true }; }
+  subscribe(_i: Instrument, _tf: Timeframe, _on: (u: CandleUpdate) => void) {
+    return () => {};
+  }
+  status(): ProviderStatus {
+    return { id: this.id, live: true, state: "DELAYED", transport: "poll", licensed: true };
+  }
 }
 
 const TEST_DB = process.env.TEST_DATABASE_URL;
-const stores: { name: string; make: () => Promise<CandleStore> }[] = [
-  { name: "memory", make: async () => new MemoryCandleStore() },
-];
-if (TEST_DB) stores.push({ name: "timescale", make: async () => { const s = new TimescaleCandleStore(TEST_DB); await s.truncate(); return s; } });
+const stores: { name: string; make: () => Promise<CandleStore> }[] = [{ name: "memory", make: async () => new MemoryCandleStore() }];
+if (TEST_DB)
+  stores.push({
+    name: "timescale",
+    make: async () => {
+      const s = new TimescaleCandleStore(TEST_DB);
+      await s.truncate();
+      return s;
+    },
+  });
 
 describe.each(stores)("CandleStore ($name)", ({ make }) => {
   let store: CandleStore;
-  beforeEach(async () => { store = await make(); });
-  afterAll(async () => { if (store instanceof TimescaleCandleStore) await store.truncate(); await store?.close(); });
+  beforeEach(async () => {
+    store = await make();
+  });
+  afterAll(async () => {
+    if (store instanceof TimescaleCandleStore) await store.truncate();
+    await store?.close();
+  });
 
   it("upserts, reads the tail, ranges and lists series", async () => {
     const bars = minuteSeries(120);
@@ -54,8 +81,20 @@ describe.each(stores)("CandleStore ($name)", ({ make }) => {
     expect(before.map((c) => c.time)).toEqual(bars.slice(45, 50).map((c) => c.time));
     const range = await store.readRange("EURUSD", "1m", bars[10]!.time, bars[13]!.time);
     expect(range.map((c) => c.time)).toEqual(bars.slice(10, 13).map((c) => c.time));
-    expect(await store.range("EURUSD", "1m")).toEqual({ symbol: "EURUSD", timeframe: "1m", first: bars[0]!.time, last: bars[119]!.time, count: 120 });
-    await store.upsert("EURUSD", "5m", minuteSeries(3, MON, 1).map((c, i) => ({ ...c, time: MON + i * 300 })), "aggregate:1m", { mode: "derived" });
+    expect(await store.range("EURUSD", "1m")).toEqual({
+      symbol: "EURUSD",
+      timeframe: "1m",
+      first: bars[0]!.time,
+      last: bars[119]!.time,
+      count: 120,
+    });
+    await store.upsert(
+      "EURUSD",
+      "5m",
+      minuteSeries(3, MON, 1).map((c, i) => ({ ...c, time: MON + i * 300 })),
+      "aggregate:1m",
+      { mode: "derived" },
+    );
     expect((await store.series()).map((s) => `${s.symbol}:${s.timeframe}:${s.count}`)).toEqual(["EURUSD:1m:120", "EURUSD:5m:3"]);
     expect(await store.range("GBPUSD", "1m")).toBeUndefined();
   });
@@ -88,11 +127,34 @@ describe.each(stores)("CandleStore ($name)", ({ make }) => {
 
 describe.skipIf(!TEST_DB)("TimescaleCandleStore run log", () => {
   let store: TimescaleCandleStore;
-  beforeAll(async () => { store = new TimescaleCandleStore(TEST_DB!); await store.truncate(); });
-  afterAll(async () => { await store.close(); });
+  beforeAll(async () => {
+    store = new TimescaleCandleStore(TEST_DB!);
+    await store.truncate();
+  });
+  afterAll(async () => {
+    await store.close();
+  });
   it("records backfill runs", async () => {
-    await store.logRun({ symbol: "EURUSD", timeframe: "1m", kind: "backfill", from: MON, to: MON + 600, bars: 10, status: "done", startedAt: Date.now() - 1000, finishedAt: Date.now() });
-    await store.logRun({ symbol: "EURUSD", timeframe: "1m", kind: "gaps", bars: 0, status: "failed", error: "boom", startedAt: Date.now() });
+    await store.logRun({
+      symbol: "EURUSD",
+      timeframe: "1m",
+      kind: "backfill",
+      from: MON,
+      to: MON + 600,
+      bars: 10,
+      status: "done",
+      startedAt: Date.now() - 1000,
+      finishedAt: Date.now(),
+    });
+    await store.logRun({
+      symbol: "EURUSD",
+      timeframe: "1m",
+      kind: "gaps",
+      bars: 0,
+      status: "failed",
+      error: "boom",
+      startedAt: Date.now(),
+    });
     const runs = await store.recentRuns(10);
     expect(runs.length).toBe(2);
     expect(runs[0]).toMatchObject({ kind: "gaps", status: "failed", error: "boom" });
@@ -102,11 +164,11 @@ describe.skipIf(!TEST_DB)("TimescaleCandleStore run log", () => {
 
 describe("findGaps", () => {
   it("reports missing open-market buckets and ignores closed hours", () => {
-    const a = minuteSeries(60, MON + 10 * 3600);                 // Monday 10:00–11:00
-    const b = minuteSeries(60, MON + 12 * 3600);                 // Monday 12:00–13:00 → 60 missing minutes between
+    const a = minuteSeries(60, MON + 10 * 3600); // Monday 10:00–11:00
+    const b = minuteSeries(60, MON + 12 * 3600); // Monday 12:00–13:00 → 60 missing minutes between
     const gaps = findGaps([...a, ...b], "1m", EURUSD);
     expect(gaps).toEqual([{ from: MON + 11 * 3600, to: MON + 12 * 3600 - 60, bars: 60 }]);
-    const fri = minuteSeries(30, MON + 4 * 86400 + 20 * 3600);   // Friday 20:00 UTC (16:00 NY) — before the 17:00 NY close
+    const fri = minuteSeries(30, MON + 4 * 86400 + 20 * 3600); // Friday 20:00 UTC (16:00 NY) — before the 17:00 NY close
     const nextMon = minuteSeries(30, MON + 7 * 86400 + 0 * 3600); // Monday 00:00 UTC — Sunday 20:00 NY, FX open again
     const weekend = findGaps([...fri, ...nextMon], "1m", EURUSD);
     // Friday 20:30 → 21:00 UTC and Sunday 21:00 UTC → Monday 00:00 are open; Saturday is not
@@ -121,8 +183,8 @@ describe("findGaps", () => {
 });
 
 describe.each(stores)("BackfillService ($name)", ({ make }) => {
-  const history = minuteSeries(2000);                     // Monday 00:00 → Tuesday 09:19 (2000 minutes)
-  const nowSec = history[history.length - 1]!.time + 30;  // 30 s into the bar after the last one
+  const history = minuteSeries(2000); // Monday 00:00 → Tuesday 09:19 (2000 minutes)
+  const nowSec = history[history.length - 1]!.time + 30; // 30 s into the bar after the last one
   let store: CandleStore;
   let provider: PagedProvider;
   let service: BackfillService;
@@ -134,7 +196,10 @@ describe.each(stores)("BackfillService ($name)", ({ make }) => {
     const registry = new ProviderRegistry(loadConfig(base), { providers: { twelvedata: provider }, store, now: () => nowSec * 1000 });
     service = new BackfillService(registry, store, { bars: 500, pageSize: 200, symbols: ["EURUSD"], now: () => nowSec * 1000 });
   });
-  afterAll(async () => { if (store instanceof TimescaleCandleStore) await store.truncate(); await store?.close(); });
+  afterAll(async () => {
+    if (store instanceof TimescaleCandleStore) await store.truncate();
+    await store?.close();
+  });
 
   it("pages history backwards until the requested depth is stored", async () => {
     const run = await service.backfill("EURUSD");
@@ -157,8 +222,17 @@ describe.each(stores)("BackfillService ($name)", ({ make }) => {
     await service.backfill("EURUSD");
     const later = minuteSeries(2100);
     provider = new PagedProvider(later, later[2099]!.time + 30);
-    const registry = new ProviderRegistry(loadConfig(base), { providers: { twelvedata: provider }, store, now: () => (later[2099]!.time + 30) * 1000 });
-    service = new BackfillService(registry, store, { bars: 500, pageSize: 200, symbols: ["EURUSD"], now: () => (later[2099]!.time + 30) * 1000 });
+    const registry = new ProviderRegistry(loadConfig(base), {
+      providers: { twelvedata: provider },
+      store,
+      now: () => (later[2099]!.time + 30) * 1000,
+    });
+    service = new BackfillService(registry, store, {
+      bars: 500,
+      pageSize: 200,
+      symbols: ["EURUSD"],
+      now: () => (later[2099]!.time + 30) * 1000,
+    });
     const run = await service.catchUp("EURUSD");
     expect(run).toMatchObject({ kind: "catchup", status: "done" });
     expect(run.bars).toBe(100);
@@ -168,8 +242,17 @@ describe.each(stores)("BackfillService ($name)", ({ make }) => {
     const fresh = await make();
     await fresh.upsert("EURUSD", "1m", later.slice(1500, 1600), "twelvedata");
     await fresh.upsert("EURUSD", "1m", later.slice(1700, 2100), "twelvedata");
-    const reg2 = new ProviderRegistry(loadConfig(base), { providers: { twelvedata: provider }, store: fresh, now: () => (later[2099]!.time + 30) * 1000 });
-    const svc2 = new BackfillService(reg2, fresh, { bars: 500, pageSize: 200, symbols: ["EURUSD"], now: () => (later[2099]!.time + 30) * 1000 });
+    const reg2 = new ProviderRegistry(loadConfig(base), {
+      providers: { twelvedata: provider },
+      store: fresh,
+      now: () => (later[2099]!.time + 30) * 1000,
+    });
+    const svc2 = new BackfillService(reg2, fresh, {
+      bars: 500,
+      pageSize: 200,
+      symbols: ["EURUSD"],
+      now: () => (later[2099]!.time + 30) * 1000,
+    });
     const gaps = await svc2.repairGaps("EURUSD");
     expect(gaps).toMatchObject({ kind: "gaps", status: "done", bars: 100, from: later[1600]!.time, to: later[1699]!.time });
     expect((await fresh.range("EURUSD", "1m"))!.count).toBe(600);
@@ -178,7 +261,7 @@ describe.each(stores)("BackfillService ($name)", ({ make }) => {
   });
 
   it("derives every higher timeframe with the engine's buckets and never overwrites native bars", async () => {
-    await service.backfill("EURUSD", "1m", 1600);                      // Monday 06:40 → Tuesday 09:19
+    await service.backfill("EURUSD", "1m", 1600); // Monday 06:40 → Tuesday 09:19
     const TUE = MON + 86400;
     await store.upsert("EURUSD", "1h", [{ time: TUE + 2 * 3600, open: 1, high: 1, low: 1, close: 42, volume: 1 }], "twelvedata");
     const run = await service.aggregateDerived("EURUSD", "full");
@@ -194,8 +277,8 @@ describe.each(stores)("BackfillService ($name)", ({ make }) => {
     expect(fiveMin[0]!.high).toBe(Math.max(...history.slice(400, 405).map((c) => c.high)));
     expect(fiveMin[0]!.volume).toBe(50);
     const hours = await store.read("EURUSD", "1h", 100);
-    expect(hours.find((c) => c.time === TUE + 2 * 3600)!.close).toBe(42);           // native row kept
-    expect(hours[hours.length - 1]!.time).toBe(TUE + 9 * 3600);                        // the current (partial) hour is written too
+    expect(hours.find((c) => c.time === TUE + 2 * 3600)!.close).toBe(42); // native row kept
+    expect(hours[hours.length - 1]!.time).toBe(TUE + 9 * 3600); // the current (partial) hour is written too
     // a target bucket that began before the stored history is incomplete and never written:
     // Monday's 12h/1d/1w/1M buckets start at 00:00 < 06:40, so only Monday 12:00 (12h) and Tuesday's partial buckets exist
     expect((await store.read("EURUSD", "12h", 10)).map((c) => c.time)).toEqual([MON + 12 * 3600, TUE]);

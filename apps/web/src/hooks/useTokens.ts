@@ -1,12 +1,40 @@
 "use client";
 import { useEffect, useState } from "react";
 
-export interface Tokens { field: string; sheet: string; raised: string; hair: string; rule: string; ink: string; ink2: string; ink3: string; up: string; down: string; upInk: string; downInk: string; stamp: string; upWash: string; downWash: string }
+export interface Tokens {
+  field: string;
+  sheet: string;
+  raised: string;
+  hair: string;
+  rule: string;
+  ink: string;
+  ink2: string;
+  ink3: string;
+  up: string;
+  down: string;
+  upInk: string;
+  downInk: string;
+  stamp: string;
+  upWash: string;
+  downWash: string;
+}
 
 const NAMES: [keyof Tokens, string][] = [
-  ["field", "--field"], ["sheet", "--sheet"], ["raised", "--raised"], ["hair", "--hair"], ["rule", "--rule"],
-  ["ink", "--ink"], ["ink2", "--ink-2"], ["ink3", "--ink-3"], ["up", "--up"], ["down", "--down"], ["upInk", "--up-ink"], ["downInk", "--down-ink"], ["stamp", "--stamp"],
-  ["upWash", "--up-wash"], ["downWash", "--down-wash"],
+  ["field", "--field"],
+  ["sheet", "--sheet"],
+  ["raised", "--raised"],
+  ["hair", "--hair"],
+  ["rule", "--rule"],
+  ["ink", "--ink"],
+  ["ink2", "--ink-2"],
+  ["ink3", "--ink-3"],
+  ["up", "--up"],
+  ["down", "--down"],
+  ["upInk", "--up-ink"],
+  ["downInk", "--down-ink"],
+  ["stamp", "--stamp"],
+  ["upWash", "--up-wash"],
+  ["downWash", "--down-wash"],
 ];
 
 export function readTokens(): Tokens {
@@ -26,7 +54,10 @@ export function useTokens(): Tokens | undefined {
     const mq = window.matchMedia("(prefers-color-scheme: light)");
     const onMq = () => setTokens(readTokens());
     mq.addEventListener("change", onMq);
-    return () => { obs.disconnect(); mq.removeEventListener("change", onMq); };
+    return () => {
+      obs.disconnect();
+      mq.removeEventListener("change", onMq);
+    };
   }, []);
   return tokens;
 }

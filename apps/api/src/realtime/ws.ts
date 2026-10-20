@@ -4,7 +4,11 @@ import { findInstrument, isTimeframe, type Instrument, type Timeframe } from "@t
 import type { AppContext } from "../context.js";
 import type { CandleUpdate } from "../providers/types.js";
 
-type ClientMsg = { type: "subscribe"; symbol: string; timeframe: string; includeLowQuality?: boolean; includeInvalidated?: boolean; token?: string } | { type: "auth"; token?: string } | { type: "unsubscribe" } | { type: "ping" };
+type ClientMsg =
+  | { type: "subscribe"; symbol: string; timeframe: string; includeLowQuality?: boolean; includeInvalidated?: boolean; token?: string }
+  | { type: "auth"; token?: string }
+  | { type: "unsubscribe" }
+  | { type: "ping" };
 
 /**
  * /ws — one subscription per socket: {type:"subscribe", symbol, timeframe, includeLowQuality?, includeInvalidated?}.
@@ -17,17 +21,32 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
   app.get("/ws", { websocket: true }, (socket) => {
     let unsub: (() => void) | undefined;
     let analysisTimer: NodeJS.Timeout | undefined;
-    let current: { symbol: string; instrument: Instrument; timeframe: Timeframe; includeLowQuality: boolean; includeInvalidated: boolean } | undefined;
-    const send = (o: unknown) => { if (socket.readyState === 1) socket.send(JSON.stringify(o)); };
+    let current:
+      { symbol: string; instrument: Instrument; timeframe: Timeframe; includeLowQuality: boolean; includeInvalidated: boolean } | undefined;
+    const send = (o: unknown) => {
+      if (socket.readyState === 1) socket.send(JSON.stringify(o));
+    };
 
     // alerts and notifications are private: only the owner's sockets receive them (the token identifies the socket)
     let userId: string | undefined;
     const authenticate = (token?: string) => {
       if (!token) return;
-      try { userId = (app.jwt.verify(token) as { id: string }).id; } catch { userId = undefined; send({ type: "error", message: "BAD_TOKEN" }); }
+      try {
+        userId = (app.jwt.verify(token) as { id: string }).id;
+      } catch {
+        userId = undefined;
+        send({ type: "error", message: "BAD_TOKEN" });
+      }
     };
-    const offAlert = ctx.alerts.onTrigger((e) => { if (userId && e.alert.userId === userId) send({ type: "alert", event: e }); });
-    const offNotify = ctx.notifications.onNotify((n) => { if (userId && n.userId === userId) { const { userId: _u, ...rest } = n; send({ type: "notification", notification: rest }); } });
+    const offAlert = ctx.alerts.onTrigger((e) => {
+      if (userId && e.alert.userId === userId) send({ type: "alert", event: e });
+    });
+    const offNotify = ctx.notifications.onNotify((n) => {
+      if (userId && n.userId === userId) {
+        const { userId: _u, ...rest } = n;
+        send({ type: "notification", notification: rest });
+      }
+    });
 
     const pushStatus = () => {
       if (!current) return;
@@ -39,17 +58,33 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
       if (!current) return;
       pushStatus();
       try {
-        const r = await ctx.analysis.run(current.symbol, current.timeframe, { force: true, includeLowQuality: current.includeLowQuality, includeInvalidated: current.includeInvalidated });
+        const r = await ctx.analysis.run(current.symbol, current.timeframe, {
+          force: true,
+          includeLowQuality: current.includeLowQuality,
+          includeInvalidated: current.includeInvalidated,
+        });
         send({ type: "analysis", result: r });
         await ctx.alerts.evaluate(current.symbol, r.lastPrice, r);
-      } catch (e) { send({ type: "error", message: (e as Error).message }); }
+      } catch (e) {
+        send({ type: "error", message: (e as Error).message });
+      }
     };
 
-    const cleanup = () => { unsub?.(); unsub = undefined; if (analysisTimer) clearInterval(analysisTimer); analysisTimer = undefined; current = undefined; };
+    const cleanup = () => {
+      unsub?.();
+      unsub = undefined;
+      if (analysisTimer) clearInterval(analysisTimer);
+      analysisTimer = undefined;
+      current = undefined;
+    };
 
     socket.on("message", (raw: Buffer) => {
       let msg: ClientMsg;
-      try { msg = JSON.parse(raw.toString()) as ClientMsg; } catch { return send({ type: "error", message: "BAD_JSON" }); }
+      try {
+        msg = JSON.parse(raw.toString()) as ClientMsg;
+      } catch {
+        return send({ type: "error", message: "BAD_JSON" });
+      }
       if (msg.type === "ping") return send({ type: "pong", at: Date.now() });
       if (msg.type === "unsubscribe") return cleanup();
       if (msg.type === "auth") return authenticate(msg.token);
@@ -58,7 +93,13 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
         if (!instrument || !isTimeframe(msg.timeframe)) return send({ type: "error", message: "BAD_SUBSCRIPTION" });
         cleanup();
         if (msg.token) authenticate(msg.token);
-        current = { symbol: instrument.symbol, instrument, timeframe: msg.timeframe, includeLowQuality: msg.includeLowQuality === true, includeInvalidated: msg.includeInvalidated === true };
+        current = {
+          symbol: instrument.symbol,
+          instrument,
+          timeframe: msg.timeframe,
+          includeLowQuality: msg.includeLowQuality === true,
+          includeInvalidated: msg.includeInvalidated === true,
+        };
         const provider = ctx.providers.for(instrument);
         pushStatus();
         unsub = provider.subscribe(instrument, msg.timeframe, (u: CandleUpdate) => {
@@ -70,6 +111,10 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
         void pushAnalysis();
       }
     });
-    socket.on("close", () => { cleanup(); offAlert(); offNotify(); });
+    socket.on("close", () => {
+      cleanup();
+      offAlert();
+      offNotify();
+    });
   });
 }

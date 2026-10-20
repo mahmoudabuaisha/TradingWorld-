@@ -3,8 +3,16 @@
  * FACTOR_KEYS mirrors the engine's FactorKey union (the engine test asserts they stay identical).
  */
 export const FACTOR_KEYS = [
-  "HTF_LEVEL", "LIQUIDITY_SWEEP", "STRUCTURE_SHIFT", "DISPLACEMENT", "FVG",
-  "ORDER_BLOCK", "HTF_BIAS_ALIGN", "SESSION_RELEVANCE", "VOLATILITY_CONDITION", "FRESH",
+  "HTF_LEVEL",
+  "LIQUIDITY_SWEEP",
+  "STRUCTURE_SHIFT",
+  "DISPLACEMENT",
+  "FVG",
+  "ORDER_BLOCK",
+  "HTF_BIAS_ALIGN",
+  "SESSION_RELEVANCE",
+  "VOLATILITY_CONDITION",
+  "FRESH",
 ] as const;
 export type FactorKeyName = (typeof FACTOR_KEYS)[number];
 

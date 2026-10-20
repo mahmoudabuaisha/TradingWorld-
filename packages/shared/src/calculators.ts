@@ -4,14 +4,14 @@
  */
 export interface RiskInput {
   balance: number;
-  riskPercent: number;      // e.g. 1 = 1%
+  riskPercent: number; // e.g. 1 = 1%
   entry: number;
   stopLoss: number;
   takeProfit?: number;
-  pipSize: number;          // instrument pip/point size
-  pipValuePerLot: number;   // account-currency value of one pip for one standard lot
+  pipSize: number; // instrument pip/point size
+  pipValuePerLot: number; // account-currency value of one pip for one standard lot
   direction?: "long" | "short";
-  maxRiskPercent?: number;  // user-defined ceiling for warnings
+  maxRiskPercent?: number; // user-defined ceiling for warnings
 }
 
 export interface RiskResult {

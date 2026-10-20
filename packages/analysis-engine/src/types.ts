@@ -1,7 +1,7 @@
 import type { Timeframe, SessionName } from "@tradingworld/shared";
 
 export interface Candle {
-  time: number;   // unix seconds, candle open time (UTC)
+  time: number; // unix seconds, candle open time (UTC)
   open: number;
   high: number;
   low: number;
@@ -23,10 +23,10 @@ export interface StructureEvent {
   id: string;
   kind: "BOS" | "CHoCH";
   direction: Direction;
-  index: number;        // candle that closed through the level
+  index: number; // candle that closed through the level
   time: number;
-  level: number;        // swing level that was broken
-  swingIndex: number;   // index of the broken swing
+  level: number; // swing level that was broken
+  swingIndex: number; // index of the broken swing
 }
 
 export interface StructureState {
@@ -40,7 +40,7 @@ export interface StructureState {
 export interface FairValueGap {
   id: string;
   direction: Direction;
-  index: number;        // middle candle (the displacement candle)
+  index: number; // middle candle (the displacement candle)
   time: number;
   top: number;
   bottom: number;
@@ -48,13 +48,13 @@ export interface FairValueGap {
   sizeAtr: number;
   mitigated: boolean;
   mitigatedIndex?: number;
-  fillRatio: number;    // 0..1 how much of the gap has been filled
+  fillRatio: number; // 0..1 how much of the gap has been filled
 }
 
 export interface OrderBlock {
   id: string;
   direction: Direction;
-  index: number;        // the OB candle
+  index: number; // the OB candle
   time: number;
   top: number;
   bottom: number;
@@ -68,20 +68,16 @@ export interface Displacement {
   index: number;
   time: number;
   direction: Direction;
-  bodyAtr: number;      // body size in ATR multiples
-  bodyRatio: number;    // body / range
+  bodyAtr: number; // body size in ATR multiples
+  bodyRatio: number; // body / range
 }
 
-export type LiquidityKind =
-  | "EQH" | "EQL"
-  | "PDH" | "PDL" | "PWH" | "PWL"
-  | "SESSION_HIGH" | "SESSION_LOW"
-  | "SWING_HIGH" | "SWING_LOW";
+export type LiquidityKind = "EQH" | "EQL" | "PDH" | "PDL" | "PWH" | "PWL" | "SESSION_HIGH" | "SESSION_LOW" | "SWING_HIGH" | "SWING_LOW";
 
 export interface LiquidityPool {
   id: string;
   kind: LiquidityKind;
-  side: "buy-side" | "sell-side";   // buy-side = above price (stops of shorts), sell-side = below
+  side: "buy-side" | "sell-side"; // buy-side = above price (stops of shorts), sell-side = below
   price: number;
   touches: number;
   indices: number[];
@@ -100,8 +96,8 @@ export interface Sweep {
   side: "buy-side" | "sell-side";
   level: number;
   wickExtreme: number;
-  reclaimed: boolean;          // closed back on the original side of the level
-  displacementAfter: boolean;  // a displacement candle followed within a few bars
+  reclaimed: boolean; // closed back on the original side of the level
+  displacementAfter: boolean; // a displacement candle followed within a few bars
 }
 
 export interface KeyLevel {
@@ -119,14 +115,21 @@ export interface Regime {
   volatility: "HIGH" | "NORMAL" | "LOW";
   phase: "EXPANSION" | "CONSOLIDATION" | "NEUTRAL";
   atr: number;
-  atrRatio: number;       // current ATR / long-run average ATR
-  rangeWidthAtr: number;  // width of recent swing range in ATR
+  atrRatio: number; // current ATR / long-run average ATR
+  rangeWidthAtr: number; // width of recent swing range in ATR
 }
 
 export type FactorKey =
-  | "HTF_LEVEL" | "LIQUIDITY_SWEEP" | "STRUCTURE_SHIFT" | "DISPLACEMENT"
-  | "FVG" | "ORDER_BLOCK" | "HTF_BIAS_ALIGN" | "SESSION_RELEVANCE"
-  | "VOLATILITY_CONDITION" | "FRESH";
+  | "HTF_LEVEL"
+  | "LIQUIDITY_SWEEP"
+  | "STRUCTURE_SHIFT"
+  | "DISPLACEMENT"
+  | "FVG"
+  | "ORDER_BLOCK"
+  | "HTF_BIAS_ALIGN"
+  | "SESSION_RELEVANCE"
+  | "VOLATILITY_CONDITION"
+  | "FRESH";
 
 export interface Factor {
   key: FactorKey;
@@ -137,8 +140,7 @@ export interface Factor {
   evidence?: { ar: string; en: string };
 }
 
-export type ZoneStatus =
-  | "DETECTED" | "CONFIRMED" | "ACTIVE" | "TESTED" | "REACTED" | "WEAKENED" | "INVALIDATED";
+export type ZoneStatus = "DETECTED" | "CONFIRMED" | "ACTIVE" | "TESTED" | "REACTED" | "WEAKENED" | "INVALIDATED";
 
 export type ZoneQuality = "HIGH" | "MEDIUM" | "LOW";
 

@@ -19,7 +19,8 @@ export default async function userRoutes(app: FastifyInstance, ctx: AppContext) 
     if (!body.success) return reply.code(400).send({ error: "VALIDATION", issues: body.error.issues });
     if (!findInstrument(body.data.symbol)) return reply.code(404).send({ error: "UNKNOWN_INSTRUMENT" });
     if (body.data.kind !== "zone_enter" && body.data.price === undefined) return reply.code(400).send({ error: "PRICE_REQUIRED" });
-    if (body.data.kind === "zone_enter" && (body.data.zoneTop === undefined || body.data.zoneBottom === undefined)) return reply.code(400).send({ error: "ZONE_REQUIRED" });
+    if (body.data.kind === "zone_enter" && (body.data.zoneTop === undefined || body.data.zoneBottom === undefined))
+      return reply.code(400).send({ error: "ZONE_REQUIRED" });
     const alert = await ctx.repos.alerts.create({ ...body.data, symbol: body.data.symbol.toUpperCase(), userId: req.user.id });
     await ctx.repos.audit.append({ actorId: req.user.id, action: "alert.create", target: alert.id });
     return { alert };
@@ -35,7 +36,16 @@ export default async function userRoutes(app: FastifyInstance, ctx: AppContext) 
     const closed = trades.filter((t) => t.rMultiple !== undefined);
     const wins = closed.filter((t) => (t.rMultiple ?? 0) > 0).length;
     const avgR = closed.length ? closed.reduce((s, t) => s + (t.rMultiple ?? 0), 0) / closed.length : 0;
-    return { trades, stats: { total: trades.length, closed: closed.length, winRate: closed.length ? wins / closed.length : 0, avgR: Math.round(avgR * 100) / 100, expectancy: Math.round(avgR * 100) / 100 } };
+    return {
+      trades,
+      stats: {
+        total: trades.length,
+        closed: closed.length,
+        winRate: closed.length ? wins / closed.length : 0,
+        avgR: Math.round(avgR * 100) / 100,
+        expectancy: Math.round(avgR * 100) / 100,
+      },
+    };
   });
   app.post("/journal", { preHandler: app.authenticate }, async (req, reply) => {
     const body = journalTradeSchema.safeParse(req.body);
@@ -52,7 +62,8 @@ export default async function userRoutes(app: FastifyInstance, ctx: AppContext) 
     const existing = (await ctx.repos.journal.list(req.user.id)).find((t) => t.id === id);
     if (!existing) return reply.code(404).send({ error: "NOT_FOUND" });
     const merged = { ...existing, ...body.data };
-    const rMultiple = merged.exitPrice !== undefined ? realizedR(merged.entry, merged.stopLoss, merged.exitPrice, merged.direction) : undefined;
+    const rMultiple =
+      merged.exitPrice !== undefined ? realizedR(merged.entry, merged.stopLoss, merged.exitPrice, merged.direction) : undefined;
     const trade = await ctx.repos.journal.update(id, req.user.id, { ...body.data, rMultiple });
     return { trade };
   });

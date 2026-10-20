@@ -31,7 +31,9 @@ export class DemoProvider implements MarketDataProvider {
   private seen = new Map<string, LastSeen>();
   private rnd = mulberry32(hashSeed("demo-live"));
 
-  supports(): boolean { return true; }
+  supports(): boolean {
+    return true;
+  }
 
   private params(i: Instrument) {
     return START_PRICES[i.symbol] ?? { price: 100, vol: 0.0005 };
@@ -65,7 +67,14 @@ export class DemoProvider implements MarketDataProvider {
       if (bucket > last.time) {
         // the previous candle is final: emit it closed, then open the new bucket
         onUpdate({ symbol: i.symbol, timeframe: tf, candle: last, closed: true, receivedAt, eventTime: now });
-        candle = { time: bucket, open: last.close, high: Math.max(last.close, last.close + delta), low: Math.min(last.close, last.close + delta), close: last.close + delta, volume: 10 };
+        candle = {
+          time: bucket,
+          open: last.close,
+          high: Math.max(last.close, last.close + delta),
+          low: Math.min(last.close, last.close + delta),
+          close: last.close + delta,
+          volume: 10,
+        };
       } else {
         const close = last.close + delta;
         candle = { ...last, close, high: Math.max(last.high, close), low: Math.min(last.low, close), volume: (last.volume ?? 0) + 5 };
@@ -81,9 +90,20 @@ export class DemoProvider implements MarketDataProvider {
     return () => clearInterval(timer);
   }
 
-  lastSeen(symbol: string): LastSeen | undefined { return this.seen.get(symbol); }
+  lastSeen(symbol: string): LastSeen | undefined {
+    return this.seen.get(symbol);
+  }
 
   status(): ProviderStatus {
-    return { id: this.id, live: true, state: "LIVE", transport: "synthetic", licensed: false, lastUpdate: this.lastUpdate, lastEventTime: this.lastEventTime, message: DEMO_MESSAGE };
+    return {
+      id: this.id,
+      live: true,
+      state: "LIVE",
+      transport: "synthetic",
+      licensed: false,
+      lastUpdate: this.lastUpdate,
+      lastEventTime: this.lastEventTime,
+      message: DEMO_MESSAGE,
+    };
   }
 }

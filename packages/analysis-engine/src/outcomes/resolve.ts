@@ -38,13 +38,20 @@ export interface ZoneOutcomeResult {
  * bar the detector could not have seen). Deterministic and pure — the same input always gives the same label.
  * Used by the live outcome tracker (AI-01) and the backtesting lab, so both speak the same language.
  */
-export function resolveOutcome(zone: Pick<Zone, "direction" | "top" | "bottom" | "factors">, future: Candle[], atr: number, horizonBars: number): ZoneOutcomeResult {
+export function resolveOutcome(
+  zone: Pick<Zone, "direction" | "top" | "bottom" | "factors">,
+  future: Candle[],
+  atr: number,
+  horizonBars: number,
+): ZoneOutcomeResult {
   const window = future.slice(0, horizonBars);
   const safeAtr = atr > 0 ? atr : 1;
   const life = evaluateLifecycle({ ...(zone as Zone), createdIndex: -1 }, window, safeAtr);
   const end = life.invalidatedIndex ?? window.length - 1;
 
-  let mfe = 0, mae = 0, reaction = 0;
+  let mfe = 0,
+    mae = 0,
+    reaction = 0;
   if (life.firstTestIndex !== undefined) {
     for (let j = life.firstTestIndex; j <= end; j++) {
       const c = window[j]!;

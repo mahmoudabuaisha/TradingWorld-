@@ -3,7 +3,12 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Locale, Timeframe } from "@tradingworld/shared";
 
-interface User { id: string; email: string; displayName: string; role: string }
+interface User {
+  id: string;
+  email: string;
+  displayName: string;
+  role: string;
+}
 export type Theme = "night" | "day" | "system";
 export type Palette = "kharita" | "classic";
 
@@ -64,8 +69,14 @@ export const useApp = create<AppState>()(
       watchlist: ["XAUUSD", "EURUSD", "BTCUSD", "US100"],
       routineDone: {},
       setLocale: (locale) => set({ locale }),
-      setTheme: (theme) => { applyTheme(theme); set({ theme }); },
-      setPalette: (palette) => { applyPalette(palette); set({ palette }); },
+      setTheme: (theme) => {
+        applyTheme(theme);
+        set({ theme });
+      },
+      setPalette: (palette) => {
+        applyPalette(palette);
+        set({ palette });
+      },
       setAuth: (token, user) => set({ token, user }),
       setSymbol: (symbol) => set({ symbol }),
       setTimeframe: (timeframe) => set({ timeframe }),
@@ -73,11 +84,12 @@ export const useApp = create<AppState>()(
       toggleLowQuality: () => set((s) => ({ showLowQuality: !s.showLowQuality })),
       toggleInvalidated: () => set((s) => ({ showInvalidated: !s.showInvalidated })),
       setWatchlist: (watchlist) => set({ watchlist }),
-      toggleRoutine: (dateKey, taskId) => set((s) => {
-        const cur = s.routineDone[dateKey] ?? [];
-        const next = cur.includes(taskId) ? cur.filter((t) => t !== taskId) : [...cur, taskId];
-        return { routineDone: { ...s.routineDone, [dateKey]: next } };
-      }),
+      toggleRoutine: (dateKey, taskId) =>
+        set((s) => {
+          const cur = s.routineDone[dateKey] ?? [];
+          const next = cur.includes(taskId) ? cur.filter((t) => t !== taskId) : [...cur, taskId];
+          return { routineDone: { ...s.routineDone, [dateKey]: next } };
+        }),
     }),
     { name: "tw-app", version: 2 },
   ),

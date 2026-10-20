@@ -9,13 +9,17 @@ export default async function notificationRoutes(app: FastifyInstance, ctx: AppC
 
   app.get("/notifications", auth, async (req) => {
     const limit = Math.min(Math.max(Number((req.query as { limit?: string }).limit ?? 50) || 50, 1), 200);
-    const [notifications, unread] = await Promise.all([ctx.repos.notifications.list(req.user.id, limit), ctx.repos.notifications.unread(req.user.id)]);
+    const [notifications, unread] = await Promise.all([
+      ctx.repos.notifications.list(req.user.id, limit),
+      ctx.repos.notifications.unread(req.user.id),
+    ]);
     return { notifications: notifications.map(({ userId: _u, ...n }) => n), unread };
   });
 
   app.post("/notifications/read", auth, async (req, reply) => {
     const ids = (req.body as { ids?: unknown } | undefined)?.ids;
-    if (ids !== undefined && (!Array.isArray(ids) || ids.some((x) => typeof x !== "string") || ids.length > 500)) return reply.code(400).send({ error: "VALIDATION" });
+    if (ids !== undefined && (!Array.isArray(ids) || ids.some((x) => typeof x !== "string") || ids.length > 500))
+      return reply.code(400).send({ error: "VALIDATION" });
     return { marked: await ctx.repos.notifications.markRead(req.user.id, ids as string[] | undefined) };
   });
 
@@ -45,7 +49,12 @@ export default async function notificationRoutes(app: FastifyInstance, ctx: AppC
     const body = pushSubscriptionSchema.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: "VALIDATION", issues: body.error.issues });
     const ua = String(req.headers["user-agent"] ?? "").slice(0, 200) || undefined;
-    await ctx.repos.push.upsert(req.user.id, { endpoint: body.data.endpoint, p256dh: body.data.keys.p256dh, auth: body.data.keys.auth, userAgent: ua });
+    await ctx.repos.push.upsert(req.user.id, {
+      endpoint: body.data.endpoint,
+      p256dh: body.data.keys.p256dh,
+      auth: body.data.keys.auth,
+      userAgent: ua,
+    });
     return { ok: true, subscriptions: (await ctx.repos.push.list(req.user.id)).length };
   });
 
@@ -60,7 +69,10 @@ export default async function notificationRoutes(app: FastifyInstance, ctx: AppC
     const n = await ctx.notifications.notify(req.user.id, {
       kind: "test",
       title: { ar: "إشعار تجريبي", en: "Test notification" },
-      body: { ar: "هكذا تصل تنبيهاتك من TradingWorld. لا شيء مطلوب منك.", en: "This is how your TradingWorld alerts arrive. Nothing to do." },
+      body: {
+        ar: "هكذا تصل تنبيهاتك من TradingWorld. لا شيء مطلوب منك.",
+        en: "This is how your TradingWorld alerts arrive. Nothing to do.",
+      },
       url: "/alerts",
     });
     const { userId: _u, ...rest } = n;

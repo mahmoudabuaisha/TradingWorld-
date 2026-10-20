@@ -19,20 +19,41 @@ export function detectStructure(candles: Candle[], swings: Swing[]): StructureSt
     // activate swings once they are confirmed (index + lookback already passed is guaranteed by detector)
     while (swingPtr < swings.length && swings[swingPtr]!.index <= i) {
       const s = swings[swingPtr]!;
-      if (s.kind === "high") { lastHigh = s; pendingHigh = s; }
-      else { lastLow = s; pendingLow = s; }
+      if (s.kind === "high") {
+        lastHigh = s;
+        pendingHigh = s;
+      } else {
+        lastLow = s;
+        pendingLow = s;
+      }
       swingPtr++;
     }
     const c = candles[i]!;
     if (pendingHigh && c.close > pendingHigh.price && i > pendingHigh.index) {
       const kind = trend === "bearish" ? "CHoCH" : "BOS";
-      events.push({ id: `st-${i}-up`, kind, direction: "bullish", index: i, time: c.time, level: pendingHigh.price, swingIndex: pendingHigh.index });
+      events.push({
+        id: `st-${i}-up`,
+        kind,
+        direction: "bullish",
+        index: i,
+        time: c.time,
+        level: pendingHigh.price,
+        swingIndex: pendingHigh.index,
+      });
       trend = "bullish";
       pendingHigh = undefined;
     }
     if (pendingLow && c.close < pendingLow.price && i > pendingLow.index) {
       const kind = trend === "bullish" ? "CHoCH" : "BOS";
-      events.push({ id: `st-${i}-dn`, kind, direction: "bearish", index: i, time: c.time, level: pendingLow.price, swingIndex: pendingLow.index });
+      events.push({
+        id: `st-${i}-dn`,
+        kind,
+        direction: "bearish",
+        index: i,
+        time: c.time,
+        level: pendingLow.price,
+        swingIndex: pendingLow.index,
+      });
       trend = "bearish";
       pendingLow = undefined;
     }

@@ -30,7 +30,11 @@ export function detectOrderBlocks(candles: Candle[], displacements: Displacement
         const hit = d.direction === "bullish" ? x.low <= ob.top : x.high >= ob.bottom;
         if (hit) {
           const through = d.direction === "bullish" ? x.close < ob.bottom : x.close > ob.top;
-          if (through) { ob.mitigated = true; ob.mitigatedIndex = j; break; }
+          if (through) {
+            ob.mitigated = true;
+            ob.mitigatedIndex = j;
+            break;
+          }
         }
       }
       out.push(ob);

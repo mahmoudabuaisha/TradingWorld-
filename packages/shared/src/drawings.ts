@@ -45,9 +45,15 @@ export function timeToLogical(times: readonly number[], time: number, step: numb
   if (!n) return 0;
   if (time <= times[0]!) return (time - times[0]!) / step;
   if (time >= times[n - 1]!) return n - 1 + (time - times[n - 1]!) / step;
-  let lo = 0, hi = n - 1;
-  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (times[mid]! <= time) lo = mid; else hi = mid; }
-  const a = times[lo]!, b = times[hi]!;
+  let lo = 0,
+    hi = n - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (times[mid]! <= time) lo = mid;
+    else hi = mid;
+  }
+  const a = times[lo]!,
+    b = times[hi]!;
   return lo + (b === a ? 0 : (time - a) / (b - a));
 }
 
@@ -58,27 +64,40 @@ export function logicalToTime(times: readonly number[], logical: number, step: n
   if (logical <= 0) return Math.round(times[0]! + logical * step);
   if (logical >= n - 1) return Math.round(times[n - 1]! + (logical - (n - 1)) * step);
   const i = Math.floor(logical);
-  const a = times[i]!, b = times[i + 1]!;
+  const a = times[i]!,
+    b = times[i + 1]!;
   return Math.round(a + (b - a) * (logical - i));
 }
 
 /** Shortest pixel distance from (px, py) to the segment a–b. */
 export function distToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
-  const dx = bx - ax, dy = by - ay;
+  const dx = bx - ax,
+    dy = by - ay;
   const len2 = dx * dx + dy * dy;
   const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
 /** Pixel geometry of one drawing, as the renderer lays it out. */
-export interface DrawingPixels { kind: DrawingKind; pts: { x: number; y: number }[]; levels?: { y: number }[] }
+export interface DrawingPixels {
+  kind: DrawingKind;
+  pts: { x: number; y: number }[];
+  levels?: { y: number }[];
+}
 
 /**
  * Hit test in pixel space: which handle (point index) or the body is under the pointer, if any.
  * Handles win over the body so endpoints stay grabbable on short lines.
  */
-export function hitTest(d: DrawingPixels, x: number, y: number, width: number, tolerance = 6): { part: "handle"; index: number } | { part: "body" } | undefined {
-  for (let i = 0; i < d.pts.length; i++) if (Math.hypot(x - d.pts[i]!.x, y - d.pts[i]!.y) <= tolerance + 2) return { part: "handle", index: i };
+export function hitTest(
+  d: DrawingPixels,
+  x: number,
+  y: number,
+  width: number,
+  tolerance = 6,
+): { part: "handle"; index: number } | { part: "body" } | undefined {
+  for (let i = 0; i < d.pts.length; i++)
+    if (Math.hypot(x - d.pts[i]!.x, y - d.pts[i]!.y) <= tolerance + 2) return { part: "handle", index: i };
   const [a, b] = d.pts;
   if (!a) return undefined;
   switch (d.kind) {
@@ -88,7 +107,8 @@ export function hitTest(d: DrawingPixels, x: number, y: number, width: number, t
       return b && distToSegment(x, y, a.x, a.y, b.x, b.y) <= tolerance ? { part: "body" } : undefined;
     case "rect": {
       if (!b) return undefined;
-      const [x1, x2] = [Math.min(a.x, b.x), Math.max(a.x, b.x)], [y1, y2] = [Math.min(a.y, b.y), Math.max(a.y, b.y)];
+      const [x1, x2] = [Math.min(a.x, b.x), Math.max(a.x, b.x)],
+        [y1, y2] = [Math.min(a.y, b.y), Math.max(a.y, b.y)];
       const inside = x >= x1 - tolerance && x <= x2 + tolerance && y >= y1 - tolerance && y <= y2 + tolerance;
       return inside ? { part: "body" } : undefined;
     }
@@ -96,7 +116,9 @@ export function hitTest(d: DrawingPixels, x: number, y: number, width: number, t
       if (!b) return undefined;
       const [x1, x2] = [Math.min(a.x, b.x), Math.max(a.x, b.x)];
       if (x < x1 - tolerance || x > x2 + tolerance) return undefined;
-      return (d.levels ?? []).some((l) => Math.abs(y - l.y) <= tolerance) || distToSegment(x, y, a.x, a.y, b.x, b.y) <= tolerance ? { part: "body" } : undefined;
+      return (d.levels ?? []).some((l) => Math.abs(y - l.y) <= tolerance) || distToSegment(x, y, a.x, a.y, b.x, b.y) <= tolerance
+        ? { part: "body" }
+        : undefined;
     }
   }
 }

@@ -24,14 +24,23 @@ export class ReconnectingSocket {
   private heartbeat?: NodeJS.Timeout;
   readonly stats = { connects: 0, drops: 0, messages: 0 };
 
-  constructor(private readonly url: string, private readonly handlers: SocketHandlers, private readonly opts: SocketOptions = {}) {}
+  constructor(
+    private readonly url: string,
+    private readonly handlers: SocketHandlers,
+    private readonly opts: SocketOptions = {},
+  ) {}
 
-  get connected(): boolean { return this.ws?.readyState === 1; }
+  get connected(): boolean {
+    return this.ws?.readyState === 1;
+  }
 
   open(): void {
     if (this.closed) return;
     const Ctor = this.opts.WebSocketCtor ?? globalThis.WebSocket;
-    if (!Ctor) { this.handlers.onClose?.("WebSocket is not available in this runtime"); return; }
+    if (!Ctor) {
+      this.handlers.onClose?.("WebSocket is not available in this runtime");
+      return;
+    }
     const ws = new Ctor(this.url);
     this.ws = ws;
     ws.onopen = () => {
@@ -42,10 +51,18 @@ export class ReconnectingSocket {
         this.heartbeat = setInterval(() => this.send(this.opts.heartbeat!.payload), this.opts.heartbeat.everyMs);
       }
     };
-    ws.onmessage = (ev) => { this.stats.messages++; this.handlers.onMessage(typeof ev.data === "string" ? ev.data : String(ev.data)); };
-    ws.onerror = () => { /* onclose follows */ };
+    ws.onmessage = (ev) => {
+      this.stats.messages++;
+      this.handlers.onMessage(typeof ev.data === "string" ? ev.data : String(ev.data));
+    };
+    ws.onerror = () => {
+      /* onclose follows */
+    };
     ws.onclose = (ev) => {
-      if (this.heartbeat) { clearInterval(this.heartbeat); this.heartbeat = undefined; }
+      if (this.heartbeat) {
+        clearInterval(this.heartbeat);
+        this.heartbeat = undefined;
+      }
       if (this.closed) return;
       this.stats.drops++;
       this.handlers.onClose?.(`closed (${(ev as { code?: number }).code ?? "?"})`);

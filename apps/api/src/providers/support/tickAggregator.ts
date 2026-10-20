@@ -1,7 +1,10 @@
 import { bucketStart, type Candle } from "@tradingworld/analysis-engine";
 import type { Timeframe } from "@tradingworld/shared";
 
-export interface AggregatedUpdate { candle: Candle; closed: boolean }
+export interface AggregatedUpdate {
+  candle: Candle;
+  closed: boolean;
+}
 
 /**
  * Builds candles of one timeframe from price ticks or lower-timeframe bars.
@@ -11,11 +14,16 @@ export interface AggregatedUpdate { candle: Candle; closed: boolean }
 export class TickAggregator {
   private current?: Candle;
 
-  constructor(private readonly timeframe: Timeframe, seed?: Candle) {
+  constructor(
+    private readonly timeframe: Timeframe,
+    seed?: Candle,
+  ) {
     this.current = seed ? { ...seed } : undefined;
   }
 
-  get candle(): Candle | undefined { return this.current ? { ...this.current } : undefined; }
+  get candle(): Candle | undefined {
+    return this.current ? { ...this.current } : undefined;
+  }
 
   /** Seed (or replace) the in-progress candle, e.g. from the last REST bar. Ignored if older than the current one. */
   seed(candle: Candle): void {

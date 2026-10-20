@@ -3,3 +3,4 @@ pnpm-lock.yaml
 apps/web/next-env.d.ts
 services/
 *.md
+docs/

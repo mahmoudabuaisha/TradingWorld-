@@ -3,11 +3,11 @@ import type { FeedState, FeedTransport, ProviderId, ProviderStatus, RateBudgetSn
 /** What an adapter tracks about its own health; `buildStatus` turns it into the public status. */
 export interface FeedClock {
   transport: FeedTransport;
-  lastUpdate?: number;      // ms
-  lastEventTime?: number;   // s
-  latencyMs?: number;       // ws ticks only
+  lastUpdate?: number; // ms
+  lastEventTime?: number; // s
+  latencyMs?: number; // ws ticks only
   lastError?: string;
-  lastErrorAt?: number;     // ms
+  lastErrorAt?: number; // ms
   pollSeconds?: number;
 }
 
@@ -23,9 +23,20 @@ export function providerState(c: FeedClock, now = Date.now()): FeedState {
   return c.transport === "ws" ? "LIVE" : "DELAYED";
 }
 
-export function buildStatus(id: ProviderId, c: FeedClock, extra: { licensed: boolean; plan?: string; budget?: RateBudgetSnapshot; message?: string }, now = Date.now()): ProviderStatus {
+export function buildStatus(
+  id: ProviderId,
+  c: FeedClock,
+  extra: { licensed: boolean; plan?: string; budget?: RateBudgetSnapshot; message?: string },
+  now = Date.now(),
+): ProviderStatus {
   const state = providerState(c, now);
-  const message = extra.message ?? (state === "OFFLINE" ? (c.lastError ?? "idle — no requests yet") : c.lastError && c.lastErrorAt && now - c.lastErrorAt < 300_000 ? `last error: ${c.lastError}` : undefined);
+  const message =
+    extra.message ??
+    (state === "OFFLINE"
+      ? (c.lastError ?? "idle — no requests yet")
+      : c.lastError && c.lastErrorAt && now - c.lastErrorAt < 300_000
+        ? `last error: ${c.lastError}`
+        : undefined);
   return {
     id,
     live: state === "LIVE" || state === "DELAYED",

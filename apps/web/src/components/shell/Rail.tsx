@@ -7,10 +7,23 @@ import { useApp } from "@/store/useApp";
 import { t } from "@/i18n/dictionary";
 import { Icon, type IconName } from "../Icon";
 
-const ICONS: Record<AtlasId, IconName> = { home: "home", analysis: "analysis", markets: "markets", tools: "tools", lab: "lab", journal: "journal", learn: "learn", community: "community" };
+const ICONS: Record<AtlasId, IconName> = {
+  home: "home",
+  analysis: "analysis",
+  markets: "markets",
+  tools: "tools",
+  lab: "lab",
+  journal: "journal",
+  learn: "learn",
+  community: "community",
+};
 
 export const STATUS_LABEL: Record<ModuleStatus, { ar: string; en: string }> = {
-  planned: { ar: "مخطط", en: "Planned" }, scaffold: { ar: "هيكل", en: "Scaffold" }, in_progress: { ar: "قيد العمل", en: "In progress" }, done: { ar: "منجز", en: "Done" }, approved: { ar: "معتمد", en: "Approved" },
+  planned: { ar: "مخطط", en: "Planned" },
+  scaffold: { ar: "هيكل", en: "Scaffold" },
+  in_progress: { ar: "قيد العمل", en: "In progress" },
+  done: { ar: "منجز", en: "Done" },
+  approved: { ar: "معتمد", en: "Approved" },
 };
 
 /** The rail: eight atlases, each opening an index of its sheets. Active atlas is printed in ink. */
@@ -21,15 +34,29 @@ export function Rail() {
   const [open, setOpen] = useState<AtlasId | null>(null);
   const [mounted, setMounted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const active = atlasForRoute(pathname)?.id ?? (pathname.startsWith("/admin") || pathname.startsWith("/settings") || pathname.startsWith("/profile") ? null : "home");
+  const active =
+    atlasForRoute(pathname)?.id ??
+    (pathname.startsWith("/admin") || pathname.startsWith("/settings") || pathname.startsWith("/profile") ? null : "home");
 
-  useEffect(() => { setMounted(true); }, []);
-  useEffect(() => { setOpen(null); }, [pathname]);
   useEffect(() => {
-    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(null); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(null); };
-    document.addEventListener("mousedown", onDoc); document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+    setMounted(true);
+  }, []);
+  useEffect(() => {
+    setOpen(null);
+  }, [pathname]);
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(null);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
   }, []);
 
   const openAtlas = open ? ATLASES.find((a) => a.id === open) : undefined;
@@ -61,9 +88,23 @@ export function Rail() {
         </nav>
         <div className="flex flex-col gap-0.5 border-t border-hair p-1.5">
           {mounted && user?.role === "admin" && (
-            <Link href="/admin" className={`flex flex-col items-center gap-1 rounded py-2 text-[10px] leading-none ${pathname.startsWith("/admin") ? "bg-ink text-field" : "text-ink-2 hover:bg-raised hover:text-ink"}`} title={t(locale, "shell", "admin")}><Icon name="admin" /><span>{t(locale, "shell", "admin")}</span></Link>
+            <Link
+              href="/admin"
+              className={`flex flex-col items-center gap-1 rounded py-2 text-[10px] leading-none ${pathname.startsWith("/admin") ? "bg-ink text-field" : "text-ink-2 hover:bg-raised hover:text-ink"}`}
+              title={t(locale, "shell", "admin")}
+            >
+              <Icon name="admin" />
+              <span>{t(locale, "shell", "admin")}</span>
+            </Link>
           )}
-          <Link href="/settings" className={`flex flex-col items-center gap-1 rounded py-2 text-[10px] leading-none ${pathname.startsWith("/settings") ? "bg-ink text-field" : "text-ink-2 hover:bg-raised hover:text-ink"}`} title={t(locale, "nav", "settings")}><Icon name="settings" /><span>{t(locale, "nav", "settings")}</span></Link>
+          <Link
+            href="/settings"
+            className={`flex flex-col items-center gap-1 rounded py-2 text-[10px] leading-none ${pathname.startsWith("/settings") ? "bg-ink text-field" : "text-ink-2 hover:bg-raised hover:text-ink"}`}
+            title={t(locale, "nav", "settings")}
+          >
+            <Icon name="settings" />
+            <span>{t(locale, "nav", "settings")}</span>
+          </Link>
         </div>
       </aside>
 
@@ -74,20 +115,29 @@ export function Rail() {
               <span className="eyebrow">{openAtlas.code}</span>
               <div className="text-base font-semibold">{locale === "ar" ? openAtlas.nameAr : openAtlas.nameEn}</div>
             </div>
-            <button className="btn-ghost px-2" onClick={() => setOpen(null)} aria-label="close"><Icon name="close" size={16} /></button>
+            <button className="btn-ghost px-2" onClick={() => setOpen(null)} aria-label="close">
+              <Icon name="close" size={16} />
+            </button>
           </div>
           <ul className="max-h-[calc(100vh-8rem)] overflow-y-auto p-2">
             {modulesOfAtlas(openAtlas.id).map((m) => (
               <li key={m.id}>
-                <Link href={m.route} className="grid grid-cols-[32px_1fr_auto] items-center gap-2 rounded px-2 py-2 text-sm hover:bg-raised">
+                <Link
+                  href={m.route}
+                  className="grid grid-cols-[32px_1fr_auto] items-center gap-2 rounded px-2 py-2 text-sm hover:bg-raised"
+                >
                   <span className="mono text-xs text-ink-3">{String(m.order).padStart(2, "0")}</span>
                   <span className="truncate">{locale === "ar" ? m.nameAr : m.nameEn}</span>
-                  <span className={`chip ${m.status === "planned" ? "opacity-60" : ""}`}>{m.status === "planned" ? m.phase : STATUS_LABEL[m.status][locale]}</span>
+                  <span className={`chip ${m.status === "planned" ? "opacity-60" : ""}`}>
+                    {m.status === "planned" ? m.phase : STATUS_LABEL[m.status][locale]}
+                  </span>
                 </Link>
               </li>
             ))}
           </ul>
-          <div className="border-t border-hair px-4 py-2 text-[11px] text-ink-3">{t(locale, "shell", "sheets")} · {modulesOfAtlas(openAtlas.id).length}</div>
+          <div className="border-t border-hair px-4 py-2 text-[11px] text-ink-3">
+            {t(locale, "shell", "sheets")} · {modulesOfAtlas(openAtlas.id).length}
+          </div>
         </div>
       )}
     </div>

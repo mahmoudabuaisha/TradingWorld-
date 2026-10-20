@@ -1,4 +1,12 @@
-import { DEFAULT_INSTRUMENTS, marketState, type AssetClass, type Instrument, type FeedStatus, type ProviderId, type ProviderStatus } from "@tradingworld/shared";
+import {
+  DEFAULT_INSTRUMENTS,
+  marketState,
+  type AssetClass,
+  type Instrument,
+  type FeedStatus,
+  type ProviderId,
+  type ProviderStatus,
+} from "@tradingworld/shared";
 import type { Config } from "../config.js";
 import type { MarketDataProvider } from "./types.js";
 import { DemoProvider } from "./demo.js";
@@ -22,7 +30,10 @@ export function parseRoutes(spec: string | undefined): { routes: Routes; errors:
     const entry = raw.trim();
     if (!entry) continue;
     const [cls, id] = entry.split("=").map((s) => s.trim().toLowerCase());
-    if (!cls || !id || !(ASSET_CLASSES as string[]).includes(cls) || !(PROVIDER_IDS as string[]).includes(id)) { errors.push(`MARKET_DATA_ROUTES: cannot parse "${entry}" (expected <asset class>=<provider>)`); continue; }
+    if (!cls || !id || !(ASSET_CLASSES as string[]).includes(cls) || !(PROVIDER_IDS as string[]).includes(id)) {
+      errors.push(`MARKET_DATA_ROUTES: cannot parse "${entry}" (expected <asset class>=<provider>)`);
+      continue;
+    }
     routes[cls as AssetClass] = id as ProviderId;
   }
   return { routes, errors };
@@ -56,26 +67,53 @@ export class ProviderRegistry {
     const cached = (p: MarketDataProvider) => new CachedProvider(p, { store: deps.store, now: this.now });
     this.byId.set("binance", pre.binance ?? cached(new BinanceProvider({ baseUrl: cfg.BINANCE_BASE_URL })));
     if (pre.twelvedata) this.byId.set("twelvedata", pre.twelvedata);
-    else if (cfg.TWELVEDATA_API_KEY) this.byId.set("twelvedata", cached(new TwelveDataProvider({ apiKey: cfg.TWELVEDATA_API_KEY, creditsPerMinute: cfg.TWELVEDATA_CREDITS_PER_MINUTE, useWebSocket: cfg.TWELVEDATA_WS, pollSeconds: cfg.TWELVEDATA_POLL_SECONDS, plan: cfg.TWELVEDATA_PLAN })));
+    else if (cfg.TWELVEDATA_API_KEY)
+      this.byId.set(
+        "twelvedata",
+        cached(
+          new TwelveDataProvider({
+            apiKey: cfg.TWELVEDATA_API_KEY,
+            creditsPerMinute: cfg.TWELVEDATA_CREDITS_PER_MINUTE,
+            useWebSocket: cfg.TWELVEDATA_WS,
+            pollSeconds: cfg.TWELVEDATA_POLL_SECONDS,
+            plan: cfg.TWELVEDATA_PLAN,
+          }),
+        ),
+      );
     if (pre.polygon) this.byId.set("polygon", pre.polygon);
-    else if (cfg.POLYGON_API_KEY) this.byId.set("polygon", cached(new PolygonProvider({ apiKey: cfg.POLYGON_API_KEY, requestsPerMinute: cfg.POLYGON_REQUESTS_PER_MINUTE, useWebSocket: cfg.POLYGON_WS, pollSeconds: cfg.POLYGON_POLL_SECONDS, plan: cfg.POLYGON_PLAN })));
+    else if (cfg.POLYGON_API_KEY)
+      this.byId.set(
+        "polygon",
+        cached(
+          new PolygonProvider({
+            apiKey: cfg.POLYGON_API_KEY,
+            requestsPerMinute: cfg.POLYGON_REQUESTS_PER_MINUTE,
+            useWebSocket: cfg.POLYGON_WS,
+            pollSeconds: cfg.POLYGON_POLL_SECONDS,
+            plan: cfg.POLYGON_PLAN,
+          }),
+        ),
+      );
 
     const parsed = parseRoutes(cfg.MARKET_DATA_ROUTES);
     this.warnings.push(...parsed.errors);
     if (Object.keys(parsed.routes).length) this.routes = parsed.routes;
-    else if (cfg.MARKET_DATA_PROVIDER !== "demo") this.routes = Object.fromEntries(ASSET_CLASSES.map((c) => [c, cfg.MARKET_DATA_PROVIDER])) as Routes;
+    else if (cfg.MARKET_DATA_PROVIDER !== "demo")
+      this.routes = Object.fromEntries(ASSET_CLASSES.map((c) => [c, cfg.MARKET_DATA_PROVIDER])) as Routes;
     else this.routes = {};
 
     for (const cls of ASSET_CLASSES) {
       const id = this.routes[cls];
       if (!id || id === "demo") continue;
-      if (!this.byId.has(id)) this.warnings.push(`${cls} is routed to ${id} but it is not configured (missing API key) — serving demo data instead`);
+      if (!this.byId.has(id))
+        this.warnings.push(`${cls} is routed to ${id} but it is not configured (missing API key) — serving demo data instead`);
       else {
         const missing = DEFAULT_INSTRUMENTS.filter((i) => i.assetClass === cls && !this.byId.get(id)!.supports(i)).map((i) => i.symbol);
         if (missing.length) this.warnings.push(`${id} has no symbol for ${missing.join(", ")} — serving demo data for those`);
       }
     }
-    if (cfg.NODE_ENV === "production" && !Object.values(this.routes).some((id) => id && id !== "demo")) this.warnings.push("production is running on synthetic demo data — set MARKET_DATA_ROUTES");
+    if (cfg.NODE_ENV === "production" && !Object.values(this.routes).some((id) => id && id !== "demo"))
+      this.warnings.push("production is running on synthetic demo data — set MARKET_DATA_ROUTES");
   }
 
   /** The source for an instrument: its routed provider when configured and able, else demo. */
@@ -85,17 +123,24 @@ export class ProviderRegistry {
     return p && p.supports(instrument) ? p : this.demo;
   }
 
-  get(id: ProviderId): MarketDataProvider | undefined { return this.byId.get(id); }
+  get(id: ProviderId): MarketDataProvider | undefined {
+    return this.byId.get(id);
+  }
 
   /** Providers in use: the routed ones in route order, then demo. */
   all(): MarketDataProvider[] {
     const out: MarketDataProvider[] = [];
-    for (const id of Object.values(this.routes)) { const p = id ? this.byId.get(id) : undefined; if (p && !out.includes(p)) out.push(p); }
+    for (const id of Object.values(this.routes)) {
+      const p = id ? this.byId.get(id) : undefined;
+      if (p && !out.includes(p)) out.push(p);
+    }
     if (!out.includes(this.demo)) out.push(this.demo);
     return out;
   }
 
-  statuses(): ProviderStatus[] { return this.all().map((p) => p.status()); }
+  statuses(): ProviderStatus[] {
+    return this.all().map((p) => p.status());
+  }
 
   /** Feed state of one instrument: provider health × that instrument's market calendar. */
   feed(instrument: Instrument, nowMs = this.now()): FeedStatus {
@@ -105,7 +150,8 @@ export class ProviderRegistry {
     const seen = provider.lastSeen?.(instrument.symbol);
     const receivedAt = seen?.receivedAt ?? st.lastUpdate;
     const routed = this.routes[instrument.assetClass];
-    const fallbackNote = provider.id === "demo" && routed && routed !== "demo" ? `${routed} unavailable for ${instrument.symbol} — demo fallback` : undefined;
+    const fallbackNote =
+      provider.id === "demo" && routed && routed !== "demo" ? `${routed} unavailable for ${instrument.symbol} — demo fallback` : undefined;
     const base: FeedStatus = {
       symbol: instrument.symbol,
       provider: provider.id,
@@ -127,8 +173,12 @@ export class ProviderRegistry {
     return { ...base, state: st.transport === "ws" ? "LIVE" : "DELAYED" };
   }
 
-  feeds(nowMs = this.now()): FeedStatus[] { return DEFAULT_INSTRUMENTS.map((i) => this.feed(i, nowMs)); }
+  feeds(nowMs = this.now()): FeedStatus[] {
+    return DEFAULT_INSTRUMENTS.map((i) => this.feed(i, nowMs));
+  }
 
   /** Closes streaming sockets (tests / shutdown). */
-  close() { for (const p of this.byId.values()) (p as { close?: () => void }).close?.(); }
+  close() {
+    for (const p of this.byId.values()) (p as { close?: () => void }).close?.();
+  }
 }

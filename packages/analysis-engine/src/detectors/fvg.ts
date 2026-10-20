@@ -26,21 +26,40 @@ export function detectFVGs(candles: Candle[], atrSeries: number[], minSizeAtr = 
       const c = candles[j]!;
       if (g.direction === "bullish") {
         if (c.low < deepest) deepest = c.low;
-        if (c.low <= g.bottom) { g.mitigated = true; g.mitigatedIndex = j; g.fillRatio = 1; break; }
+        if (c.low <= g.bottom) {
+          g.mitigated = true;
+          g.mitigatedIndex = j;
+          g.fillRatio = 1;
+          break;
+        }
       } else {
         if (c.high > deepest) deepest = c.high;
-        if (c.high >= g.top) { g.mitigated = true; g.mitigatedIndex = j; g.fillRatio = 1; break; }
+        if (c.high >= g.top) {
+          g.mitigated = true;
+          g.mitigatedIndex = j;
+          g.fillRatio = 1;
+          break;
+        }
       }
     }
     if (!g.mitigated) {
-      g.fillRatio = g.direction === "bullish"
-        ? Math.min(1, Math.max(0, (g.top - deepest) / g.size))
-        : Math.min(1, Math.max(0, (deepest - g.bottom) / g.size));
+      g.fillRatio =
+        g.direction === "bullish"
+          ? Math.min(1, Math.max(0, (g.top - deepest) / g.size))
+          : Math.min(1, Math.max(0, (deepest - g.bottom) / g.size));
     }
   }
   return out;
 }
 
-function makeGap(direction: FairValueGap["direction"], index: number, time: number, top: number, bottom: number, size: number, sizeAtr: number): FairValueGap {
+function makeGap(
+  direction: FairValueGap["direction"],
+  index: number,
+  time: number,
+  top: number,
+  bottom: number,
+  size: number,
+  sizeAtr: number,
+): FairValueGap {
   return { id: `fvg-${direction[0]}-${index}`, direction, index, time, top, bottom, size, sizeAtr, mitigated: false, fillRatio: 0 };
 }

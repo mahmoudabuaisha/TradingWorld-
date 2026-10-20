@@ -7,9 +7,18 @@ import { ReconnectingSocket } from "./support/socket.js";
 import { buildStatus, describeError, type FeedClock } from "./support/status.js";
 
 const TF_MAP: Record<Timeframe, { mult: number; span: string }> = {
-  "1m": { mult: 1, span: "minute" }, "3m": { mult: 3, span: "minute" }, "5m": { mult: 5, span: "minute" }, "15m": { mult: 15, span: "minute" }, "30m": { mult: 30, span: "minute" },
-  "1h": { mult: 1, span: "hour" }, "2h": { mult: 2, span: "hour" }, "4h": { mult: 4, span: "hour" }, "12h": { mult: 12, span: "hour" },
-  "1d": { mult: 1, span: "day" }, "1w": { mult: 1, span: "week" }, "1M": { mult: 1, span: "month" },
+  "1m": { mult: 1, span: "minute" },
+  "3m": { mult: 3, span: "minute" },
+  "5m": { mult: 5, span: "minute" },
+  "15m": { mult: 15, span: "minute" },
+  "30m": { mult: 30, span: "minute" },
+  "1h": { mult: 1, span: "hour" },
+  "2h": { mult: 2, span: "hour" },
+  "4h": { mult: 4, span: "hour" },
+  "12h": { mult: 12, span: "hour" },
+  "1d": { mult: 1, span: "day" },
+  "1w": { mult: 1, span: "week" },
+  "1M": { mult: 1, span: "month" },
 };
 
 export type PolygonCluster = "forex" | "crypto" | "indices" | "stocks";
@@ -29,20 +38,35 @@ export interface PolygonOptions {
 }
 
 export class PolygonError extends Error {
-  constructor(message: string, public readonly status?: number) { super(message); this.name = "PolygonError"; }
+  constructor(
+    message: string,
+    public readonly status?: number,
+  ) {
+    super(message);
+    this.name = "PolygonError";
+  }
 }
 
 /** Polygon ticker → websocket cluster, aggregate channel and the keys its events carry (`pair` / `sym`). */
-export function polygonChannel(i: Pick<Instrument, "base" | "quote" | "providerSymbols">): { cluster: PolygonCluster; channel: string; keys: string[] } | undefined {
+export function polygonChannel(
+  i: Pick<Instrument, "base" | "quote" | "providerSymbols">,
+): { cluster: PolygonCluster; channel: string; keys: string[] } | undefined {
   const t = i.providerSymbols.polygon;
   if (!t) return undefined;
-  if (t.startsWith("C:")) return { cluster: "forex", channel: `CA.C:${i.base}-${i.quote}`, keys: [t, `${i.base}/${i.quote}`, `${i.base}-${i.quote}`] };
-  if (t.startsWith("X:")) return { cluster: "crypto", channel: `XA.X:${i.base}-${i.quote}`, keys: [t, `${i.base}-${i.quote}`, `${i.base}/${i.quote}`] };
+  if (t.startsWith("C:"))
+    return { cluster: "forex", channel: `CA.C:${i.base}-${i.quote}`, keys: [t, `${i.base}/${i.quote}`, `${i.base}-${i.quote}`] };
+  if (t.startsWith("X:"))
+    return { cluster: "crypto", channel: `XA.X:${i.base}-${i.quote}`, keys: [t, `${i.base}-${i.quote}`, `${i.base}/${i.quote}`] };
   if (t.startsWith("I:")) return { cluster: "indices", channel: `AM.${t}`, keys: [t, t.slice(2)] };
   return { cluster: "stocks", channel: `AM.${t}`, keys: [t] };
 }
 
-interface AggsJson { status?: string; error?: string; message?: string; results?: { t: number; o: number; h: number; l: number; c: number; v?: number }[] }
+interface AggsJson {
+  status?: string;
+  error?: string;
+  message?: string;
+  results?: { t: number; o: number; h: number; l: number; c: number; v?: number }[];
+}
 
 /** Parses `/v2/aggs` output (t in ms) into ascending candles; throws PolygonError on API errors. */
 export function parseAggregates(json: unknown): Candle[] {
@@ -71,12 +95,27 @@ class PolygonSocket {
   private readonly subs = new Map<string, { keys: string[]; handlers: Set<(bar: Candle, endMs: number) => void> }>();
   private authed = false;
 
-  constructor(url: string, private readonly apiKey: string, Ctor: typeof WebSocket | undefined, private readonly onEvent: (e: { type: "bar" | "error" | "close"; message?: string }) => void) {
-    this.sock = new ReconnectingSocket(url, {
-      onOpen: (send) => { this.authed = false; send({ action: "auth", params: this.apiKey }); },
-      onMessage: (raw) => this.handle(raw),
-      onClose: (reason) => { this.authed = false; this.onEvent({ type: "close", message: reason }); },
-    }, { WebSocketCtor: Ctor });
+  constructor(
+    url: string,
+    private readonly apiKey: string,
+    Ctor: typeof WebSocket | undefined,
+    private readonly onEvent: (e: { type: "bar" | "error" | "close"; message?: string }) => void,
+  ) {
+    this.sock = new ReconnectingSocket(
+      url,
+      {
+        onOpen: (send) => {
+          this.authed = false;
+          send({ action: "auth", params: this.apiKey });
+        },
+        onMessage: (raw) => this.handle(raw),
+        onClose: (reason) => {
+          this.authed = false;
+          this.onEvent({ type: "close", message: reason });
+        },
+      },
+      { WebSocketCtor: Ctor },
+    );
     this.sock.open();
   }
 
@@ -90,18 +129,28 @@ class PolygonSocket {
     sub.handlers.add(handler);
     return () => {
       sub!.handlers.delete(handler);
-      if (!sub!.handlers.size) { this.subs.delete(channel); if (this.authed) this.sock.send({ action: "unsubscribe", params: channel }); }
+      if (!sub!.handlers.size) {
+        this.subs.delete(channel);
+        if (this.authed) this.sock.send({ action: "unsubscribe", params: channel });
+      }
     };
   }
 
   private handle(raw: string) {
     let events: AggEvent[];
-    try { const parsed = JSON.parse(raw); events = Array.isArray(parsed) ? parsed : [parsed]; } catch { return; }
+    try {
+      const parsed = JSON.parse(raw);
+      events = Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      return;
+    }
     for (const ev of events) {
       if (ev.ev === "status") {
-        const st = (ev as unknown as { status?: string; message?: string });
-        if (st.status === "auth_success") { this.authed = true; if (this.subs.size) this.sock.send({ action: "subscribe", params: [...this.subs.keys()].join(",") }); }
-        else if (st.status === "auth_failed" || st.status === "error") this.onEvent({ type: "error", message: st.message ?? st.status });
+        const st = ev as unknown as { status?: string; message?: string };
+        if (st.status === "auth_success") {
+          this.authed = true;
+          if (this.subs.size) this.sock.send({ action: "subscribe", params: [...this.subs.keys()].join(",") });
+        } else if (st.status === "auth_failed" || st.status === "error") this.onEvent({ type: "error", message: st.message ?? st.status });
         continue;
       }
       if (ev.ev !== "CA" && ev.ev !== "XA" && ev.ev !== "AM") continue;
@@ -116,7 +165,9 @@ class PolygonSocket {
     }
   }
 
-  close() { this.sock.close(); }
+  close() {
+    this.sock.close();
+  }
 }
 
 /**
@@ -143,7 +194,9 @@ export class PolygonProvider implements MarketDataProvider {
     this.clock = { transport: opts.useWebSocket ? "ws" : "poll", pollSeconds: opts.pollSeconds ?? 15 };
   }
 
-  supports(i: Instrument): boolean { return !!i.providerSymbols.polygon; }
+  supports(i: Instrument): boolean {
+    return !!i.providerSymbols.polygon;
+  }
 
   async getCandles(i: Instrument, tf: Timeframe, limit: number, to?: number): Promise<Candle[]> {
     const ticker = i.providerSymbols.polygon;
@@ -192,10 +245,13 @@ export class PolygonProvider implements MarketDataProvider {
         if (!last) return;
         const receivedAt = this.now();
         const prev = tail[tail.length - 2];
-        if (lastTime !== undefined && last.time > lastTime && prev) onUpdate({ symbol: i.symbol, timeframe: tf, candle: prev, closed: true, receivedAt, eventTime: prev.time });
+        if (lastTime !== undefined && last.time > lastTime && prev)
+          onUpdate({ symbol: i.symbol, timeframe: tf, candle: prev, closed: true, receivedAt, eventTime: prev.time });
         onUpdate({ symbol: i.symbol, timeframe: tf, candle: last, closed: false, receivedAt, eventTime: last.time });
         lastTime = last.time;
-      } catch { /* status() carries the error; keep polling */ }
+      } catch {
+        /* status() carries the error; keep polling */
+      }
     };
     const timer = setInterval(() => void tick(), (this.opts.pollSeconds ?? 15) * 1000);
     return () => clearInterval(timer);
@@ -214,22 +270,37 @@ export class PolygonProvider implements MarketDataProvider {
     }
     const agg = new TickAggregator(tf);
     let active = true;
-    void this.getCandles(i, tf, 1).then((c) => { if (active && c[0]) agg.seed(c[0]); }).catch(() => { /* seeded by the first bar instead */ });
+    void this.getCandles(i, tf, 1)
+      .then((c) => {
+        if (active && c[0]) agg.seed(c[0]);
+      })
+      .catch(() => {
+        /* seeded by the first bar instead */
+      });
     const off = socket.subscribe(ch.channel, ch.keys, (bar, endMs) => {
       if (!active) return;
       const receivedAt = this.now();
       this.clock.lastEventTime = Math.floor(endMs / 1000);
       this.clock.latencyMs = Math.max(0, receivedAt - endMs);
-      for (const u of agg.bar(bar)) onUpdate({ symbol: i.symbol, timeframe: tf, candle: u.candle, closed: u.closed, receivedAt, eventTime: Math.floor(endMs / 1000) });
+      for (const u of agg.bar(bar))
+        onUpdate({ symbol: i.symbol, timeframe: tf, candle: u.candle, closed: u.closed, receivedAt, eventTime: Math.floor(endMs / 1000) });
     });
-    return () => { active = false; off(); };
+    return () => {
+      active = false;
+      off();
+    };
   }
 
-  private fail(message: string) { this.clock.lastError = message; this.clock.lastErrorAt = this.now(); }
+  private fail(message: string) {
+    this.clock.lastError = message;
+    this.clock.lastErrorAt = this.now();
+  }
 
   status(): ProviderStatus {
     return buildStatus(this.id, this.clock, { licensed: true, plan: this.opts.plan, budget: this.budget.snapshot() }, this.now());
   }
 
-  close() { for (const s of this.sockets.values()) s.close(); }
+  close() {
+    for (const s of this.sockets.values()) s.close();
+  }
 }

@@ -16,7 +16,10 @@ export function mulberry32(seed: number): () => number {
 
 export function hashSeed(s: string): number {
   let h = 2166136261;
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
   return h >>> 0;
 }
 
@@ -45,7 +48,8 @@ export function generateSyntheticCandles(o: SyntheticOptions): Candle[] {
   let volMult = 1;
   let regimeLeft = 0;
   const gauss = () => {
-    const u = 1 - rnd(), v = rnd();
+    const u = 1 - rnd(),
+      v = rnd();
     return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
   };
   for (let i = 0; i < o.bars; i++) {
@@ -69,8 +73,15 @@ export function generateSyntheticCandles(o: SyntheticOptions): Candle[] {
     // occasional sweep: long wick beyond recent extremes, close back inside
     if (rnd() < 0.03 && out.length > 20) {
       const recent = out.slice(-20);
-      if (rnd() < 0.5) { low = Math.min(...recent.map((c) => c.low)) - sigma * 0.5; close = open + Math.abs(gauss()) * sigma * 1.2; high = Math.max(high, close); }
-      else { high = Math.max(...recent.map((c) => c.high)) + sigma * 0.5; close = open - Math.abs(gauss()) * sigma * 1.2; low = Math.min(low, close); }
+      if (rnd() < 0.5) {
+        low = Math.min(...recent.map((c) => c.low)) - sigma * 0.5;
+        close = open + Math.abs(gauss()) * sigma * 1.2;
+        high = Math.max(high, close);
+      } else {
+        high = Math.max(...recent.map((c) => c.high)) + sigma * 0.5;
+        close = open - Math.abs(gauss()) * sigma * 1.2;
+        low = Math.min(low, close);
+      }
     }
     // occasional displacement candle
     if (rnd() < 0.04) {
@@ -90,7 +101,10 @@ export function generateSyntheticCandles(o: SyntheticOptions): Candle[] {
 export class SyntheticMarket {
   private cache = new Map<string, Candle[]>();
   /** @param endTime fixed end timestamp (tests/replay); omitted → series ends "now" */
-  constructor(private readonly masterBars = 60_000, private readonly endTime?: number) {}
+  constructor(
+    private readonly masterBars = 60_000,
+    private readonly endTime?: number,
+  ) {}
 
   master(symbol: string, startPrice: number, vol: number): Candle[] {
     const key = `${symbol}:${this.endTime ?? "live"}`;
