@@ -1,8 +1,19 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { buildGrounding, buildUserMessage, answerDeterministic, EXPLAINER_SYSTEM_PROMPT, type AnalysisResult } from "@tradingworld/analysis-engine";
+import {
+  buildGrounding,
+  buildUserMessage,
+  answerDeterministic,
+  EXPLAINER_SYSTEM_PROMPT,
+  type AnalysisResult,
+} from "@tradingworld/analysis-engine";
 import type { Config } from "../config.js";
 
-export interface AiAnswer { answer: string; provider: "anthropic" | "deterministic"; model?: string; grounded: true }
+export interface AiAnswer {
+  answer: string;
+  provider: "anthropic" | "deterministic";
+  model?: string;
+  grounded: true;
+}
 
 /**
  * Explanation / chat layer. Detection never depends on this service.
@@ -15,7 +26,9 @@ export class AiService {
     if (cfg.AI_PROVIDER === "anthropic" && cfg.ANTHROPIC_API_KEY) this.client = new Anthropic({ apiKey: cfg.ANTHROPIC_API_KEY });
   }
 
-  get enabled(): boolean { return !!this.client; }
+  get enabled(): boolean {
+    return !!this.client;
+  }
 
   async ask(result: AnalysisResult, question: string, locale: "ar" | "en", zoneId?: string): Promise<AiAnswer> {
     if (!this.client) return { answer: answerDeterministic(result, question, locale, zoneId), provider: "deterministic", grounded: true };
@@ -31,8 +44,17 @@ export class AiService {
       if (res.stop_reason === "refusal") {
         return { answer: answerDeterministic(result, question, locale, zoneId), provider: "deterministic", grounded: true };
       }
-      const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
-      return { answer: text || answerDeterministic(result, question, locale, zoneId), provider: "anthropic", model: res.model, grounded: true };
+      const text = res.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
+        .trim();
+      return {
+        answer: text || answerDeterministic(result, question, locale, zoneId),
+        provider: "anthropic",
+        model: res.model,
+        grounded: true,
+      };
     } catch (err) {
       if (err instanceof Anthropic.APIError) {
         // graceful degradation: the product keeps answering from structured data

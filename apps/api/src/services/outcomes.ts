@@ -16,9 +16,26 @@ export interface OutcomeOptions {
   log?: (m: string) => void;
 }
 
-export interface OutcomeRun { at: number; scanned: number; checked: number; resolved: number; failed: number; error?: string; ms: number }
+export interface OutcomeRun {
+  at: number;
+  scanned: number;
+  checked: number;
+  resolved: number;
+  failed: number;
+  error?: string;
+  ms: number;
+}
 
-export interface Bucket { n: number; reacted: number; invalidated: number; tested: number; untouched: number; reactionRate: number; avgMfeAtr?: number; avgMaeAtr?: number }
+export interface Bucket {
+  n: number;
+  reacted: number;
+  invalidated: number;
+  tested: number;
+  untouched: number;
+  reactionRate: number;
+  avgMfeAtr?: number;
+  avgMaeAtr?: number;
+}
 
 export interface OutcomeStats {
   outcomeVersion: string;
@@ -32,20 +49,49 @@ export interface OutcomeStats {
   bySession: Record<string, Bucket>;
   byTimeframe: Record<string, Bucket>;
   byScoreBand: Record<string, Bucket>;
-  recent: { key: string; symbol: string; timeframe: string; name: string; nameAr: string; quality: string; score: number; provider: string; label: string; reason: string; barsToOutcome: number; mfeAtr: number; resolvedAt: number }[];
+  recent: {
+    key: string;
+    symbol: string;
+    timeframe: string;
+    name: string;
+    nameAr: string;
+    quality: string;
+    score: number;
+    provider: string;
+    label: string;
+    reason: string;
+    barsToOutcome: number;
+    mfeAtr: number;
+    resolvedAt: number;
+  }[];
 }
 
 /** One ZoneSample per resolved zone — the exact shape services/ml expects in POST /train. */
-export interface DatasetSample { zone: TrackedZone["zone"]; regime: TrackedZone["context"]["regime"]; session: string; outcome: NonNullable<TrackedZone["outcome"]> & { key: string; provider: string } }
+export interface DatasetSample {
+  zone: TrackedZone["zone"];
+  regime: TrackedZone["context"]["regime"];
+  session: string;
+  outcome: NonNullable<TrackedZone["outcome"]> & { key: string; provider: string };
+}
 
 /** "XAUUSD:15m,EURUSD:1h" → pairs; unknown symbols or timeframes are dropped. */
 export function parseScan(spec: string | undefined): { symbol: string; timeframe: Timeframe }[] {
-  return (spec ?? "").split(",").map((p) => p.trim()).filter(Boolean).map((p) => { const [s = "", tf = ""] = p.split(":"); return { symbol: s.toUpperCase(), timeframe: tf as Timeframe }; })
+  return (spec ?? "")
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => {
+      const [s = "", tf = ""] = p.split(":");
+      return { symbol: s.toUpperCase(), timeframe: tf as Timeframe };
+    })
     .filter((p) => findInstrument(p.symbol) && isTimeframe(p.timeframe));
 }
 
 /** Stable identity of a market zone across analysis windows (engine ids are window-local). */
-export function zoneKey(r: Pick<AnalysisResult, "symbol" | "timeframe" | "engineVersion" | "scoringVersion">, z: AnalysisResult["zones"][number]): string {
+export function zoneKey(
+  r: Pick<AnalysisResult, "symbol" | "timeframe" | "engineVersion" | "scoringVersion">,
+  z: AnalysisResult["zones"][number],
+): string {
   return zoneTrackKey(r, z); // shared with the browser (feedback) — packages/shared/src/research.ts
 }
 
@@ -55,14 +101,28 @@ function bucket(zs: TrackedZone[]): Bucket {
   const out = zs.map((z) => z.outcome!).filter(Boolean);
   const touched = out.filter((o) => o.label !== "UNTOUCHED");
   const count = (l: string) => out.filter((o) => o.label === l).length;
-  const avg = (f: (o: (typeof out)[number]) => number) => (touched.length ? Math.round((touched.reduce((s, o) => s + f(o), 0) / touched.length) * 100) / 100 : undefined);
-  return { n: out.length, reacted: count("REACTED"), invalidated: count("INVALIDATED"), tested: count("TESTED"), untouched: count("UNTOUCHED"), reactionRate: out.length ? Math.round((count("REACTED") / out.length) * 1000) / 1000 : 0, avgMfeAtr: avg((o) => o.mfeAtr), avgMaeAtr: avg((o) => o.maeAtr) };
+  const avg = (f: (o: (typeof out)[number]) => number) =>
+    touched.length ? Math.round((touched.reduce((s, o) => s + f(o), 0) / touched.length) * 100) / 100 : undefined;
+  return {
+    n: out.length,
+    reacted: count("REACTED"),
+    invalidated: count("INVALIDATED"),
+    tested: count("TESTED"),
+    untouched: count("UNTOUCHED"),
+    reactionRate: out.length ? Math.round((count("REACTED") / out.length) * 1000) / 1000 : 0,
+    avgMfeAtr: avg((o) => o.mfeAtr),
+    avgMaeAtr: avg((o) => o.maeAtr),
+  };
 }
 
 function groupBy(zs: TrackedZone[], f: (z: TrackedZone) => string): Record<string, Bucket> {
   const g: Record<string, TrackedZone[]> = {};
   for (const z of zs) (g[f(z)] ??= []).push(z);
-  return Object.fromEntries(Object.entries(g).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, bucket(v)]));
+  return Object.fromEntries(
+    Object.entries(g)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => [k, bucket(v)]),
+  );
 }
 
 /**
@@ -83,7 +143,11 @@ export class OutcomeService {
   /** set by the app: runs an analysis for the scan list (avoids a circular import with AnalysisService) */
   analyze?: (symbol: string, timeframe: Timeframe) => Promise<unknown>;
 
-  constructor(private readonly repos: Repositories, private readonly providers: ProviderRegistry, opts: Partial<OutcomeOptions> = {}) {
+  constructor(
+    private readonly repos: Repositories,
+    private readonly providers: ProviderRegistry,
+    opts: Partial<OutcomeOptions> = {},
+  ) {
     this.opts = { horizonBars: 120, intervalSeconds: 300, batch: 2000, scan: [], ...opts };
     this.now = opts.now ?? Date.now;
     this.log = opts.log ?? (() => {});
@@ -97,8 +161,17 @@ export class OutcomeService {
       const key = zoneKey(r, z);
       if (this.seen.has(key)) continue;
       const isNew = await this.repos.zones.track({
-        key, symbol: r.symbol, timeframe: r.timeframe, engineVersion: r.engineVersion, scoringVersion: r.scoringVersion, provider, zone: z, atr: r.base.atr,
-        context: { regime: r.base.regime, session: r.session.current, htfBias: r.htfBias }, detectedBarTime: r.lastCandleTime, detectedAt: this.now(),
+        key,
+        symbol: r.symbol,
+        timeframe: r.timeframe,
+        engineVersion: r.engineVersion,
+        scoringVersion: r.scoringVersion,
+        provider,
+        zone: z,
+        atr: r.base.atr,
+        context: { regime: r.base.regime, session: r.session.current, htfBias: r.htfBias },
+        detectedBarTime: r.lastCandleTime,
+        detectedAt: this.now(),
       });
       this.seen.add(key);
       if (this.seen.size > 100_000) this.seen.clear();
@@ -114,7 +187,10 @@ export class OutcomeService {
     this.timer.unref?.();
   }
 
-  stop(): void { if (this.timer) clearInterval(this.timer); this.timer = undefined; }
+  stop(): void {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = undefined;
+  }
 
   /** One pass: analyse the scan list, then label every open zone that has become decidable. */
   async run(): Promise<OutcomeRun> {
@@ -124,14 +200,27 @@ export class OutcomeService {
     this.running = true;
     try {
       for (const p of this.opts.scan) {
-        try { await this.analyze?.(p.symbol, p.timeframe); run.scanned++; } catch (e) { this.log(`scan ${p.symbol} ${p.timeframe}: ${describeError(e)}`); }
+        try {
+          await this.analyze?.(p.symbol, p.timeframe);
+          run.scanned++;
+        } catch (e) {
+          this.log(`scan ${p.symbol} ${p.timeframe}: ${describeError(e)}`);
+        }
       }
       const open = await this.repos.zones.open(this.opts.batch);
       const groups = new Map<string, TrackedZone[]>();
-      for (const z of open) { const k = `${z.symbol}:${z.timeframe}`; (groups.get(k) ?? groups.set(k, []).get(k)!).push(z); }
+      for (const z of open) {
+        const k = `${z.symbol}:${z.timeframe}`;
+        (groups.get(k) ?? groups.set(k, []).get(k)!).push(z);
+      }
       for (const zs of groups.values()) {
         // a failed fetch fails the group; per-zone errors are counted inside resolveGroup
-        try { await this.resolveGroup(zs, run); } catch (e) { run.failed += zs.length; this.log(`resolve ${zs[0]!.symbol} ${zs[0]!.timeframe}: ${describeError(e)}`); }
+        try {
+          await this.resolveGroup(zs, run);
+        } catch (e) {
+          run.failed += zs.length;
+          this.log(`resolve ${zs[0]!.symbol} ${zs[0]!.timeframe}: ${describeError(e)}`);
+        }
       }
     } catch (e) {
       run.error = describeError(e);
@@ -161,7 +250,12 @@ export class OutcomeService {
       try {
         let candles: Candle[] = recent;
         if (!recent.length || recent[0]!.time > z.detectedBarTime + step) {
-          candles = await provider.getCandles(instrument, tf, this.opts.horizonBars + 2, z.detectedBarTime + (this.opts.horizonBars + 2) * step);
+          candles = await provider.getCandles(
+            instrument,
+            tf,
+            this.opts.horizonBars + 2,
+            z.detectedBarTime + (this.opts.horizonBars + 2) * step,
+          );
         }
         // strictly after the detection bar, and only bars whose bucket has closed
         const future = candles.filter((c) => c.time > z.detectedBarTime && c.time + step <= nowSec);
@@ -169,8 +263,18 @@ export class OutcomeService {
         const r = resolveOutcome(z.zone, future, z.atr, this.opts.horizonBars);
         if (!r.done) continue;
         await this.repos.zones.resolve(z.key, {
-          outcomeVersion: OUTCOME_VERSION, label: r.label, reason: r.reason!, finalStatus: r.finalStatus, mfeAtr: round(r.mfeAtr), maeAtr: round(r.maeAtr), reactionAtr: round(r.reactionAtr),
-          barsToOutcome: r.barsToOutcome, barsObserved: r.barsObserved, horizonBars: this.opts.horizonBars, retests: r.retests, resolvedAt: this.now(),
+          outcomeVersion: OUTCOME_VERSION,
+          label: r.label,
+          reason: r.reason!,
+          finalStatus: r.finalStatus,
+          mfeAtr: round(r.mfeAtr),
+          maeAtr: round(r.maeAtr),
+          reactionAtr: round(r.reactionAtr),
+          barsToOutcome: r.barsToOutcome,
+          barsObserved: r.barsObserved,
+          horizonBars: this.opts.horizonBars,
+          retests: r.retests,
+          resolvedAt: this.now(),
         });
         run.resolved++;
       } catch (e) {
@@ -183,29 +287,64 @@ export class OutcomeService {
 
   async stats(includeDemo = false, limit = 20_000): Promise<OutcomeStats> {
     const q: ZoneQuery = { includeDemo };
-    const [open, resolvedZones] = await Promise.all([this.repos.zones.count({ ...q, resolved: false }), this.repos.zones.list({ ...q, resolved: true, limit })]);
+    const [open, resolvedZones] = await Promise.all([
+      this.repos.zones.count({ ...q, resolved: false }),
+      this.repos.zones.list({ ...q, resolved: true, limit }),
+    ]);
     return {
-      outcomeVersion: OUTCOME_VERSION, horizonBars: this.opts.horizonBars, includeDemo, open, resolved: resolvedZones.length,
+      outcomeVersion: OUTCOME_VERSION,
+      horizonBars: this.opts.horizonBars,
+      includeDemo,
+      open,
+      resolved: resolvedZones.length,
       overall: bucket(resolvedZones),
       byQuality: groupBy(resolvedZones, (z) => z.zone.quality),
       byOrigin: groupBy(resolvedZones, (z) => z.zone.origin),
       bySession: groupBy(resolvedZones, (z) => z.context.session),
       byTimeframe: groupBy(resolvedZones, (z) => z.timeframe),
       byScoreBand: groupBy(resolvedZones, (z) => scoreBand(z.zone.score)),
-      recent: [...resolvedZones].sort((a, b) => b.outcome!.resolvedAt - a.outcome!.resolvedAt).slice(0, 30).map((z) => ({
-        key: z.key, symbol: z.symbol, timeframe: z.timeframe, name: z.zone.name, nameAr: z.zone.nameAr, quality: z.zone.quality, score: z.zone.score, provider: z.provider,
-        label: z.outcome!.label, reason: z.outcome!.reason, barsToOutcome: z.outcome!.barsToOutcome, mfeAtr: z.outcome!.mfeAtr, resolvedAt: z.outcome!.resolvedAt,
-      })),
+      recent: [...resolvedZones]
+        .sort((a, b) => b.outcome!.resolvedAt - a.outcome!.resolvedAt)
+        .slice(0, 30)
+        .map((z) => ({
+          key: z.key,
+          symbol: z.symbol,
+          timeframe: z.timeframe,
+          name: z.zone.name,
+          nameAr: z.zone.nameAr,
+          quality: z.zone.quality,
+          score: z.zone.score,
+          provider: z.provider,
+          label: z.outcome!.label,
+          reason: z.outcome!.reason,
+          barsToOutcome: z.outcome!.barsToOutcome,
+          mfeAtr: z.outcome!.mfeAtr,
+          resolvedAt: z.outcome!.resolvedAt,
+        })),
     };
   }
 
   /** Resolved zones as ML samples. Demo data is excluded unless asked for: synthetic prices must never train a model. */
   async dataset(q: { engineVersion?: string; scoringVersion?: string; includeDemo?: boolean; limit?: number }): Promise<DatasetSample[]> {
     const zs = await this.repos.zones.list({ ...q, resolved: true, limit: q.limit ?? 50_000 });
-    return zs.reverse().map((z) => ({ zone: z.zone, regime: z.context.regime, session: z.context.session, outcome: { ...z.outcome!, key: z.key, provider: z.provider } }));
+    return zs.reverse().map((z) => ({
+      zone: z.zone,
+      regime: z.context.regime,
+      session: z.context.session,
+      outcome: { ...z.outcome!, key: z.key, provider: z.provider },
+    }));
   }
 
-  status() { return { running: this.running, started: !!this.timer, horizonBars: this.opts.horizonBars, intervalSeconds: this.opts.intervalSeconds, scan: this.opts.scan.map((p) => `${p.symbol}:${p.timeframe}`), runs: [...this.runs].reverse().slice(0, 10) }; }
+  status() {
+    return {
+      running: this.running,
+      started: !!this.timer,
+      horizonBars: this.opts.horizonBars,
+      intervalSeconds: this.opts.intervalSeconds,
+      scan: this.opts.scan.map((p) => `${p.symbol}:${p.timeframe}`),
+      runs: [...this.runs].reverse().slice(0, 10),
+    };
+  }
 }
 
 const round = (n: number) => Math.round(n * 1000) / 1000;

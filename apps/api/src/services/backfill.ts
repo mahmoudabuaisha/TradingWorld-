@@ -52,14 +52,24 @@ export interface BackfillStatus {
   runs: BackfillRun[];
 }
 
-const DEFAULTS: BackfillOptions = { baseTimeframe: "1m", bars: 20_000, pageSize: 5000, includeDemo: false, intervalMinutes: 15, aggregateSeconds: 60, maxGapsPerRun: 20 };
+const DEFAULTS: BackfillOptions = {
+  baseTimeframe: "1m",
+  bars: 20_000,
+  pageSize: 5000,
+  includeDemo: false,
+  intervalMinutes: 15,
+  aggregateSeconds: 60,
+  maxGapsPerRun: 20,
+};
 
 /** Timeframes derived locally from `base` (all coarser ones; week and month use calendar buckets). */
 export function derivedTargets(base: Timeframe): Timeframe[] {
   return TIMEFRAMES.filter((t) => canAggregate(base, t));
 }
 
-interface RunLogger { logRun(run: BackfillRun): Promise<void> }
+interface RunLogger {
+  logRun(run: BackfillRun): Promise<void>;
+}
 const hasRunLog = (s: unknown): s is RunLogger => typeof (s as RunLogger)?.logRun === "function";
 
 /**
@@ -82,7 +92,11 @@ export class BackfillService {
   private readonly now: () => number;
   private readonly log: (msg: string) => void;
 
-  constructor(private readonly registry: ProviderRegistry, readonly store: CandleStore, opts: Partial<BackfillOptions> = {}) {
+  constructor(
+    private readonly registry: ProviderRegistry,
+    readonly store: CandleStore,
+    opts: Partial<BackfillOptions> = {},
+  ) {
     this.opts = { ...DEFAULTS, ...opts };
     this.now = opts.now ?? Date.now;
     this.log = opts.log ?? (() => {});
@@ -90,11 +104,22 @@ export class BackfillService {
 
   /** Instruments the job maintains: routed to a real source (demo too when asked), optionally filtered. */
   instruments(): Instrument[] {
-    return DEFAULT_INSTRUMENTS.filter((i) => (!this.opts.symbols || this.opts.symbols.includes(i.symbol)) && (this.opts.includeDemo || this.registry.for(i).id !== "demo"));
+    return DEFAULT_INSTRUMENTS.filter(
+      (i) => (!this.opts.symbols || this.opts.symbols.includes(i.symbol)) && (this.opts.includeDemo || this.registry.for(i).id !== "demo"),
+    );
   }
 
   status(): BackfillStatus {
-    return { running: this.running, started: this.started, baseTimeframe: this.opts.baseTimeframe, bars: this.opts.bars, symbols: this.instruments().map((i) => i.symbol), lastRunAt: this.lastRunAt, nextRunAt: this.nextRunAt, runs: this.runs.slice(-50).reverse() };
+    return {
+      running: this.running,
+      started: this.started,
+      baseTimeframe: this.opts.baseTimeframe,
+      bars: this.opts.bars,
+      symbols: this.instruments().map((i) => i.symbol),
+      lastRunAt: this.lastRunAt,
+      nextRunAt: this.nextRunAt,
+      runs: this.runs.slice(-50).reverse(),
+    };
   }
 
   start(initialDelayMs = 3000): void {
@@ -151,7 +176,8 @@ export class BackfillService {
       const step = TIMEFRAME_SECONDS[tf];
       const to = range ? range.first : Math.floor(this.now() / 1000) + step;
       const { written, from } = await this.pullBackward(i, tf, to, remaining);
-      run.from = from; run.to = to;
+      run.from = from;
+      run.to = to;
       return written;
     });
   }
@@ -185,10 +211,16 @@ export class BackfillService {
       const provider = this.registry.for(i);
       const step = TIMEFRAME_SECONDS[tf];
       let written = 0;
-      run.from = gaps[0]!.from; run.to = gaps[gaps.length - 1]!.to;
+      run.from = gaps[0]!.from;
+      run.to = gaps[gaps.length - 1]!.to;
       for (const g of gaps) {
         const page = await provider.getCandles(i, tf, Math.min(this.opts.pageSize, g.bars + 2), g.to + step);
-        written += await this.store.upsert(symbol, tf, page.filter((c) => c.time >= g.from && c.time <= g.to), provider.id);
+        written += await this.store.upsert(
+          symbol,
+          tf,
+          page.filter((c) => c.time >= g.from && c.time <= g.to),
+          provider.id,
+        );
       }
       this.log(`gaps ${symbol} ${tf}: ${gaps.length} gap(s), ${written} bars`);
       return written;
@@ -203,29 +235,38 @@ export class BackfillService {
   async aggregateDerived(symbol: string, scope: "full" | "recent" | { since: number } = "recent"): Promise<BackfillRun> {
     const base = this.opts.baseTimeframe;
     // the minute-cadence "recent" pass is routine housekeeping: kept in the in-memory status, not in the run table
-    return this.record({ symbol, timeframe: base, kind: "aggregate" }, async (run) => {
-      const range = await this.store.range(symbol, base);
-      if (!range) return 0;
-      const nowSec = Math.floor(this.now() / 1000);
-      let written = 0;
-      for (const target of derivedTargets(base)) {
-        const start = scope === "full" ? range.first : scope === "recent" ? nowSec - TIMEFRAME_SECONDS[target] : scope.since;
-        const from = scope === "full" ? range.first : bucketStart(Math.max(range.first, start), target);
-        const bars = await this.store.readRange(symbol, base, from, range.last + 1);
-        if (!bars.length) continue;
-        const derived = aggregate(bars, target);
-        // a target bucket that starts before the base history is incomplete — never write it
-        const complete = derived.filter((c) => c.time >= range.first);
-        written += await this.store.upsert(symbol, target, complete, `aggregate:${base}`, { mode: "derived" });
-      }
-      run.from = scope === "full" ? range.first : scope === "recent" ? undefined : scope.since; run.to = range.last;
-      return written;
-    }, { persist: scope !== "recent" });
+    return this.record(
+      { symbol, timeframe: base, kind: "aggregate" },
+      async (run) => {
+        const range = await this.store.range(symbol, base);
+        if (!range) return 0;
+        const nowSec = Math.floor(this.now() / 1000);
+        let written = 0;
+        for (const target of derivedTargets(base)) {
+          const start = scope === "full" ? range.first : scope === "recent" ? nowSec - TIMEFRAME_SECONDS[target] : scope.since;
+          const from = scope === "full" ? range.first : bucketStart(Math.max(range.first, start), target);
+          const bars = await this.store.readRange(symbol, base, from, range.last + 1);
+          if (!bars.length) continue;
+          const derived = aggregate(bars, target);
+          // a target bucket that starts before the base history is incomplete — never write it
+          const complete = derived.filter((c) => c.time >= range.first);
+          written += await this.store.upsert(symbol, target, complete, `aggregate:${base}`, { mode: "derived" });
+        }
+        run.from = scope === "full" ? range.first : scope === "recent" ? undefined : scope.since;
+        run.to = range.last;
+        return written;
+      },
+      { persist: scope !== "recent" },
+    );
   }
 
   async aggregateRecentAll(): Promise<void> {
     for (const i of this.instruments()) {
-      try { await this.aggregateDerived(i.symbol, "recent"); } catch (e) { this.log(`aggregate ${i.symbol}: ${describeError(e)}`); }
+      try {
+        await this.aggregateDerived(i.symbol, "recent");
+      } catch (e) {
+        this.log(`aggregate ${i.symbol}: ${describeError(e)}`);
+      }
     }
   }
 
@@ -237,7 +278,13 @@ export class BackfillService {
   }
 
   /** Walk backwards from `to` in pages until `bars` are written, history runs out, or `stopAt` (s) is reached. */
-  private async pullBackward(i: Instrument, tf: Timeframe, to: number, bars: number, stopAt?: number): Promise<{ written: number; from: number }> {
+  private async pullBackward(
+    i: Instrument,
+    tf: Timeframe,
+    to: number,
+    bars: number,
+    stopAt?: number,
+  ): Promise<{ written: number; from: number }> {
     const provider = this.registry.for(i);
     let remaining = bars;
     let cursor = to;
@@ -259,7 +306,11 @@ export class BackfillService {
     return { written, from };
   }
 
-  private async record(seed: Pick<BackfillRun, "symbol" | "timeframe" | "kind"> & Partial<BackfillRun>, work: (run: BackfillRun) => Promise<number>, opts: { persist?: boolean } = {}): Promise<BackfillRun> {
+  private async record(
+    seed: Pick<BackfillRun, "symbol" | "timeframe" | "kind"> & Partial<BackfillRun>,
+    work: (run: BackfillRun) => Promise<number>,
+    opts: { persist?: boolean } = {},
+  ): Promise<BackfillRun> {
     const run: BackfillRun = { bars: 0, status: "running", startedAt: this.now(), ...seed };
     this.runs.push(run);
     if (this.runs.length > 500) this.runs.splice(0, this.runs.length - 500);
@@ -272,7 +323,10 @@ export class BackfillService {
       throw e;
     } finally {
       run.finishedAt = this.now();
-      if (opts.persist !== false && hasRunLog(this.store)) await this.store.logRun(run).catch(() => { /* the in-memory list still has it */ });
+      if (opts.persist !== false && hasRunLog(this.store))
+        await this.store.logRun(run).catch(() => {
+          /* the in-memory list still has it */
+        });
     }
     return run;
   }

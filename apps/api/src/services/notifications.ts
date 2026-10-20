@@ -43,19 +43,39 @@ export class NotificationService {
   private listeners = new Set<(n: StoredNotification) => void>();
   private readonly senders: Senders;
 
-  constructor(private readonly repos: Repositories, private readonly cfg: NotificationConfig, senders: Senders = {}, private readonly log: (m: string) => void = () => {}) {
+  constructor(
+    private readonly repos: Repositories,
+    private readonly cfg: NotificationConfig,
+    senders: Senders = {},
+    private readonly log: (m: string) => void = () => {},
+  ) {
     this.senders = { push: senders.push ?? this.defaultPush(), email: senders.email ?? this.defaultEmail() };
   }
 
-  get pushConfigured(): boolean { return !!this.senders.push; }
-  get emailConfigured(): boolean { return !!this.senders.email; }
-  get publicKey(): string | undefined { return this.cfg.vapidPublicKey; }
+  get pushConfigured(): boolean {
+    return !!this.senders.push;
+  }
+  get emailConfigured(): boolean {
+    return !!this.senders.email;
+  }
+  get publicKey(): string | undefined {
+    return this.cfg.vapidPublicKey;
+  }
 
-  onNotify(fn: (n: StoredNotification) => void): () => void { this.listeners.add(fn); return () => this.listeners.delete(fn); }
+  onNotify(fn: (n: StoredNotification) => void): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
 
   async notify(userId: string, input: NotifyInput): Promise<StoredNotification> {
     const n = await this.repos.notifications.create({ userId, ...input, deliveries: [] });
-    for (const l of this.listeners) { try { l(n); } catch { /* a socket listener must not break delivery */ } }
+    for (const l of this.listeners) {
+      try {
+        l(n);
+      } catch {
+        /* a socket listener must not break delivery */
+      }
+    }
     const user = await this.repos.users.byId(userId);
     const prefs = prefsOf(user);
     const locale = (user?.settings?.locale as "ar" | "en" | undefined) === "en" ? "en" : "ar";
@@ -70,17 +90,32 @@ export class NotificationService {
     if (!this.senders.push) return { channel: "push", status: "skipped", detail: "not configured", at };
     const subs = await this.repos.push.list(userId);
     if (!subs.length) return { channel: "push", status: "skipped", detail: "no subscription", at };
-    const payload = JSON.stringify({ title: n.title[locale], body: n.body[locale], url: n.url ?? "/alerts", tag: n.alertId ?? n.id, id: n.id, dir: locale === "ar" ? "rtl" : "ltr", lang: locale });
+    const payload = JSON.stringify({
+      title: n.title[locale],
+      body: n.body[locale],
+      url: n.url ?? "/alerts",
+      tag: n.alertId ?? n.id,
+      id: n.id,
+      dir: locale === "ar" ? "rtl" : "ltr",
+      lang: locale,
+    });
     let ok = 0;
     const errors: string[] = [];
     for (const s of subs) {
       const r = await this.senders.push(s, payload).catch((e): PushResult => ({ ok: false, gone: false, error: describeError(e) }));
-      if (r.ok) { ok++; await this.repos.push.result(s.endpoint, true); continue; }
+      if (r.ok) {
+        ok++;
+        await this.repos.push.result(s.endpoint, true);
+        continue;
+      }
       errors.push(r.error);
-      if (r.gone) await this.repos.push.remove(s.endpoint); // the browser unsubscribed or the subscription expired
+      if (r.gone)
+        await this.repos.push.remove(s.endpoint); // the browser unsubscribed or the subscription expired
       else await this.repos.push.result(s.endpoint, false);
     }
-    return ok ? { channel: "push", status: "sent", detail: `${ok}/${subs.length} devices`, at } : { channel: "push", status: "failed", detail: errors[0], at };
+    return ok
+      ? { channel: "push", status: "sent", detail: `${ok}/${subs.length} devices`, at }
+      : { channel: "push", status: "failed", detail: errors[0], at };
   }
 
   private async sendEmail(user: User | undefined, n: StoredNotification, prefs: NotificationPrefs, locale: "ar" | "en"): Promise<Delivery> {
@@ -89,7 +124,10 @@ export class NotificationService {
     if (!this.senders.email) return { channel: "email", status: "skipped", detail: "not configured", at };
     if (!user?.email) return { channel: "email", status: "skipped", detail: "no address", at };
     const link = `${this.cfg.appUrl.replace(/\/$/, "")}${n.url ?? "/alerts"}`;
-    const disclaimer = locale === "ar" ? "تنبيه تحليلي وليس توصية. أي قرار تداول مسؤوليتك وحدك." : "Analytical alert, not advice. Any trading decision is yours alone.";
+    const disclaimer =
+      locale === "ar"
+        ? "تنبيه تحليلي وليس توصية. أي قرار تداول مسؤوليتك وحدك."
+        : "Analytical alert, not advice. Any trading decision is yours alone.";
     const open = locale === "ar" ? "افتح التحليل" : "Open the analysis";
     const text = `${n.body[locale]}\n\n${open}: ${link}\n\n${disclaimer}`;
     const html = `<div dir="${locale === "ar" ? "rtl" : "ltr"}" style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.6;color:#1a2124">
@@ -110,7 +148,10 @@ export class NotificationService {
     webpush.setVapidDetails(subject, pub, priv);
     return async (sub, payload) => {
       try {
-        await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 3600, urgency: "high" });
+        await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, {
+          TTL: 3600,
+          urgency: "high",
+        });
         return { ok: true };
       } catch (e) {
         const status = (e as { statusCode?: number }).statusCode;
@@ -122,6 +163,8 @@ export class NotificationService {
   private defaultEmail(): Senders["email"] {
     if (!this.cfg.smtpUrl) return undefined;
     const transport = nodemailer.createTransport(this.cfg.smtpUrl);
-    return async (m) => { await transport.sendMail({ from: this.cfg.emailFrom, ...m }); };
+    return async (m) => {
+      await transport.sendMail({ from: this.cfg.emailFrom, ...m });
+    };
   }
 }

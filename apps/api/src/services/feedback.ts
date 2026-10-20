@@ -1,7 +1,11 @@
 import type { Repositories, ZoneFeedbackEntry, TrackedZone } from "../repositories/memory.js";
 
 type Row = ZoneFeedbackEntry & { zone: TrackedZone };
-export interface FeedbackBucket { n: number; useful: number; usefulRate: number }
+export interface FeedbackBucket {
+  n: number;
+  useful: number;
+  usefulRate: number;
+}
 
 export interface FeedbackStats {
   includeDemo: boolean;
@@ -18,7 +22,17 @@ export interface FeedbackStats {
    * Research only — opinions and outcomes are never merged into one label.
    */
   agreement: { useful: Record<string, number>; notUseful: Record<string, number>; resolved: number };
-  recentComments: { zoneName: string; zoneNameAr: string; symbol: string; timeframe: string; useful: boolean; bestFactor?: string; comment: string; at: number; outcome?: string }[];
+  recentComments: {
+    zoneName: string;
+    zoneNameAr: string;
+    symbol: string;
+    timeframe: string;
+    useful: boolean;
+    bestFactor?: string;
+    comment: string;
+    at: number;
+    outcome?: string;
+  }[];
 }
 
 const scoreBand = (s: number) => (s >= 80 ? "80-100" : s >= 65 ? "65-79" : s >= 50 ? "50-64" : "0-49");
@@ -31,7 +45,11 @@ function bucket(rows: Row[]): FeedbackBucket {
 function groupBy(rows: Row[], f: (r: Row) => string): Record<string, FeedbackBucket> {
   const g: Record<string, Row[]> = {};
   for (const r of rows) (g[f(r)] ??= []).push(r);
-  return Object.fromEntries(Object.entries(g).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, bucket(v)]));
+  return Object.fromEntries(
+    Object.entries(g)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => [k, bucket(v)]),
+  );
 }
 
 /** AI-02 — aggregates of user opinions for the admin research sheet. Users never see these counts (no herding). */
@@ -58,8 +76,19 @@ export async function feedbackStats(repos: Repositories, includeDemo = false): P
     bestFactor: Object.fromEntries(Object.entries(bestFactor).sort((a, b) => b[1] - a[1])),
     agreement,
     // no user ids here: comments are read as research notes, not attributed
-    recentComments: rows.filter((r) => r.comment).slice(0, 20).map((r) => ({
-      zoneName: r.zone.zone.name, zoneNameAr: r.zone.zone.nameAr, symbol: r.zone.symbol, timeframe: r.zone.timeframe, useful: r.useful, bestFactor: r.bestFactor, comment: r.comment!, at: r.updatedAt, outcome: r.zone.outcome?.label,
-    })),
+    recentComments: rows
+      .filter((r) => r.comment)
+      .slice(0, 20)
+      .map((r) => ({
+        zoneName: r.zone.zone.name,
+        zoneNameAr: r.zone.zone.nameAr,
+        symbol: r.zone.symbol,
+        timeframe: r.zone.timeframe,
+        useful: r.useful,
+        bestFactor: r.bestFactor,
+        comment: r.comment!,
+        at: r.updatedAt,
+        outcome: r.zone.outcome?.label,
+      })),
   };
 }

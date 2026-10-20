@@ -1,6 +1,6 @@
 pnpm-lock.yaml
 **/generated/**
 apps/web/next-env.d.ts
-services/
+/services/
 *.md
 docs/
