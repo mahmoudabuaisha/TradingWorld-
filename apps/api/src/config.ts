@@ -28,6 +28,31 @@ const schema = z.object({
   EMAIL_FROM: z.string().default("TradingWorld <alerts@tradingworld.local>"),
   /** public web URL used in notification links (defaults to the first CORS origin) */
   APP_URL: z.string().optional(),
+  /** OPS-02 backups (node apps/api/dist/tools/backup.js): where dumps, manifests and status.json live */
+  BACKUP_DIR: z.string().default("./backups"),
+  /** daily backup time for `backup schedule`, HH:MM UTC */
+  BACKUP_AT: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .default("02:30"),
+  /** restore drill after the scheduled backup: every day, once a week, or never */
+  BACKUP_DRILL: z.enum(["daily", "weekly", "off"]).default("weekly"),
+  /** connection with CREATE DATABASE rights for the drill's scratch database (default: DATABASE_URL's server) */
+  BACKUP_DRILL_URL: z.string().optional(),
+  /** age public keys (age1…, comma-separated): dumps are encrypted to them; the private key stays off the backup host */
+  BACKUP_AGE_RECIPIENTS: z.string().optional(),
+  /** age identity (private key) file, needed only where drills or restores run */
+  BACKUP_AGE_IDENTITY_FILE: z.string().optional(),
+  /** rclone destination for the offsite copy, e.g. r2:tradingworld-backups/db (remote configured via RCLONE_CONFIG_*) */
+  BACKUP_RCLONE_REMOTE: z.string().optional(),
+  BACKUP_KEEP_DAILY: z.coerce.number().int().min(1).default(7),
+  BACKUP_KEEP_WEEKLY: z.coerce.number().int().min(0).default(4),
+  BACKUP_KEEP_MONTHLY: z.coerce.number().int().min(0).default(6),
+  /** `backup status --check` fails beyond these (container healthcheck, admin sheet) */
+  BACKUP_MAX_AGE_HOURS: z.coerce.number().min(1).default(26),
+  BACKUP_DRILL_MAX_AGE_DAYS: z.coerce.number().min(1).default(8),
+  /** tables up to this many rows also get a content hash in the manifest, compared row for row by the drill */
+  BACKUP_HASH_MAX_ROWS: z.coerce.number().int().min(0).default(200_000),
   /** AI-01 outcome tracker: labels every observed zone once it is invalidated or OUTCOME_HORIZON_BARS have closed */
   OUTCOME_ENABLED: envBool.default(true),
   OUTCOME_HORIZON_BARS: z.coerce.number().int().min(10).max(2000).default(120),
@@ -68,14 +93,15 @@ const schema = z.object({
 
 export type Config = z.infer<typeof schema>;
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+/** `requireJwtSecret: false` for tools that never sign or verify tokens (the backup job) */
+export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: { requireJwtSecret?: boolean } = {}): Config {
   const cleaned = Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined && v !== ""));
   const parsed = schema.safeParse(cleaned);
   if (!parsed.success) {
     throw new Error(`Invalid environment: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(", ")}`);
   }
   const cfg = parsed.data;
-  if (cfg.NODE_ENV === "production" && cfg.JWT_SECRET.startsWith("dev-only")) {
+  if ((opts.requireJwtSecret ?? true) && cfg.NODE_ENV === "production" && cfg.JWT_SECRET.startsWith("dev-only")) {
     throw new Error("JWT_SECRET must be set in production");
   }
   return cfg;

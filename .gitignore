@@ -12,6 +12,7 @@ coverage/
 .env
 .env.*
 !.env.example
+secrets/
 # python
 __pycache__/
 *.pyc
@@ -35,3 +36,5 @@ pnpm-debug.log*
 data/cache/
 *.egg-info/
 services/ml/registry/
+# OPS-02 local backups (BACKUP_DIR default)
+backups/

@@ -70,6 +70,7 @@ export const api = {
   deleteTrade: (token: string, id: string) => request<{ ok: true }>(`/journal/${id}`, { method: "DELETE" }, token),
   adminOverview: (token: string) => request<AdminOverview>("/admin/overview", {}, token),
   adminBackfill: (token: string) => request<AdminBackfill>("/admin/backfill", {}, token),
+  adminBackups: (token: string) => request<AdminBackups>("/admin/backups", {}, token),
   triggerBackfill: (token: string, b: { kind?: "cycle" | "backfill" | "catchup" | "gaps" | "aggregate"; symbol?: string; bars?: number }) =>
     request<{ accepted: boolean }>("/admin/backfill", { method: "POST", body: JSON.stringify(b) }, token),
   adminOutcomes: (token: string, includeDemo = false) =>
@@ -190,6 +191,36 @@ export interface BackfillRun {
   error?: string;
   startedAt: number;
   finishedAt?: number;
+}
+export interface DrillReport {
+  file: string;
+  ok: boolean;
+  startedAt: string;
+  durationMs: number;
+  restoreMs: number;
+  source: "local" | "remote";
+  backupAgeHours: number;
+  checks: { name: string; ok: boolean; detail?: string }[];
+  error?: string;
+}
+export interface AdminBackups {
+  database: boolean;
+  status: {
+    lastBackup?: { file: string; at: string; bytes: number; encrypted: boolean; remote?: string; durationMs: number };
+    lastFailure?: { at: string; error: string };
+    lastDrill?: DrillReport;
+    updatedAt: string;
+  } | null;
+  problems: string[];
+  policy: {
+    at: string;
+    drill: "daily" | "weekly" | "off";
+    keep: { daily: number; weekly: number; monthly: number };
+    encrypted: boolean;
+    offsite: string | null;
+    maxAgeHours: number;
+    drillMaxAgeDays: number;
+  };
 }
 export interface AdminBackfill {
   store: "memory" | "timescale";

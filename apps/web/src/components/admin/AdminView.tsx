@@ -9,9 +9,11 @@ import {
   type AdminOutcomes,
   type OutcomeBucket,
   type AdminFeedback,
+  type AdminBackups,
 } from "@/lib/api";
 import { useApp } from "@/store/useApp";
 import { FeedMark } from "../marks/FeedMark";
+import { BackupPanel } from "./BackupPanel";
 
 /** SHEET 58 — the admin panel: system health, feeds, engine, module status and the research sheet. */
 export function AdminView() {
@@ -20,6 +22,7 @@ export function AdminView() {
   const [factors, setFactors] = useState<Awaited<ReturnType<typeof api.adminFactors>>>();
   const [feeds, setFeeds] = useState<FeedsResponse>();
   const [backfill, setBackfill] = useState<AdminBackfill>();
+  const [backups, setBackups] = useState<AdminBackups>();
   const [outcomes, setOutcomes] = useState<AdminOutcomes>();
   const [withDemo, setWithDemo] = useState(false);
   const [feedback, setFeedback] = useState<AdminFeedback>();
@@ -43,6 +46,10 @@ export function AdminView() {
       api
         .adminBackfill(token)
         .then(setBackfill)
+        .catch(() => {});
+      api
+        .adminBackups(token)
+        .then(setBackups)
         .catch(() => {});
     };
     void loadFeeds();
@@ -221,6 +228,7 @@ export function AdminView() {
           />
         )}
         {feedback && <FeedbackPanel data={feedback} L={L} locale={locale} />}
+        {backups && <BackupPanel data={backups} L={L} />}
         <section className="sheet p-4 md:col-span-2">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="eyebrow">

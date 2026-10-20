@@ -41,6 +41,10 @@ services:
     environment:
       DATABASE_URL: postgresql://tradingworld:tradingworld@db:5432/tradingworld?schema=public
       REDIS_URL: redis://redis:6379
+      BACKUP_DIR: /backups
+    volumes:
+      # read-only: the admin sheet shows the backup job's status.json
+      - tw-backups:/backups:ro
     ports:
       - "4000:4000"
     depends_on:
@@ -48,6 +52,33 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+
+  # OPS-02: daily pg_dump at BACKUP_AT (UTC) + weekly restore drill into a scratch database (docs/13-backups.md).
+  # Set BACKUP_AGE_RECIPIENTS and BACKUP_RCLONE_REMOTE (+ RCLONE_CONFIG_*) in .env for encryption and the offsite copy.
+  backup:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    container_name: tw-backup
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://tradingworld:tradingworld@db:5432/tradingworld?schema=public
+      BACKUP_DIR: /backups
+      # the drill decrypts, so it needs the age identity; mount it only where drills run (see docs/13)
+      BACKUP_AGE_IDENTITY_FILE: /run/secrets/age-identity
+    command: ["node", "apps/api/dist/tools/backup.js", "schedule"]
+    volumes:
+      - tw-backups:/backups
+      - ./secrets/age-identity.txt:/run/secrets/age-identity:ro
+    healthcheck:
+      # unhealthy when the last backup is older than BACKUP_MAX_AGE_HOURS or the last drill failed or is overdue
+      test: ["CMD", "node", "apps/api/dist/tools/backup.js", "status", "--check"]
+      interval: 1h
+      start_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
 
   web:
     profiles: ["app"]
@@ -76,4 +107,5 @@ services:
 
 volumes:
   tw-db-data:
+  tw-backups:
   tw-redis-data:

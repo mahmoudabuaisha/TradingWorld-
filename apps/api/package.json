@@ -13,7 +13,8 @@
     "test": "vitest run",
     "feed:check": "node dist/tools/feed-check.js",
     "backfill": "node dist/tools/backfill.js",
-    "vapid-keys": "node dist/tools/vapid-keys.js"
+    "vapid-keys": "node dist/tools/vapid-keys.js",
+    "backup": "node dist/tools/backup.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",

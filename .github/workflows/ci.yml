@@ -31,6 +31,8 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      # the backup tests use the real pg_dump/pg_restore (16, like the server), age and rclone
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-16 age rclone
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
       - run: pnpm build:packages
@@ -39,13 +41,82 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
         env:
-          # the candle store tests run against real PostgreSQL (plain Postgres; the Timescale layer is SQL-only)
+          # the candle store, repository and backup tests run against real PostgreSQL (plain Postgres here; the
+          # TimescaleDB path is exercised by the backup-drill job)
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tradingworld_test
       - run: pnpm --filter @tradingworld/api build
       - run: pnpm --filter @tradingworld/web build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
           NEXT_PUBLIC_WS_URL: ws://localhost:4000/ws
+
+  backup-drill:
+    # OPS-02 end to end on the production database engine: TimescaleDB with a compressed hypertable chunk →
+    # encrypted backup with an offsite copy → restore drill from the offsite copy → disaster restore into a new database
+    name: Backup · restore drill on TimescaleDB
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: timescale/timescaledb:latest-pg16
+        env:
+          POSTGRES_USER: tradingworld
+          POSTGRES_PASSWORD: tradingworld
+          POSTGRES_DB: tradingworld
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tradingworld"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://tradingworld:tradingworld@localhost:5432/tradingworld?schema=public
+      PGPASSWORD: tradingworld
+      CANDLE_STORE: timescale
+      MARKET_DATA_PROVIDER: demo
+      BACKUP_DIR: ${{ github.workspace }}/.backups/local
+      BACKUP_RCLONE_REMOTE: ${{ github.workspace }}/.backups/offsite
+      BACKUP_AGE_IDENTITY_FILE: ${{ github.workspace }}/.backups/identity.txt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-16 age rclone
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:packages && pnpm --filter @tradingworld/api build
+      - name: Schema, data and a compressed chunk
+        run: |
+          psql -h localhost -U tradingworld -d tradingworld -v ON_ERROR_STOP=1 -f packages/db/prisma/sql/0001_timescale.sql
+          pnpm --filter @tradingworld/db exec prisma migrate deploy
+          node apps/api/dist/tools/backfill.js XAUUSD 3000
+          psql -h localhost -U tradingworld -d tradingworld -v ON_ERROR_STOP=1 -c "SELECT compress_chunk(c) FROM show_chunks('market.candles') c ORDER BY 1 LIMIT 1"
+      - name: Encrypted backup with an offsite copy
+        run: |
+          mkdir -p .backups && age-keygen -o .backups/identity.txt
+          export BACKUP_AGE_RECIPIENTS=$(age-keygen -y .backups/identity.txt)
+          node apps/api/dist/tools/backup.js run
+          ls -l .backups/local .backups/offsite
+      - name: Restore drill from the offsite copy
+        run: node apps/api/dist/tools/backup.js drill && node apps/api/dist/tools/backup.js status --check
+      - name: Disaster restore into a new database (local copy gone)
+        run: |
+          rm .backups/local/*.dump.age
+          psql -h localhost -U tradingworld -d postgres -c "CREATE DATABASE tw_recovered"
+          node apps/api/dist/tools/backup.js restore .backups/local/*.manifest.json --target postgresql://tradingworld:tradingworld@localhost:5432/tw_recovered
+          psql -h localhost -U tradingworld -d tw_recovered -At -c "SELECT count(*) FROM market.candles" -c "SELECT count(*) FROM timescaledb_information.hypertables"
+
+  docker-api:
+    # the image the API and the backup job run from: it builds, and carries pg_dump 16, age and rclone
+    name: Docker · API image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f infra/Dockerfile.api -t tradingworld-api:ci .
+      - run: docker run --rm tradingworld-api:ci sh -c 'pg_dump --version && pg_restore --version && age --version && rclone version | head -1 && node apps/api/dist/tools/backup.js status'
 
   python:
     name: ML service · ruff · tests

@@ -10,7 +10,9 @@ RUN pnpm --filter ./packages/* build && pnpm --filter @tradingworld/api build
 
 # ── Runtime stage ────────────────────────────────────────────
 FROM node:22-alpine
-RUN corepack enable && apk add --no-cache openssl
+# OPS-02: the same image runs the backup job (docker-compose service `backup`). pg_dump must be at least the server's
+# major version (docker-compose runs PostgreSQL 16); age encrypts the dumps, rclone copies them offsite.
+RUN corepack enable && apk add --no-cache openssl postgresql16-client age rclone
 WORKDIR /repo
 ENV NODE_ENV=production
 COPY --from=build /repo ./

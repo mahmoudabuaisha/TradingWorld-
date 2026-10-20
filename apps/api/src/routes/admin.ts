@@ -4,6 +4,8 @@ import { PLATFORM_MODULES, ROLES } from "@tradingworld/shared";
 import { publicUser } from "./auth.js";
 import type { AppContext } from "../context.js";
 import { feedbackStats } from "../services/feedback.js";
+import { readStatus, statusProblems } from "../ops/backup.js";
+import { resolve } from "node:path";
 
 export default async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
   const admin = app.requireRole("admin");
@@ -77,6 +79,31 @@ export default async function adminRoutes(app: FastifyInstance, ctx: AppContext)
     job: ctx.backfill.status(),
     series: await ctx.store.series(),
   }));
+
+  /**
+   * OPS-02: what the backup job last reported (status.json in BACKUP_DIR, shared with the backup container) and anything
+   * an operator must act on. Read-only: backups and drills run in their own process (tools/backup.ts).
+   */
+  app.get("/admin/backups", { preHandler: admin }, async () => {
+    const c = ctx.config;
+    const status = c.DATABASE_URL ? await readStatus(resolve(c.BACKUP_DIR)) : undefined;
+    return {
+      database: !!c.DATABASE_URL,
+      status: status ?? null,
+      problems: c.DATABASE_URL
+        ? statusProblems(status, { maxAgeHours: c.BACKUP_MAX_AGE_HOURS, drillMaxAgeDays: c.BACKUP_DRILL_MAX_AGE_DAYS })
+        : ["no DATABASE_URL: the API runs on memory repositories and there is nothing to back up"],
+      policy: {
+        at: c.BACKUP_AT,
+        drill: c.BACKUP_DRILL,
+        keep: { daily: c.BACKUP_KEEP_DAILY, weekly: c.BACKUP_KEEP_WEEKLY, monthly: c.BACKUP_KEEP_MONTHLY },
+        encrypted: !!c.BACKUP_AGE_RECIPIENTS,
+        offsite: c.BACKUP_RCLONE_REMOTE ?? null,
+        maxAgeHours: c.BACKUP_MAX_AGE_HOURS,
+        drillMaxAgeDays: c.BACKUP_DRILL_MAX_AGE_DAYS,
+      },
+    };
+  });
 
   /** Trigger maintenance now: a full cycle, or one step for one symbol. Runs in the background; poll GET for progress. */
   app.post("/admin/backfill", { preHandler: admin }, async (req, reply) => {
