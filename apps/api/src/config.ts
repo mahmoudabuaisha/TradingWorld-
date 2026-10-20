@@ -14,6 +14,8 @@ const schema = z.object({
   RATE_LIMIT_WINDOW: z.string().default("1 minute"),
   DATABASE_URL: z.string().optional(),
   REDIS_URL: z.string().optional(),
+  /** users, alerts, journal, watchlists, zone log, audit: memory (default without DATABASE_URL) or PostgreSQL via Prisma (DB-02) */
+  REPOSITORIES: z.enum(["auto", "memory", "prisma"]).default("auto"),
   /** where candles live: memory (default without DATABASE_URL) or the Timescale/PostgreSQL store */
   CANDLE_STORE: z.enum(["auto", "memory", "timescale"]).default("auto"),
   /** DATA-02 maintenance job: backfill, catch-up, gap repair and timeframe aggregation into the store */

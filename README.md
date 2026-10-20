@@ -67,15 +67,17 @@ pnpm dev:web                   # http://localhost:3000
 
 ```bash
 pnpm typecheck      # كل الحزم
-pnpm test           # engine (15) + api (43; اختبارات المخزن على Postgres حقيقي عند ضبط TEST_DATABASE_URL)
+pnpm test           # engine (15) + api (58؛ اختبارات المخزن والمستودعات على Postgres حقيقي عند ضبط TEST_DATABASE_URL)
 cd services/ml && pip install -e ".[dev]" && pytest -q   # ml (3)
 ```
 
 ### البنية التحتية (اختياري)
 
 ```bash
-docker compose up -d                 # TimescaleDB + Redis (ينشئ market_candles كـhypertable)
+docker compose up -d                 # TimescaleDB + Redis (ينشئ market.candles كـhypertable)
 docker compose --profile app up      # + api + web
+# مع DATABASE_URL: المستودعات على Postgres (REPOSITORIES=auto) بعد تطبيق الترحيلات
+pnpm --filter @tradingworld/db build && pnpm --filter @tradingworld/db migrate:deploy
 # مخزن شموع دائم + تعبئة تاريخية: CANDLE_STORE=auto يختار Timescale عند وجود DATABASE_URL
 BACKFILL_ENABLED=true pnpm --filter @tradingworld/api backfill all   # أو تلقائيًا مع الـAPI
 ```

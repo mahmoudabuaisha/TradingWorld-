@@ -4,7 +4,8 @@ import type { Zone } from "@tradingworld/analysis-engine";
 
 /**
  * In-memory repositories — the default store for local development and tests.
- * The same interfaces are implemented by Prisma repositories (packages/db) in production.
+ * The same interfaces are implemented by Prisma repositories (./prisma.ts) in production;
+ * __tests__/repositories.test.ts runs one contract suite against both.
  * Keeping the interface identical lets the API run with zero infrastructure.
  */
 export interface User { id: string; email: string; displayName: string; passwordHash: string; role: Role; createdAt: number; settings: Record<string, unknown> }

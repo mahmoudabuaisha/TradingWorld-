@@ -109,7 +109,7 @@ pnpm --filter @tradingworld/api feed:check XAUUSD 5m 30
 ```
 
 ## المخزن الدائم والتعبئة التاريخية (DATA-02)
-المخزن الذاكري من DATA-01 أصبح واجهة `CandleStore` بتطبيقين: `MemoryCandleStore` (الافتراضي بلا قاعدة بيانات) و`TimescaleCandleStore` (PostgreSQL/TimescaleDB، `CANDLE_STORE=auto|memory|timescale`). الجداول `market_candles` و`market_backfills` مملوكة للـSQL لا لـPrisma (`packages/db/prisma/sql/0001_timescale.sql`): الـAPI ينشئ الجداول العادية إن غابت، والملف يضيف طبقة Timescale (hypertable بقطع 7 أيام، ضغط بعد 30 يومًا).
+المخزن الذاكري من DATA-01 أصبح واجهة `CandleStore` بتطبيقين: `MemoryCandleStore` (الافتراضي بلا قاعدة بيانات) و`TimescaleCandleStore` (PostgreSQL/TimescaleDB، `CANDLE_STORE=auto|memory|timescale`). الجداول `market.candles` و`market.backfills` مملوكة للـSQL لا لـPrisma (`packages/db/prisma/sql/0001_timescale.sql`): الـAPI ينشئ الجداول العادية إن غابت، والملف يضيف طبقة Timescale (hypertable بقطع 7 أيام، ضغط بعد 30 يومًا).
 
 **قراءة المزود عبر المخزن** (`CachedProvider`): السلسلة تُجلب كاملة مرة واحدة، وبعدها يُجلب فقط ما حدث منذ آخر شمعة مخزنة (لا «3 شموع» ثابتة: بعد انقطاع لساعات يُجلب ما يغطيه حتى 5000 شمعة، وما بعده يتولاه إصلاح الفجوات). تحديثات البث تُكتب في المخزن (المكتملة فورًا، الجارية كل 5 ثوانٍ)، فإعادة التشغيل تستأنف من حيث توقف البث.
 

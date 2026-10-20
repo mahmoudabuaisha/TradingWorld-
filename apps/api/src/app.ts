@@ -21,9 +21,21 @@ import type { AppContext } from "./context.js";
 
 export interface BuildOptions { config?: Config; repos?: Repositories; logger?: boolean }
 
+/** memory, or PostgreSQL through Prisma when REPOSITORIES=prisma (or auto with DATABASE_URL). Loaded lazily so the
+ *  in-memory path never needs the generated Prisma client. Fails fast with the fix when the schema is not migrated. */
+export async function createRepositories(config: Config): Promise<Repositories & { close?: () => Promise<void> }> {
+  const usePrisma = config.REPOSITORIES === "prisma" || (config.REPOSITORIES === "auto" && !!config.DATABASE_URL);
+  if (!usePrisma) return createMemoryRepositories();
+  if (!config.DATABASE_URL) throw new Error("REPOSITORIES=prisma needs DATABASE_URL");
+  const { createPrismaRepositories } = await import("./repositories/prisma.js");
+  const repos = createPrismaRepositories(config.DATABASE_URL);
+  try { await repos.seed(); } catch (e) { await repos.close(); throw e; }
+  return repos;
+}
+
 export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance & { ctx: AppContext }> {
   const config = opts.config ?? loadConfig();
-  const repos = opts.repos ?? createMemoryRepositories();
+  const repos: Repositories & { close?: () => Promise<void> } = opts.repos ?? (await createRepositories(config));
   const store = createCandleStore(config);
   const providers = new ProviderRegistry(config, { store });
   const analysis = new AnalysisService(providers, repos);
@@ -37,7 +49,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   });
   const ctx: AppContext = { config, repos, providers, analysis, ai, alerts, store, backfill };
   if (config.BACKFILL_ENABLED && config.NODE_ENV !== "test") backfill.start();
-  app.addHook("onClose", async () => { backfill.stop(); providers.close(); await store.close(); });
+  app.addHook("onClose", async () => { backfill.stop(); providers.close(); await store.close(); if (!opts.repos) await repos.close?.(); });
   await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(cors, { origin: config.CORS_ORIGIN.split(",").map((s) => s.trim()), credentials: true });
   await app.register(rateLimit, { max: config.RATE_LIMIT_MAX, timeWindow: config.RATE_LIMIT_WINDOW });

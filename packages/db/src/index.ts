@@ -1,7 +1,7 @@
 /**
- * Database client entry point.
- * `pnpm --filter @tradingworld/db generate` must run (with DATABASE_URL set) before importing.
- * The API currently uses in-memory repositories by default; Prisma repositories are the next step
- * (tracked in PROGRESS.md → "DB-02").
+ * Database client entry point. `prisma generate` runs as part of `pnpm --filter @tradingworld/db build`
+ * (no database needed); migrations are applied with `pnpm --filter @tradingworld/db migrate:deploy`.
+ * The generated client is CommonJS; Node's CJS interop exposes these named exports to ESM importers.
  */
-export * from "../generated/client/index.js";
+export { PrismaClient, Prisma } from "../generated/client/index.js";
+export type { User, Alert, Trade, Watchlist, AuditLog, ZoneLog, Instrument } from "../generated/client/index.js";

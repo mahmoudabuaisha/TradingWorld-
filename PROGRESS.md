@@ -124,8 +124,8 @@
 |---|---|---|---|
 | DATA-01 | اعتماد مزود بيانات مرخص (Twelve Data / Polygon) وتوقيع العقد | 🔴 عالية | 🟩 الهندسة (توجيه حسب الفئة، Twelve Data + Polygon بميزانية ومخزن وبث، حالة التدفق، feed:check، ADR-0006) · ⬜ توقيع العقد — قائمة التحقق في docs/03 |
 | DATA-02 | Backfill تاريخي إلى Timescale + job تجميع الشموع | 🔴 | 🟩 مخزن `CandleStore` (ذاكري/Timescale) خلف المزودين، تعبئة بصفحات، لحاق، إصلاح فجوات واعٍ بساعات السوق، اشتقاق كل الفريمات من 1m، CLI `backfill`، لوحة الإدارة، اختبارات على Postgres حقيقي |
-| DB-01 | تشغيل `prisma generate` + migrations + seed للـInstrument Master (جداول السوق خارج Prisma منذ DATA-02) | 🔴 | ⬜ |
-| DB-02 | Prisma repositories تطبق نفس واجهة `Repositories` | 🔴 | ⬜ |
+| DB-01 | تشغيل `prisma generate` + migrations + seed للـInstrument Master (جداول السوق خارج Prisma منذ DATA-02) | 🔴 | 🟩 الحزمة تبني العميل، ترحيل `20261020000000_init`، الزرع عند الإقلاع، الترحيل قبل تشغيل صورة Docker |
+| DB-02 | Prisma repositories تطبق نفس واجهة `Repositories` | 🔴 | 🟩 `repositories/prisma.ts` + `REPOSITORIES=auto/memory/prisma` + اختبار عقد على التطبيقين + اختبار إعادة تشغيل |
 | RT-01 | Redis pub/sub للـWS عند أكثر من instance | 🟠 | ⬜ |
 | SEC-01 | 2FA + جدول Sessions/الأجهزة + revoke | 🟠 | ⬜ |
 | SEC-02 | Secrets manager + تدوير JWT | 🟠 | ⬜ |
@@ -150,6 +150,8 @@
 
 | التاريخ | النطاق | التغيير | الحالة | معتمد |
 |---|---|---|---|---|
+| 2026-10-20 | apps/api · packages/db (DB-01/DB-02) | مستودعات PostgreSQL عبر Prisma بنفس واجهة الذاكرية ودلالاتها (التحويلات، «undefined يمسح»، تقييد المالك)؛ `REPOSITORIES=auto` مع تحميل ديناميكي وفحص الترحيل وزرع Instrument Master عند الإقلاع؛ نموذج `ZoneLog` إلحاقي جديد (معرفات مناطق المحرك محلية للنافذة) وإزالة المفتاح الأجنبي `Alert.zoneId→Zone`؛ أول ترحيل `20261020000000_init`؛ حزمة `@tradingworld/db` تبني العميل وتصدّره؛ هدف محرك musl وتشغيل `migrate:deploy` في صورة Docker؛ اختبار عقد يشغّل نفس التأكيدات على التطبيقين + الاستمرار عبر عميل جديد + خطأ واضح لقاعدة غير مُرحَّلة + إعادة تشغيل الـAPI كاملة (15 اختبارًا، 58 في الـAPI) | 🟩 | ☐ |
+| 2026-10-20 | packages/db · apps/api (إصلاح) | جداول السوق نُقلت إلى مخطط Postgres مستقل `market` (`market.candles`، `market.backfills`): وجودها في `public` كان يجعل `prisma migrate deploy` يفشل بـP3005، وفي Docker Compose يُنفَّذ ملف Timescale أولًا فكانت الترحيلات ستفشل دائمًا | 🟩 | ☐ |
 | 2026-10-19 | apps/api · packages/db (DATA-02) | مخزن الشموع: واجهة `CandleStore` بتطبيقين ذاكري و`TimescaleCandleStore` (pg، upsert بـunnest بدفعات 5000، فهرس (symbol, timeframe, time DESC))؛ `CachedProvider` أعيد بناؤه على المخزن: جلب ما حدث منذ آخر شمعة مخزنة بدل ذيل ثابت، وكتابة تحديثات البث؛ `BackfillService`: تعبئة بصفحات إلى الخلف، لحاق بعد التوقف، `findGaps` واعٍ بتقويم السوق، اشتقاق كل الفريمات الأعلى بدلاء المحرك مع قاعدة «الأصلي يغلب المشتق»، دورة كل 15 دقيقة واشتقاق الدلو الحالي كل 60 ثانية؛ `GET/POST /admin/backfill`؛ CLI `backfill`؛ SQL `0001_timescale.sql` أُعيدت كتابته (`market_candles` hypertable + `market_backfills`) ونموذج `Candle` أُزيل من Prisma؛ 16 اختبارًا جديدًا تعمل على Postgres حقيقي عند `TEST_DATABASE_URL` (خدمة postgres في CI)؛ docs/03/05/06/01 و.env.example | 🟩 | ☐ |
 | 2026-10-19 | apps/web (DATA-02) | لوحة الإدارة: قسم مخزن الشموع (النوع، حالة الوظيفة، تغطية كل سلسلة، آخر الدورات، زر تشغيل دورة صيانة) | 🟩 | ☐ |
 | 2026-10-19 | apps/api · packages/shared (DATA-01) | طبقة البيانات المرخصة: توجيه حسب فئة الأصل `MARKET_DATA_ROUTES` مع احتياط demo مُعلَن؛ Twelve Data (REST + ميزانية credits + فريمات مشتقة + WebSocket/polling) وPolygon (REST aggregates + ميزانية + WS للعناقيد) مُنفَّذان؛ `support/`: RateBudget، CachedProvider (مخزن شموع في الذاكرة)، TickAggregator، ReconnectingSocket؛ حالة التدفق لكل أداة `LIVE/DELAYED/STALE/CLOSED/OFFLINE` من صحة المزود × تقويم السوق (`marketHours.ts`)؛ `/feeds` و`feed` في `/candles` و`/overview` و`/health.routes+warnings` ورسالة `status` في WS؛ أداة `feed:check`؛ 21 اختبارًا جديدًا بلا شبكة (27 في الـAPI)؛ docs/03 أُعيدت كتابتها + ADR-0006 + .env.example | 🟩 | ☐ |

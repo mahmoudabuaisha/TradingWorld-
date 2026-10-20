@@ -1,10 +1,14 @@
 // TradingWorld — database schema (PostgreSQL 16 + TimescaleDB)
-// Candles live in a Timescale hypertable created by prisma/sql/0001_timescale.sql.
+// Candles live in a Timescale hypertable created by prisma/sql/0001_timescale.sql (outside Prisma).
+// The API's Prisma repositories (apps/api/src/repositories/prisma.ts) implement the same interface as the
+// in-memory ones; apply migrations with `pnpm --filter @tradingworld/db migrate:deploy`.
 // Every analytical artefact is versioned (engineVersion / scoringVersion) so results are reproducible.
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/client"
+  provider      = "prisma-client-js"
+  output        = "../generated/client"
+  // native for dev/CI, musl for the node:22-alpine API image (infra/Dockerfile.api)
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -109,7 +113,7 @@ model Instrument {
   alerts  Alert[]
 }
 
-/// Candles are NOT a Prisma model: `market_candles` (+ `market_backfills`) is a TimescaleDB hypertable owned by SQL
+/// Candles are NOT a Prisma model: `market.candles` (+ `market.backfills`) is a TimescaleDB hypertable owned by SQL
 /// (prisma/sql/0001_timescale.sql) and written by the API's candle store (apps/api/src/store/timescale.ts).
 /// Hypertables, compression and retention policies do not fit Prisma migrations — see docs/05.
 
@@ -125,6 +129,8 @@ model EngineVersion {
   @@unique([engineVersion, scoringVersion])
 }
 
+/// Canonical zones for the outcome tracker (AI-01). Needs a globally stable id; the engine's ids
+/// (`z-<tf>-<origin>-<index>-<n>`) are only unique inside one analysis window, so the API logs into ZoneLog instead.
 model Zone {
   id             String      @id
   symbol         String
@@ -150,8 +156,25 @@ model Zone {
   updatedAt      DateTime    @updatedAt
   outcome        ZoneOutcome?
   feedback       ZoneFeedback[]
-  alerts         Alert[]
   @@index([symbol, timeframe, detectedAt(sort: Desc)])
+  @@index([engineVersion, scoringVersion])
+}
+
+/// Append-only research log: one row each time a zone is emitted with a new status (repos.zoneLog).
+/// `zone` holds the full engine Zone object (factors, evidence, lifecycle) as produced.
+model ZoneLog {
+  id             String   @id @default(uuid())
+  symbol         String
+  timeframe      String
+  engineVersion  String
+  scoringVersion String
+  zoneId         String   // engine id — unique only within one analysis window
+  status         ZoneStatus
+  score          Int
+  zone           Json
+  loggedAt       DateTime @default(now())
+  @@index([loggedAt(sort: Desc)])
+  @@index([symbol, timeframe, loggedAt(sort: Desc)])
   @@index([engineVersion, scoringVersion])
 }
 
@@ -215,8 +238,7 @@ model Alert {
   instrument  Instrument @relation(fields: [symbol], references: [symbol])
   kind        AlertKind
   price       Float?
-  zoneId      String?
-  zone        Zone?     @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  zoneId      String?   // engine zone id at creation time (no FK: engine ids are window-local)
   note        String?
   active      Boolean   @default(true)
   triggeredAt DateTime?

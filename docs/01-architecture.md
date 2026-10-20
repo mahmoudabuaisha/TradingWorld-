@@ -24,6 +24,7 @@ Offline: Zone log + Outcomes ─► services/ml (walk-forward) ─► weight pro
 - Plugins: helmet · cors · rate-limit · jwt (`authenticate`, `requireRole`).
 - Routes تحت `/api/v1` (health, auth, market, user, admin). Realtime في `/ws`.
 - **ProviderRegistry**: يوجّه كل أداة إلى مزودها حسب فئة الأصل (`MARKET_DATA_ROUTES`)، يلفّ المزودين المرخصين بميزانية ومخزن شموع، يحسب حالة التدفق لكل أداة (`LIVE/DELAYED/STALE/CLOSED/OFFLINE`)، ويرجع إلى `demo` مع تحذير مرئي.
+- **Repositories** (`repositories/`): واجهة واحدة بتطبيقين — ذاكري وPostgreSQL عبر Prisma (DB-02)، يختار بينهما `REPOSITORIES` ويغطيهما اختبار عقد واحد.
 - **CandleStore** (`store/`): واجهة واحدة بتطبيقين — ذاكري و PostgreSQL/TimescaleDB — خلف كل مزود مرخص؛ **BackfillService** يبقيه كاملًا (تعبئة، لحاق، إصلاح فجوات، اشتقاق الفريمات الأعلى من 1m بنفس دلاء المحرك).
 - **AnalysisService**: يجلب الشموع الأساسية + شموع HTF الصريحة (من المخزن عندما تكون مشتقة)، يشغّل المحرك، يخزّن مؤقتًا (TTL 5s)، يسجل المناطق (`zoneLog`).
 - **AlertService**: تقييم لحظي للتنبيهات على كل tick/تحليل.

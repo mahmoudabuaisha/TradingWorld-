@@ -4,21 +4,31 @@
   "private": true,
   "description": "Prisma schema (PostgreSQL + TimescaleDB) and database client for TradingWorld.",
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "scripts": {
-    "build": "echo \"(db) schema only — run prisma generate when DATABASE_URL is configured\"",
-    "typecheck": "echo \"(db) typecheck skipped until prisma generate\"",
-    "test": "echo \"(db) no tests\"",
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "typecheck": "prisma generate >/dev/null && tsc -p tsconfig.json --noEmit",
+    "test": "echo \"(db) schema covered by apps/api repository tests\"",
     "lint": "echo \"(db) lint skipped\"",
     "generate": "prisma generate",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "studio": "prisma studio"
+    "studio": "prisma studio",
+    "migrate:diff": "prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --script"
   },
   "devDependencies": {
-    "prisma": "^6.1.0"
+    "prisma": "^6.1.0",
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3"
   },
   "dependencies": {
     "@prisma/client": "^6.1.0"
+  },
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   }
 }

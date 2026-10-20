@@ -1,0 +1,184 @@
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import type { Zone } from "@tradingworld/analysis-engine";
+import { createMemoryRepositories, type Repositories } from "../repositories/memory.js";
+import { createPrismaRepositories, type PrismaRepositories } from "../repositories/prisma.js";
+import { buildApp } from "../app.js";
+import { loadConfig } from "../config.js";
+
+const TEST_DB = process.env.TEST_DATABASE_URL;
+const withSchema = (url: string, schema: string) => `${url}${url.includes("?") ? "&" : "?"}schema=${schema}`;
+const REPO_URL = TEST_DB ? withSchema(TEST_DB, "tw_repo_test") : "";
+const DB_PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../packages/db");
+
+function migrate(url: string) {
+  execFileSync(path.join(DB_PKG, "node_modules/.bin/prisma"), ["migrate", "deploy"], { cwd: DB_PKG, env: { ...process.env, DATABASE_URL: url }, stdio: "pipe" });
+}
+
+let prisma: PrismaRepositories | undefined;
+async function resetPrisma() {
+  const db = prisma!.client;
+  await db.$executeRawUnsafe(`TRUNCATE "AuditLog", "ZoneLog", "Trade", "Alert", "Watchlist", "Session", "User" CASCADE`);
+}
+
+const impls: { name: string; make: () => Promise<Repositories> }[] = [{ name: "memory", make: async () => createMemoryRepositories() }];
+if (TEST_DB) impls.push({ name: "prisma", make: async () => { await resetPrisma(); return prisma!; } });
+
+beforeAll(async () => {
+  if (!TEST_DB) return;
+  migrate(REPO_URL);
+  prisma = createPrismaRepositories(REPO_URL);
+  await prisma.seed();
+}, 120_000);
+afterAll(async () => { if (prisma) { await resetPrisma(); await prisma.close(); } });
+
+const zone = (id: string, status: string, score: number) => ({ id, status, score, name: `zone ${id}`, direction: "bullish", top: 2, bottom: 1, factors: [{ key: "FVG", present: true, weight: 10, evidence: "gap" }] }) as unknown as Zone;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** absent = missing or undefined (memory omits the key, Prisma returns it as undefined) */
+const expectAbsent = (o: object, keys: string[]) => { for (const k of keys) expect((o as Record<string, unknown>)[k], k).toBeUndefined(); };
+
+describe.each(impls)("Repositories contract ($name)", ({ make }) => {
+  let repos: Repositories;
+  beforeEach(async () => { repos = await make(); });
+
+  it("users: create, find case-insensitively, list in creation order, partial update", async () => {
+    const a = await repos.users.create({ email: "first@tw.test", displayName: "First", passwordHash: "h1", role: "admin", settings: { locale: "ar", theme: "dark" } });
+    await sleep(5);
+    const b = await repos.users.create({ email: "second@tw.test", displayName: "Second", passwordHash: "h2", role: "user", settings: {} });
+    expect(a.id).toBeTruthy();
+    expect(typeof a.createdAt).toBe("number");
+    expect((await repos.users.byEmail("FIRST@tw.test"))?.id).toBe(a.id);
+    expect(await repos.users.byEmail("nobody@tw.test")).toBeUndefined();
+    expect((await repos.users.byId(b.id))?.settings).toEqual({});
+    expect((await repos.users.list()).map((u) => u.email)).toEqual(["first@tw.test", "second@tw.test"]);
+    const upd = await repos.users.update(b.id, { role: "coach", settings: { locale: "en", nested: { x: 1 } } });
+    expect(upd).toMatchObject({ role: "coach", displayName: "Second", passwordHash: "h2", settings: { locale: "en", nested: { x: 1 } } });
+    expect(await repos.users.update("00000000-0000-0000-0000-000000000000", { role: "admin" })).toBeUndefined();
+  });
+
+  it("watchlists: default list until set", async () => {
+    const u = await repos.users.create({ email: "w@tw.test", displayName: "W", passwordHash: "h", role: "user", settings: {} });
+    expect(await repos.watchlists.get(u.id)).toEqual(["XAUUSD", "EURUSD", "BTCUSD", "US100"]);
+    expect(await repos.watchlists.set(u.id, ["GBPUSD", "XAGUSD"])).toEqual(["GBPUSD", "XAGUSD"]);
+    expect(await repos.watchlists.get(u.id)).toEqual(["GBPUSD", "XAGUSD"]);
+    expect(await repos.watchlists.set(u.id, [])).toEqual([]);
+  });
+
+  it("alerts: create active, list per user, trigger, clear a field, remove only own", async () => {
+    const u = await repos.users.create({ email: "a@tw.test", displayName: "A", passwordHash: "h", role: "user", settings: {} });
+    const other = await repos.users.create({ email: "b@tw.test", displayName: "B", passwordHash: "h", role: "user", settings: {} });
+    const a1 = await repos.alerts.create({ userId: u.id, symbol: "XAUUSD", kind: "price_below", price: 2355.5, note: "demand" });
+    const a2 = await repos.alerts.create({ userId: u.id, symbol: "EURUSD", kind: "zone_enter", zoneId: "z-5m-fvg-412-0" });
+    await repos.alerts.create({ userId: other.id, symbol: "BTCUSD", kind: "price_above", price: 70000 });
+    expect(a1).toMatchObject({ active: true, price: 2355.5, note: "demand" });
+    expectAbsent(a1, ["zoneId", "triggeredAt"]);
+    expect((await repos.alerts.list(u.id)).map((a) => a.id)).toEqual([a1.id, a2.id]);
+    expect((await repos.alerts.listActive()).length).toBe(3);
+    const at = Date.now();
+    const trig = await repos.alerts.update(a1.id, { active: false, triggeredAt: at });
+    expect(trig).toMatchObject({ active: false, triggeredAt: at });
+    expect((await repos.alerts.listActive()).length).toBe(2);
+    expect((await repos.alerts.update(a1.id, { note: undefined }))?.note).toBeUndefined();
+    expect(await repos.alerts.update("00000000-0000-0000-0000-000000000000", { active: false })).toBeUndefined();
+    expect(await repos.alerts.remove(a2.id, other.id)).toBe(false);
+    expect(await repos.alerts.remove(a2.id, u.id)).toBe(true);
+    expect((await repos.alerts.list(u.id)).length).toBe(1);
+  });
+
+  it("journal: seconds round-trip, newest first, owner-scoped update/remove, clearing fields", async () => {
+    const u = await repos.users.create({ email: "j@tw.test", displayName: "J", passwordHash: "h", role: "user", settings: {} });
+    const other = await repos.users.create({ email: "k@tw.test", displayName: "K", passwordHash: "h", role: "user", settings: {} });
+    const now = Math.floor(Date.now() / 1000);
+    const older = await repos.journal.create({ userId: u.id, symbol: "EURUSD", direction: "short", entry: 1.089, stopLoss: 1.0912, takeProfit: 1.0824, size: 1, openedAt: now - 90_000, closedAt: now - 80_000, exitPrice: 1.0836, rMultiple: 2.45, setup: "Supply + CHoCH", notes: "خروج قبل الهدف" });
+    const newer = await repos.journal.create({ userId: u.id, symbol: "XAUUSD", direction: "long", entry: 2362.4, stopLoss: 2354.9, size: 0.5, openedAt: now - 7200 });
+    expect(newer.openedAt).toBe(now - 7200);
+    expectAbsent(newer, ["closedAt", "exitPrice", "rMultiple", "takeProfit"]);
+    expect(older).toMatchObject({ openedAt: now - 90_000, closedAt: now - 80_000, rMultiple: 2.45, notes: "خروج قبل الهدف" });
+    expect((await repos.journal.list(u.id)).map((t) => t.id)).toEqual([newer.id, older.id]);
+    expect(await repos.journal.update(newer.id, other.id, { exitPrice: 2370 })).toBeUndefined();
+    const closed = await repos.journal.update(newer.id, u.id, { exitPrice: 2384.9, rMultiple: 3, closedAt: now });
+    expect(closed).toMatchObject({ exitPrice: 2384.9, rMultiple: 3, closedAt: now, entry: 2362.4 });
+    const reopened = await repos.journal.update(newer.id, u.id, { exitPrice: undefined, rMultiple: undefined, closedAt: undefined });
+    expectAbsent(reopened!, ["exitPrice", "rMultiple", "closedAt"]);
+    expect(await repos.journal.remove(older.id, other.id)).toBe(false);
+    expect(await repos.journal.remove(older.id, u.id)).toBe(true);
+    expect((await repos.journal.list(u.id)).length).toBe(1);
+    expect(await repos.journal.list(other.id)).toEqual([]);
+  });
+
+  it("zone log: append, newest first, count, full zone round-trip", async () => {
+    await repos.zoneLog.append({ symbol: "XAUUSD", timeframe: "5m", engineVersion: "1.1.1", scoringVersion: "scoring-v1", zone: zone("z-5m-fvg-1-0", "ACTIVE", 72) });
+    await sleep(3);
+    await repos.zoneLog.append({ symbol: "XAUUSD", timeframe: "5m", engineVersion: "1.1.1", scoringVersion: "scoring-v1", zone: zone("z-5m-fvg-1-0", "REACTED", 72) });
+    await sleep(3);
+    await repos.zoneLog.append({ symbol: "EURUSD", timeframe: "15m", engineVersion: "1.1.1", scoringVersion: "scoring-v1", zone: zone("z-15m-ob-3-1", "TESTED", 57.6) });
+    expect(await repos.zoneLog.count()).toBe(3);
+    const recent = await repos.zoneLog.recent(2);
+    expect(recent.map((e) => `${e.symbol}:${e.zone.status}`)).toEqual(["EURUSD:TESTED", "XAUUSD:REACTED"]);
+    expect(recent[0]!.zone).toEqual(zone("z-15m-ob-3-1", "TESTED", 57.6));
+    expect(typeof recent[0]!.loggedAt).toBe("number");
+  });
+
+  it("audit: append with meta, newest first", async () => {
+    const u = await repos.users.create({ email: "au@tw.test", displayName: "Au", passwordHash: "h", role: "admin", settings: {} });
+    await repos.audit.append({ actorId: u.id, action: "user.register" });
+    await sleep(3);
+    await repos.audit.append({ actorId: u.id, action: "user.role.change", target: "x", meta: { role: "coach" } });
+    await sleep(3);
+    await repos.audit.append({ action: "system.start" });
+    const r = await repos.audit.recent(10);
+    expect(r.map((e) => e.action)).toEqual(["system.start", "user.role.change", "user.register"]);
+    expect(r[1]).toMatchObject({ actorId: u.id, target: "x", meta: { role: "coach" } });
+    expect(r[0]!.actorId).toBeUndefined();
+  });
+});
+
+describe.skipIf(!TEST_DB)("Prisma repositories — persistence and setup", () => {
+  it("data written by one client is read by a fresh one; the seed is idempotent", async () => {
+    await resetPrisma();
+    const u = await prisma!.users.create({ email: "persist@tw.test", displayName: "P", passwordHash: "h", role: "user", settings: { a: 1 } });
+    await prisma!.alerts.create({ userId: u.id, symbol: "XAUUSD", kind: "price_above", price: 2500 });
+    const second = createPrismaRepositories(REPO_URL);
+    try {
+      await second.seed();
+      expect((await second.users.byEmail("persist@tw.test"))?.settings).toEqual({ a: 1 });
+      expect((await second.alerts.list(u.id)).length).toBe(1);
+      expect(await second.client.instrument.count()).toBe(10);
+    } finally { await second.close(); }
+  });
+
+  it("an unmigrated database fails fast with the command that fixes it", async () => {
+    const bare = createPrismaRepositories(withSchema(TEST_DB!, "tw_never_migrated"));
+    try { await expect(bare.seed()).rejects.toThrow(/migrate:deploy/); } finally { await bare.close(); }
+  });
+
+  it("the API keeps a registered user across a restart (REPOSITORIES=prisma)", async () => {
+    await resetPrisma();
+    const cfg = loadConfig({ NODE_ENV: "test", JWT_SECRET: "test-secret-test-secret-123456", REPOSITORIES: "prisma", DATABASE_URL: REPO_URL, CANDLE_STORE: "memory" });
+    const app1 = await buildApp({ config: cfg, logger: false });
+    const reg = await app1.inject({ method: "POST", url: "/api/v1/auth/register", payload: { email: "Restart@tw.test", password: "password123", displayName: "Restart" } });
+    expect(reg.statusCode).toBe(200);
+    expect(reg.json().user.role).toBe("admin");
+    const token = reg.json().token;
+    const al = await app1.inject({ method: "POST", url: "/api/v1/alerts", headers: { authorization: `Bearer ${token}` }, payload: { symbol: "XAUUSD", kind: "price_below", price: 2300 } });
+    expect(al.statusCode).toBe(200);
+    const tr = await app1.inject({ method: "POST", url: "/api/v1/journal", headers: { authorization: `Bearer ${token}` }, payload: { symbol: "XAUUSD", direction: "long", entry: 100, stopLoss: 99, exitPrice: 103, size: 1, openedAt: 1_792_400_000 } });
+    expect(tr.json().trade.rMultiple).toBe(3);
+    await app1.close();
+
+    const app2 = await buildApp({ config: cfg, logger: false });
+    try {
+      const login = await app2.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "restart@tw.test", password: "password123" } });
+      expect(login.statusCode).toBe(200);
+      const h = { authorization: `Bearer ${login.json().token}` };
+      expect((await app2.inject({ method: "GET", url: "/api/v1/alerts", headers: h })).json().alerts.length).toBe(1);
+      const j = (await app2.inject({ method: "GET", url: "/api/v1/journal", headers: h })).json();
+      expect(j.trades[0]).toMatchObject({ openedAt: 1_792_400_000, rMultiple: 3 });
+      expect(j.stats).toMatchObject({ total: 1, closed: 1, winRate: 1 });
+      const second = await app2.inject({ method: "POST", url: "/api/v1/auth/register", payload: { email: "two@tw.test", password: "password123", displayName: "Two" } });
+      expect(second.json().user.role).toBe("user");
+    } finally { await app2.close(); }
+  }, 60_000);
+});
