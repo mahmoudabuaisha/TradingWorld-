@@ -6,6 +6,7 @@ import type { AiService } from "./services/ai.js";
 import type { AlertService } from "./services/alerts.js";
 import type { BackfillService } from "./services/backfill.js";
 import type { OutcomeService } from "./services/outcomes.js";
+import type { NotificationService } from "./services/notifications.js";
 import type { CandleStore } from "./store/candleStore.js";
 
 /** Dependency container shared by every route module. */
@@ -21,4 +22,6 @@ export interface AppContext {
   backfill: BackfillService;
   /** AI-01: zone outcome tracker */
   outcomes: OutcomeService;
+  /** NOTIF-01: in-app inbox, Web Push, email */
+  notifications: NotificationService;
 }

@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { Icon } from "../Icon";
 import { ConfluenceStack } from "../marks/ConfluenceStack";
 import { ZoneFeedback, type TrackContext } from "./ZoneFeedback";
+import { zoneTrackKey } from "@tradingworld/shared";
 
 /** Survey callout: pinned to the zone by the overlay's leader line. Reasons, the confluence stack, weaknesses, invalidation. */
 export function ZoneDetails({ zone, precision, onClose, track }: { zone: Zone; precision: number; onClose: () => void; track?: TrackContext }) {
@@ -41,7 +42,7 @@ export function ZoneDetails({ zone, precision, onClose, track }: { zone: Zone; p
         <div className="mono text-2xs text-ink-3">HTF {zone.htfContext.join(" · ")}</div>
         {!dead && (
           <div className="flex flex-wrap items-center gap-2">
-            <button disabled={!token || alertState === "ok"} className="btn" onClick={async () => { try { await api.createAlert(token!, { symbol, kind: "zone_enter", zoneId: zone.id, note: zone.name }); setAlertState("ok"); } catch { setAlertState("err"); } }}>
+            <button disabled={!token || alertState === "ok"} className="btn" onClick={async () => { try { await api.createAlert(token!, { symbol, kind: "zone_enter", zoneId: track ? zoneTrackKey(track, zone) : zone.id, zoneTop: zone.top, zoneBottom: zone.bottom, note: zone.name }); setAlertState("ok"); } catch { setAlertState("err"); } }}>
               <Icon name="bell" size={15} />{L("setAlert")} {alertState === "ok" ? "✓" : alertState === "err" ? "!" : ""}
             </button>
             {!token && <span className="text-[11px] text-ink-3">{locale === "ar" ? "سجّل الدخول لإنشاء تنبيه" : "Sign in to create alerts"}</span>}

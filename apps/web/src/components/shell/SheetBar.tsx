@@ -7,6 +7,7 @@ import { useApp, type Theme } from "@/store/useApp";
 import { useClock, fmtMinutes, sessionLabel } from "@/hooks/useClock";
 import { t } from "@/i18n/dictionary";
 import { Icon } from "../Icon";
+import { useUnread } from "../NotificationInbox";
 
 function currentSheet(pathname: string) {
   const clean = pathname.split("#")[0] ?? pathname;
@@ -19,7 +20,8 @@ function currentSheet(pathname: string) {
 
 /** The sheet bar: where you are (atlas · sheet), the search field, the survey clock, night/day, language, the user. */
 export function SheetBar({ onSearch }: { onSearch: () => void }) {
-  const { locale, setLocale, theme, setTheme, user, setAuth } = useApp();
+  const { locale, setLocale, theme, setTheme, user, token, setAuth } = useApp();
+  const unread = useUnread(token);
   const pathname = usePathname();
   const clock = useClock();
   const [mounted, setMounted] = useState(false);
@@ -53,6 +55,10 @@ export function SheetBar({ onSearch }: { onSearch: () => void }) {
         <button className="btn-ghost px-2 text-xs" onClick={() => setLocale(locale === "ar" ? "en" : "ar")}>{locale === "ar" ? "EN" : "ع"}</button>
         {mounted && user ? (
           <>
+            <Link href="/alerts#inbox" id="bar-bell" className="btn-ghost relative px-2" aria-label={`${locale === "ar" ? "الإشعارات" : "Notifications"}${unread ? ` (${unread})` : ""}`} title={locale === "ar" ? "الإشعارات" : "Notifications"}>
+              <Icon name="bell" size={16} />
+              {unread > 0 && <span className="mono absolute -end-0.5 -top-0.5 min-w-[16px] border border-ink bg-field px-0.5 text-center text-[10px] leading-[14px]">{unread > 99 ? "99+" : unread}</span>}
+            </Link>
             <Link href="/profile" className="btn-ghost hidden px-2 sm:inline-flex" title={t(locale, "shell", "profile")}><Icon name="user" size={16} /><span className="max-w-[9rem] truncate text-xs">{user.displayName}</span></Link>
             <button className="btn-ghost px-2" onClick={() => setAuth(undefined, undefined)} title={t(locale, "shell", "signout")} aria-label="sign out"><Icon name="logout" size={16} /></button>
           </>

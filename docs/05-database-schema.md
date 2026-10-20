@@ -18,7 +18,9 @@
 | `BacktestRun` | نتائج اختبارات تاريخية مع المعاملات والإصدار | |
 | `Drawing` | رسوم المستخدم على الشارت (UI-01): `kind` + `points` JSON بنقاط (وقت، سعر) | لكل (userId, symbol)، مشتركة بين الفريمات؛ حد 200 لكل أصل |
 | `Watchlist` | قوائم متابعة متعددة لكل مستخدم | |
-| `Alert` | سعر/منطقة، triggeredAt | |
+| `Alert` | سعر/منطقة، triggeredAt، `zoneTop/zoneBottom` (NOTIF-01) | حدود المنطقة تُخزَّن عند الإنشاء فيفحصها المراقب على الخادم دون تحليل حي؛ الإطلاق ذري (`active=true` شرط التحديث) |
+| `PushSubscription` | اشتراك Web Push لكل متصفح: `endpoint` فريد، `p256dh`، `auth`، `userAgent`، `lastSuccessAt`، `failures` | يُحذف عند رد 404/410 من خدمة الدفع |
+| `Notification` | صندوق الإشعارات: `kind`، `title/body` JSON ثنائي اللغة، `url`، `alertId`، `deliveries` JSON (نتيجة كل قناة)، `readAt` | فهرس (userId, createdAt DESC) |
 | `Trade` | سجل التداول + `zoneId` و`snapshotId` للربط | R multiple مخزن |
 | `Note` | ملاحظات مع tags وربط بأي كيان | |
 | `Goal` | أهداف يومية/أسبوعية/شهرية/سنوية | |
@@ -26,7 +28,7 @@
 | `FeatureFlag` | تفعيل الوحدات تدريجيًا | rollout % |
 
 ## الجداول المخططة (P2/P3)
-`Strategy` · `Setup` · `Scenario` · `Snapshot` · `RoutineTask` · `Lesson/Course/Quiz/Progress` · `Term` (القاموس) · `ShariahRuling` (مع المصدر والتاريخ) · `Post/Comment/Room/Team/Membership` · `Plan/Subscription/Invoice` · `Notification`.
+`Strategy` · `Setup` · `Scenario` · `Snapshot` · `RoutineTask` · `Lesson/Course/Quiz/Progress` · `Term` (القاموس) · `ShariahRuling` (مع المصدر والتاريخ) · `Post/Comment/Room/Team/Membership` · `Plan/Subscription/Invoice`.
 
 ## قواعد
 - كل كيان تحليلي يحمل `engineVersion`/`scoringVersion`.

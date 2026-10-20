@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Role, Drawing, DrawingKind, DrawingPoint } from "@tradingworld/shared";
+import type { Role, Drawing, DrawingKind, DrawingPoint, AppNotification, Delivery } from "@tradingworld/shared";
 import type { Zone, Regime, OutcomeLabel } from "@tradingworld/analysis-engine";
 
 /**
@@ -9,7 +9,9 @@ import type { Zone, Regime, OutcomeLabel } from "@tradingworld/analysis-engine";
  * Keeping the interface identical lets the API run with zero infrastructure.
  */
 export interface User { id: string; email: string; displayName: string; passwordHash: string; role: Role; createdAt: number; settings: Record<string, unknown> }
-export interface Alert { id: string; userId: string; symbol: string; kind: "price_above" | "price_below" | "zone_enter"; price?: number; zoneId?: string; note?: string; active: boolean; createdAt: number; triggeredAt?: number }
+export interface Alert { id: string; userId: string; symbol: string; kind: "price_above" | "price_below" | "zone_enter"; price?: number; zoneId?: string; zoneTop?: number; zoneBottom?: number; note?: string; active: boolean; createdAt: number; triggeredAt?: number }
+export interface PushSub { id: string; userId: string; endpoint: string; p256dh: string; auth: string; userAgent?: string; createdAt: number; lastSuccessAt?: number; failures: number }
+export interface StoredNotification extends AppNotification { userId: string }
 export interface JournalTrade {
   id: string; userId: string; symbol: string; direction: "long" | "short"; entry: number; stopLoss: number; takeProfit?: number; size: number; riskAmount?: number;
   openedAt: number; closedAt?: number; exitPrice?: number; rMultiple?: number; setup?: string; strategy?: string; reason?: string; emotion?: string; notes?: string; zoneId?: string; createdAt: number;
@@ -74,6 +76,25 @@ export interface Repositories {
     listActive(): Promise<Alert[]>;
     update(id: string, patch: Partial<Alert>): Promise<Alert | undefined>;
     remove(id: string, userId: string): Promise<boolean>;
+    /** atomic: flips an ACTIVE alert to triggered and returns it; undefined if it was already triggered or removed (fires once) */
+    trigger(id: string, at: number): Promise<Alert | undefined>;
+  };
+  /** NOTIF-01: Web Push subscriptions */
+  push: {
+    /** keyed by endpoint: re-subscribing the same browser moves it to the current user */
+    upsert(userId: string, s: { endpoint: string; p256dh: string; auth: string; userAgent?: string }): Promise<PushSub>;
+    list(userId: string): Promise<PushSub[]>;
+    remove(endpoint: string, userId?: string): Promise<boolean>;
+    result(endpoint: string, ok: boolean): Promise<void>;
+  };
+  /** NOTIF-01: in-app inbox + delivery log */
+  notifications: {
+    create(n: Omit<StoredNotification, "id" | "createdAt" | "readAt">): Promise<StoredNotification>;
+    setDeliveries(id: string, deliveries: Delivery[]): Promise<void>;
+    list(userId: string, limit: number): Promise<StoredNotification[]>;
+    unread(userId: string): Promise<number>;
+    /** ids omitted → all; returns how many were marked */
+    markRead(userId: string, ids?: string[]): Promise<number>;
   };
   journal: {
     create(t: Omit<JournalTrade, "id" | "createdAt">): Promise<JournalTrade>;
@@ -131,6 +152,8 @@ export function createMemoryRepositories(): Repositories {
   const tracked = new Map<string, TrackedZone>();
   const feedback = new Map<string, ZoneFeedbackEntry>(); // `${zoneKey}|${userId}`
   const drawings = new Map<string, Drawing & { userId: string }>();
+  const pushSubs = new Map<string, PushSub>(); // by endpoint
+  const notifications: StoredNotification[] = [];
   const publicDrawing = ({ userId: _u, ...d }: Drawing & { userId: string }): Drawing => ({ ...d, points: d.points.map((p) => ({ ...p })) });
   const audit: AuditEntry[] = [];
   const MAX_LOG = 20_000;
@@ -153,6 +176,20 @@ export function createMemoryRepositories(): Repositories {
       async listActive() { return [...alerts.values()].filter((a) => a.active); },
       async update(id, patch) { const a = alerts.get(id); if (!a) return undefined; const n = { ...a, ...patch }; alerts.set(id, n); return n; },
       async remove(id, userId) { const a = alerts.get(id); if (!a || a.userId !== userId) return false; alerts.delete(id); return true; },
+      async trigger(id, at) { const a = alerts.get(id); if (!a || !a.active) return undefined; a.active = false; a.triggeredAt = at; return { ...a }; },
+    },
+    push: {
+      async upsert(userId, s) { const prev = pushSubs.get(s.endpoint); const sub: PushSub = { id: prev?.id ?? randomUUID(), userId, ...s, createdAt: prev?.createdAt ?? Date.now(), failures: 0, lastSuccessAt: prev?.lastSuccessAt }; pushSubs.set(s.endpoint, sub); return { ...sub }; },
+      async list(userId) { return [...pushSubs.values()].filter((p) => p.userId === userId).map((p) => ({ ...p })); },
+      async remove(endpoint, userId) { const p = pushSubs.get(endpoint); if (!p || (userId && p.userId !== userId)) return false; pushSubs.delete(endpoint); return true; },
+      async result(endpoint, ok) { const p = pushSubs.get(endpoint); if (!p) return; if (ok) { p.failures = 0; p.lastSuccessAt = Date.now(); } else p.failures++; },
+    },
+    notifications: {
+      async create(n) { const row: StoredNotification = { ...n, id: randomUUID(), createdAt: Date.now() }; notifications.push(row); if (notifications.length > MAX_LOG) notifications.shift(); return { ...row }; },
+      async setDeliveries(id, deliveries) { const n = notifications.find((x) => x.id === id); if (n) n.deliveries = deliveries; },
+      async list(userId, limit) { return notifications.filter((n) => n.userId === userId).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit).map((n) => ({ ...n })); },
+      async unread(userId) { return notifications.filter((n) => n.userId === userId && !n.readAt).length; },
+      async markRead(userId, ids) { let c = 0; const now = Date.now(); for (const n of notifications) if (n.userId === userId && !n.readAt && (!ids || ids.includes(n.id))) { n.readAt = now; c++; } return c; },
     },
     journal: {
       async create(t) { const tr: JournalTrade = { ...t, id: randomUUID(), createdAt: Date.now() }; trades.set(tr.id, tr); return tr; },

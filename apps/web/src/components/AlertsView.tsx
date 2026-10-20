@@ -5,6 +5,7 @@ import { DEFAULT_INSTRUMENTS } from "@tradingworld/shared";
 import { api, type Alert } from "@/lib/api";
 import { useApp } from "@/store/useApp";
 import { Icon } from "./Icon";
+import { NotificationInbox } from "./NotificationInbox";
 
 /** SHEET 11 — alerts: a condition the trader set, never a buy or sell call. */
 export function AlertsView() {
@@ -13,14 +14,17 @@ export function AlertsView() {
   const [f, setF] = useState({ symbol: "XAUUSD", kind: "price_above", price: "", note: "" });
   const [err, setErr] = useState<string>();
   const L = (ar: string, en: string) => (locale === "ar" ? ar : en);
-  const load = useCallback(async () => { if (token) setAlerts((await api.alerts(token)).alerts); }, [token]);
+  const [tick, setTick] = useState(0);
+  const load = useCallback(async () => { if (token) { setAlerts((await api.alerts(token)).alerts); setTick((t) => t + 1); } }, [token]);
   useEffect(() => { void load(); }, [load]);
+  // the server-side watcher fires alerts while this page is open too: refresh every 30 s
+  useEffect(() => { const id = setInterval(() => void load().catch(() => undefined), 30_000); return () => clearInterval(id); }, [load]);
   if (!token) return <div className="sheet mx-auto mt-6 max-w-lg p-6 text-center text-ink-2">{L("سجّل الدخول لإدارة التنبيهات.", "Sign in to manage alerts.")} <Link href="/login" className="underline">{L("تسجيل الدخول", "Sign in")}</Link></div>;
   const kindLabel = (k: string) => (k === "price_above" ? L("السعر يتجاوز", "Price above") : k === "price_below" ? L("السعر يكسر", "Price below") : L("دخول منطقة", "Zone entry"));
   const kindGlyph = (k: string) => (k === "price_above" ? "▲" : k === "price_below" ? "▼" : "⌖");
   return (
     <div className="space-y-5">
-      <div><span className="eyebrow">ATLAS 02 · 11 · SMART ALERTS</span><h1 className="text-2xl font-semibold">{L("التنبيهات الذكية", "Smart Alerts")}</h1><p className="max-w-[68ch] text-sm text-ink-2">{L("التنبيه يقول إن شرطًا حددته قد تحقق، ولا يقول اشترِ أو بِع. تنبيهات دخول المناطق تُنشأ من التعليق المساحي على الشارت.", "An alert says a condition you set was met. It never says buy or sell. Zone-entry alerts are created from the survey callout on the chart.")}</p></div>
+      <div><span className="eyebrow">ATLAS 02 · 11 · SMART ALERTS</span><h1 className="text-2xl font-semibold">{L("التنبيهات الذكية", "Smart Alerts")}</h1><p className="max-w-[68ch] text-sm text-ink-2">{L("التنبيه يقول إن شرطًا حددته قد تحقق، ولا يقول اشترِ أو بِع. تنبيهات دخول المناطق تُنشأ من التعليق المساحي على الشارت. الفحص يجري على الخادم فيُطلق التنبيه حتى لو كانت الصفحة مغلقة.", "An alert says a condition you set was met. It never says buy or sell. Zone-entry alerts are created from the survey callout on the chart. They are checked on the server, so they fire even when this page is closed.")}</p></div>
       <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
         <form className="sheet space-y-3 p-4" onSubmit={async (e) => { e.preventDefault(); setErr(undefined); try { await api.createAlert(token, { symbol: f.symbol, kind: f.kind, price: +f.price, note: f.note || undefined }); setF({ ...f, price: "", note: "" }); await load(); } catch (x) { setErr((x as Error).message); } }}>
           <span className="eyebrow">NEW ALERT</span>
@@ -47,6 +51,7 @@ export function AlertsView() {
           </ul>
         </section>
       </div>
+      <NotificationInbox refreshKey={tick} />
     </div>
   );
 }

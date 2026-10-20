@@ -80,6 +80,8 @@ model User {
   notes      Note[]
   feedback   ZoneFeedback[]
   drawings   Drawing[]
+  pushSubscriptions PushSubscription[]
+  notifications     Notification[]
   audit      AuditLog[]
   goals      Goal[]
 }
@@ -257,7 +259,9 @@ model Alert {
   instrument  Instrument @relation(fields: [symbol], references: [symbol])
   kind        AlertKind
   price       Float?
-  zoneId      String?   // engine zone id at creation time (no FK: engine ids are window-local)
+  zoneId      String?   // tracked zone key (zoneTrackKey) or a legacy engine id — no FK
+  zoneTop     Float?    // zone_enter: the zone's bounds at creation, so the watcher needs prices only
+  zoneBottom  Float?
   note        String?
   active      Boolean   @default(true)
   triggeredAt DateTime?
@@ -305,6 +309,37 @@ model Drawing {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([userId, symbol])
+}
+
+/// NOTIF-01: a browser's Web Push subscription (VAPID). Removed when the push service answers 404/410.
+model PushSubscription {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint      String    @unique
+  p256dh        String
+  auth          String
+  userAgent     String?
+  createdAt     DateTime  @default(now())
+  lastSuccessAt DateTime?
+  failures      Int       @default(0)
+  @@index([userId])
+}
+
+/// NOTIF-01: the in-app inbox and the delivery log of every notification (one entry per channel attempt).
+model Notification {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind       String    // alert | test
+  title      Json      // { ar, en }
+  body       Json      // { ar, en }
+  url        String?
+  alertId    String?
+  deliveries Json      // [{ channel: push|email, status: sent|failed|skipped, detail?, at }]
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model Note {

@@ -14,6 +14,7 @@ import { TitleBlock } from "./TitleBlock";
 import { DrawingToolbar, type Tool } from "./DrawingToolbar";
 import { useDrawings } from "@/hooks/useDrawings";
 import { SessionDial } from "../marks/SessionDial";
+import { INBOX_EVENT } from "../NotificationInbox";
 import { Icon } from "../Icon";
 
 function pipPrice(p: number | undefined, precision: number) {
@@ -63,9 +64,17 @@ export function ChartWorkspace() {
       } else if (m.type === "analysis") { if (mode === "ai") setAnalysis(m.result); }
       else if (m.type === "status") { setProvider(m.provider); if (m.feed) setFeed(m.feed); }
       else if (m.type === "alert") { setToast(m.event.message[locale]); setTimeout(() => setToast(undefined), 8000); }
-    }, { includeLowQuality: showLowQuality, includeInvalidated: showInvalidated });
+      else if (m.type === "notification") window.dispatchEvent(new Event(INBOX_EVENT));
+    }, { includeLowQuality: showLowQuality, includeInvalidated: showInvalidated, token: token ?? undefined });
     return off;
-  }, [symbol, timeframe, mode, locale, showLowQuality, showInvalidated]);
+  }, [symbol, timeframe, mode, locale, showLowQuality, showInvalidated, token]);
+
+  // deep links from notifications: /chart?symbol=XAUUSD
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("symbol");
+    if (q && findInstrument(q) && q.toUpperCase() !== symbol) setSymbol(q.toUpperCase());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // open trades on this instrument → dimension lines on the chart
   useEffect(() => {

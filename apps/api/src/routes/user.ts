@@ -19,7 +19,7 @@ export default async function userRoutes(app: FastifyInstance, ctx: AppContext) 
     if (!body.success) return reply.code(400).send({ error: "VALIDATION", issues: body.error.issues });
     if (!findInstrument(body.data.symbol)) return reply.code(404).send({ error: "UNKNOWN_INSTRUMENT" });
     if (body.data.kind !== "zone_enter" && body.data.price === undefined) return reply.code(400).send({ error: "PRICE_REQUIRED" });
-    if (body.data.kind === "zone_enter" && !body.data.zoneId) return reply.code(400).send({ error: "ZONE_REQUIRED" });
+    if (body.data.kind === "zone_enter" && (body.data.zoneTop === undefined || body.data.zoneBottom === undefined)) return reply.code(400).send({ error: "ZONE_REQUIRED" });
     const alert = await ctx.repos.alerts.create({ ...body.data, symbol: body.data.symbol.toUpperCase(), userId: req.user.id });
     await ctx.repos.audit.append({ actorId: req.user.id, action: "alert.create", target: alert.id });
     return { alert };

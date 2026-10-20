@@ -57,10 +57,21 @@ export const drawingUpdateSchema = z.object({ points: z.array(drawingPoint).min(
 export const alertCreateSchema = z.object({
   symbol: z.string().min(3).max(20),
   kind: z.enum(["price_above", "price_below", "zone_enter"]),
-  price: z.number().optional(),
-  zoneId: z.string().optional(),
+  price: z.number().positive().optional(),
+  /** zone_enter: the tracked zone key (zoneTrackKey) — kept for linking back to the zone */
+  zoneId: z.string().max(200).optional(),
+  /** zone_enter: the zone's bounds, so the alert can be watched from prices alone */
+  zoneTop: z.number().positive().optional(),
+  zoneBottom: z.number().positive().optional(),
   note: z.string().max(200).optional(),
+}).refine((a) => a.kind !== "zone_enter" || (a.zoneTop !== undefined && a.zoneBottom !== undefined && a.zoneTop > a.zoneBottom), { message: "zone_enter needs zoneTop > zoneBottom", path: ["zoneTop"] });
+
+/** NOTIF-01: a browser PushSubscription as serialised by PushSubscription.toJSON(). */
+export const pushSubscriptionSchema = z.object({
+  endpoint: z.string().url().max(2000).refine((u) => u.startsWith("https://"), "push endpoints are https"),
+  keys: z.object({ p256dh: z.string().min(10).max(300), auth: z.string().min(8).max(100) }),
 });
+export const notificationPrefsSchema = z.object({ push: z.boolean().optional(), email: z.boolean().optional() });
 
 export const watchlistUpdateSchema = z.object({
   symbols: z.array(z.string().min(3).max(20)).max(50),

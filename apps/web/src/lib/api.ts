@@ -1,5 +1,5 @@
 import type { AnalysisResult, Candle } from "@tradingworld/analysis-engine";
-import type { Timeframe, ProviderStatus, FeedStatus, FeedState, ProviderId, AssetClass, Drawing, DrawingKind, DrawingPoint } from "@tradingworld/shared";
+import type { Timeframe, ProviderStatus, FeedStatus, FeedState, ProviderId, AssetClass, Drawing, DrawingKind, DrawingPoint, AppNotification, NotificationPrefs } from "@tradingworld/shared";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:4000/ws";
@@ -29,7 +29,7 @@ export const api = {
   register: (b: { email: string; password: string; displayName: string }) => request<AuthResponse>("/auth/register", { method: "POST", body: JSON.stringify(b) }),
   login: (b: { email: string; password: string }) => request<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify(b) }),
   alerts: (token: string) => request<{ alerts: Alert[] }>("/alerts", {}, token),
-  createAlert: (token: string, b: { symbol: string; kind: string; price?: number; zoneId?: string; note?: string }) => request<{ alert: Alert }>("/alerts", { method: "POST", body: JSON.stringify(b) }, token),
+  createAlert: (token: string, b: { symbol: string; kind: string; price?: number; zoneId?: string; zoneTop?: number; zoneBottom?: number; note?: string }) => request<{ alert: Alert }>("/alerts", { method: "POST", body: JSON.stringify(b) }, token),
   deleteAlert: (token: string, id: string) => request<{ ok: true }>(`/alerts/${id}`, { method: "DELETE" }, token),
   journal: (token: string) => request<{ trades: Trade[]; stats: { total: number; closed: number; winRate: number; avgR: number } }>("/journal", {}, token),
   addTrade: (token: string, b: Record<string, unknown>) => request<{ trade: Trade }>("/journal", { method: "POST", body: JSON.stringify(b) }, token),
@@ -48,6 +48,13 @@ export const api = {
   updateDrawing: (token: string, id: string, points: DrawingPoint[]) => request<{ drawing: Drawing }>(`/drawings/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ points }) }, token),
   deleteDrawing: (token: string, id: string) => request<{ ok: true }>(`/drawings/${encodeURIComponent(id)}`, { method: "DELETE" }, token),
   clearDrawings: (token: string, symbol: string) => request<{ removed: number }>(`/drawings?symbol=${encodeURIComponent(symbol)}`, { method: "DELETE" }, token),
+  notifications: (token: string, limit = 50) => request<{ notifications: AppNotification[]; unread: number }>(`/notifications?limit=${limit}`, {}, token),
+  markNotificationsRead: (token: string, ids?: string[]) => request<{ marked: number }>("/notifications/read", { method: "POST", body: JSON.stringify(ids ? { ids } : {}) }, token),
+  notificationSettings: (token: string) => request<NotificationSettings>("/notifications/settings", {}, token),
+  saveNotificationPrefs: (token: string, prefs: Partial<NotificationPrefs>) => request<{ prefs: NotificationPrefs }>("/notifications/settings", { method: "PUT", body: JSON.stringify(prefs) }, token),
+  subscribePush: (token: string, sub: { endpoint: string; keys: { p256dh: string; auth: string } }) => request<{ ok: true; subscriptions: number }>("/push/subscriptions", { method: "POST", body: JSON.stringify(sub) }, token),
+  unsubscribePush: (token: string, endpoint: string) => request<{ removed: boolean }>("/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) }, token),
+  testNotification: (token: string) => request<{ notification: AppNotification }>("/notifications/test", { method: "POST", body: "{}" }, token),
   adminFactors: (token: string) => request<{ sample: number; factors: Record<string, { present: number; total: number; avgScoreWhenPresent: number }>; byStatus: Record<string, number> }>("/admin/research/factors", {}, token),
 };
 
@@ -68,6 +75,12 @@ export interface AdminBackfill {
   store: "memory" | "timescale"; enabled: boolean;
   job: { running: boolean; started: boolean; baseTimeframe: string; bars: number; symbols: string[]; lastRunAt?: number; nextRunAt?: number; runs: BackfillRun[] };
   series: { symbol: string; timeframe: string; first: number; last: number; count: number }[];
+}
+export interface NotificationSettings {
+  prefs: NotificationPrefs;
+  push: { configured: boolean; publicKey: string | null; subscriptions: number };
+  email: { configured: boolean; address: string | null };
+  watcher: { pollSeconds: number; enabled: boolean };
 }
 export interface ZoneFeedback { id: string; zoneKey: string; useful: boolean; bestFactor?: string; comment?: string; createdAt: number; updatedAt: number }
 export interface FeedbackBucket { n: number; useful: number; usefulRate: number }

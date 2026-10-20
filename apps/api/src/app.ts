@@ -10,6 +10,7 @@ import { AiService } from "./services/ai.js";
 import { AlertService } from "./services/alerts.js";
 import { BackfillService } from "./services/backfill.js";
 import { OutcomeService, parseScan } from "./services/outcomes.js";
+import { NotificationService, type Senders } from "./services/notifications.js";
 import { createCandleStore } from "./store/index.js";
 import authPlugin from "./plugins/auth.js";
 import healthRoutes from "./routes/health.js";
@@ -19,10 +20,11 @@ import userRoutes from "./routes/user.js";
 import adminRoutes from "./routes/admin.js";
 import feedbackRoutes from "./routes/feedback.js";
 import drawingRoutes from "./routes/drawings.js";
+import notificationRoutes from "./routes/notifications.js";
 import realtime from "./realtime/ws.js";
 import type { AppContext } from "./context.js";
 
-export interface BuildOptions { config?: Config; repos?: Repositories; logger?: boolean }
+export interface BuildOptions { config?: Config; repos?: Repositories; logger?: boolean; senders?: Senders }
 
 /** memory, or PostgreSQL through Prisma when REPOSITORIES=prisma (or auto with DATABASE_URL). Loaded lazily so the
  *  in-memory path never needs the generated Prisma client. Fails fast with the fix when the schema is not migrated. */
@@ -43,7 +45,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   const providers = new ProviderRegistry(config, { store });
   const analysis = new AnalysisService(providers, repos);
   const ai = new AiService(config);
-  const alerts = new AlertService(repos);
+  const alerts = new AlertService(repos, providers, { pollSeconds: config.ALERT_POLL_SECONDS });
   const app = Fastify({ logger: opts.logger ?? config.NODE_ENV !== "test", trustProxy: true });
   const backfill = new BackfillService(providers, store, {
     baseTimeframe: config.BACKFILL_BASE_TIMEFRAME, bars: config.BACKFILL_BARS, pageSize: config.BACKFILL_PAGE_SIZE, intervalMinutes: config.BACKFILL_INTERVAL_MINUTES,
@@ -53,10 +55,17 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   const outcomes = new OutcomeService(repos, providers, { horizonBars: config.OUTCOME_HORIZON_BARS, intervalSeconds: config.OUTCOME_INTERVAL_SECONDS, scan: parseScan(config.OUTCOME_SCAN), log: (m) => app.log.info(`[outcomes] ${m}`) });
   analysis.outcomes = outcomes;
   outcomes.analyze = (symbol, timeframe) => analysis.run(symbol, timeframe, { force: true });
-  const ctx: AppContext = { config, repos, providers, analysis, ai, alerts, store, backfill, outcomes };
+  const notifications = new NotificationService(repos, {
+    vapidPublicKey: config.VAPID_PUBLIC_KEY, vapidPrivateKey: config.VAPID_PRIVATE_KEY, vapidSubject: config.VAPID_SUBJECT,
+    smtpUrl: config.SMTP_URL, emailFrom: config.EMAIL_FROM, appUrl: config.APP_URL ?? config.CORS_ORIGIN.split(",")[0]!.trim(),
+  }, opts.senders, (m) => app.log.warn(`[notify] ${m}`));
+  // every triggered alert becomes a notification for its owner (inbox + push + email per preferences)
+  alerts.onTrigger((e) => { void notifications.notify(e.alert.userId, { kind: "alert", title: e.title, body: e.message, url: `/chart?symbol=${encodeURIComponent(e.alert.symbol)}`, alertId: e.alert.id }).catch((err) => app.log.error(err)); });
+  const ctx: AppContext = { config, repos, providers, analysis, ai, alerts, store, backfill, outcomes, notifications };
+  if (config.ALERT_WATCH_ENABLED && config.NODE_ENV !== "test") alerts.start();
   if (config.BACKFILL_ENABLED && config.NODE_ENV !== "test") backfill.start();
   if (config.OUTCOME_ENABLED && config.NODE_ENV !== "test") outcomes.start();
-  app.addHook("onClose", async () => { backfill.stop(); outcomes.stop(); providers.close(); await store.close(); if (!opts.repos) await repos.close?.(); });
+  app.addHook("onClose", async () => { alerts.stop(); backfill.stop(); outcomes.stop(); providers.close(); await store.close(); if (!opts.repos) await repos.close?.(); });
   await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(cors, { origin: config.CORS_ORIGIN.split(",").map((s) => s.trim()), credentials: true });
   await app.register(rateLimit, { max: config.RATE_LIMIT_MAX, timeWindow: config.RATE_LIMIT_WINDOW });
@@ -70,6 +79,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     await adminRoutes(api, ctx);
     await feedbackRoutes(api, ctx);
     await drawingRoutes(api, ctx);
+    await notificationRoutes(api, ctx);
   }, { prefix: "/api/v1" });
   await realtime(app, ctx);
 

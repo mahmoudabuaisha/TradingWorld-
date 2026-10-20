@@ -20,7 +20,7 @@ function migrate(url: string) {
 let prisma: PrismaRepositories | undefined;
 async function resetPrisma() {
   const db = prisma!.client;
-  await db.$executeRawUnsafe(`TRUNCATE "Drawing", "ZoneFeedback", "ZoneOutcome", "Zone", "AuditLog", "ZoneLog", "Trade", "Alert", "Watchlist", "Session", "User" CASCADE`);
+  await db.$executeRawUnsafe(`TRUNCATE "Notification", "PushSubscription", "Drawing", "ZoneFeedback", "ZoneOutcome", "Zone", "AuditLog", "ZoneLog", "Trade", "Alert", "Watchlist", "Session", "User" CASCADE`);
 }
 
 const impls: { name: string; make: () => Promise<Repositories> }[] = [{ name: "memory", make: async () => createMemoryRepositories() }];
@@ -208,6 +208,49 @@ describe.each(impls)("Repositories contract ($name)", ({ make }) => {
     expect(await repos.drawings.list(u.id, "XAUUSD")).toEqual([]);
     expect((await repos.drawings.list(u.id, "EURUSD")).length).toBe(1);
     expect((await repos.drawings.list(v.id, "XAUUSD")).length).toBe(1);
+  });
+
+  it("alerts fire once; push subscriptions by endpoint; notifications inbox and read state", async () => {
+    const u = await repos.users.create({ email: "nt@tw.test", displayName: "Nt", passwordHash: "h", role: "user", settings: {} });
+    const v = await repos.users.create({ email: "nt2@tw.test", displayName: "Nt2", passwordHash: "h", role: "user", settings: {} });
+    const a = await repos.alerts.create({ userId: u.id, symbol: "XAUUSD", kind: "zone_enter", zoneId: "k", zoneTop: 2410, zoneBottom: 2400 });
+    expect(a).toMatchObject({ zoneTop: 2410, zoneBottom: 2400, active: true });
+    const at = Date.now();
+    const [first, second] = await Promise.all([repos.alerts.trigger(a.id, at), repos.alerts.trigger(a.id, at + 1)]);
+    expect([first, second].filter(Boolean).length).toBe(1);
+    expect((first ?? second)!).toMatchObject({ active: false, triggeredAt: at + (first ? 0 : 1) });
+    expect(await repos.alerts.trigger(a.id, at + 2)).toBeUndefined();
+    // push
+    const ep = "https://push.example.test/abc";
+    await repos.push.upsert(u.id, { endpoint: ep, p256dh: "p".repeat(20), auth: "a".repeat(12), userAgent: "UA" });
+    await repos.push.upsert(u.id, { endpoint: ep + "2", p256dh: "q".repeat(20), auth: "b".repeat(12) });
+    expect((await repos.push.list(u.id)).length).toBe(2);
+    await repos.push.result(ep, false);
+    expect((await repos.push.list(u.id)).find((x) => x.endpoint === ep)!.failures).toBe(1);
+    await repos.push.result(ep, true);
+    const ok = (await repos.push.list(u.id)).find((x) => x.endpoint === ep)!;
+    expect(ok.failures).toBe(0);
+    expect(typeof ok.lastSuccessAt).toBe("number");
+    await repos.push.upsert(v.id, { endpoint: ep, p256dh: "r".repeat(20), auth: "c".repeat(12) }); // same browser, other account
+    expect((await repos.push.list(u.id)).length).toBe(1);
+    expect(await repos.push.remove(ep + "2", v.id)).toBe(false);
+    expect(await repos.push.remove(ep + "2", u.id)).toBe(true);
+    // notifications
+    const n1 = await repos.notifications.create({ userId: u.id, kind: "alert", title: { ar: "ت", en: "t" }, body: { ar: "ن", en: "b" }, url: "/chart?symbol=XAUUSD", alertId: a.id, deliveries: [] });
+    await sleep(3);
+    const n2 = await repos.notifications.create({ userId: u.id, kind: "test", title: { ar: "ت", en: "t2" }, body: { ar: "ن", en: "b2" }, deliveries: [] });
+    await repos.notifications.create({ userId: v.id, kind: "test", title: { ar: "ت", en: "x" }, body: { ar: "ن", en: "x" }, deliveries: [] });
+    await repos.notifications.setDeliveries(n1.id, [{ channel: "push", status: "sent", detail: "1/1 devices", at }]);
+    const list = await repos.notifications.list(u.id, 10);
+    expect(list.map((n) => n.id)).toEqual([n2.id, n1.id]);
+    expect(list[1]).toMatchObject({ url: "/chart?symbol=XAUUSD", alertId: a.id, deliveries: [{ channel: "push", status: "sent" }] });
+    expectAbsent(list[0]!, ["readAt", "url"]);
+    expect(await repos.notifications.unread(u.id)).toBe(2);
+    expect(await repos.notifications.markRead(u.id, [n1.id])).toBe(1);
+    expect(await repos.notifications.unread(u.id)).toBe(1);
+    expect(await repos.notifications.markRead(u.id)).toBe(1);
+    expect(await repos.notifications.unread(u.id)).toBe(0);
+    expect(await repos.notifications.unread(v.id)).toBe(1);
   });
 
   it("audit: append with meta, newest first", async () => {

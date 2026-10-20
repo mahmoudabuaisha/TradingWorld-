@@ -1,17 +1,19 @@
 import { WS_URL } from "./api";
 import type { AnalysisResult, Candle } from "@tradingworld/analysis-engine";
-import type { Timeframe, ProviderStatus, FeedStatus } from "@tradingworld/shared";
+import type { Timeframe, ProviderStatus, FeedStatus, AppNotification } from "@tradingworld/shared";
 
 export type ServerMessage =
   | { type: "candle"; update: { symbol: string; timeframe: Timeframe; candle: Candle; closed: boolean; receivedAt: number } }
   | { type: "analysis"; result: AnalysisResult }
   | { type: "alert"; event: { message: { ar: string; en: string }; price: number } }
   | { type: "status"; provider: ProviderStatus; feed?: FeedStatus }
+  | { type: "notification"; notification: AppNotification }
   | { type: "error"; message: string }
   | { type: "pong"; at: number };
 
 /** Minimal auto-reconnecting subscription client for /ws. */
-export function subscribeMarket(symbol: string, timeframe: Timeframe, onMessage: (m: ServerMessage) => void, flags: { includeLowQuality?: boolean; includeInvalidated?: boolean } = {}): () => void {
+/** `token` identifies the socket, so the server can deliver this user's alerts and notifications (and nobody else's). */
+export function subscribeMarket(symbol: string, timeframe: Timeframe, onMessage: (m: ServerMessage) => void, flags: { includeLowQuality?: boolean; includeInvalidated?: boolean; token?: string } = {}): () => void {
   let ws: WebSocket | undefined;
   let closed = false;
   let retry = 1000;

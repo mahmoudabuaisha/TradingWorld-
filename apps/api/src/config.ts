@@ -16,6 +16,18 @@ const schema = z.object({
   REDIS_URL: z.string().optional(),
   /** users, alerts, journal, watchlists, zone log, audit: memory (default without DATABASE_URL) or PostgreSQL via Prisma (DB-02) */
   REPOSITORIES: z.enum(["auto", "memory", "prisma"]).default("auto"),
+  /** NOTIF-01: server-side alert watcher (alerts fire without anyone watching the chart) */
+  ALERT_WATCH_ENABLED: envBool.default(true),
+  ALERT_POLL_SECONDS: z.coerce.number().int().min(5).default(15),
+  /** Web Push (VAPID) — generate once: node apps/api/dist/tools/vapid-keys.js */
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().optional(),
+  /** email: smtp(s)://user:pass@host:port — unset disables the email channel */
+  SMTP_URL: z.string().optional(),
+  EMAIL_FROM: z.string().default("TradingWorld <alerts@tradingworld.local>"),
+  /** public web URL used in notification links (defaults to the first CORS origin) */
+  APP_URL: z.string().optional(),
   /** AI-01 outcome tracker: labels every observed zone once it is invalidated or OUTCOME_HORIZON_BARS have closed */
   OUTCOME_ENABLED: envBool.default(true),
   OUTCOME_HORIZON_BARS: z.coerce.number().int().min(10).max(2000).default(120),

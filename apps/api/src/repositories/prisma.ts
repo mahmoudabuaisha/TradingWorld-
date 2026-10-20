@@ -1,7 +1,7 @@
 import { PrismaClient, Prisma } from "@tradingworld/db";
-import { DEFAULT_INSTRUMENTS, type Role, type Drawing, type DrawingKind, type DrawingPoint } from "@tradingworld/shared";
+import { DEFAULT_INSTRUMENTS, type Role, type Drawing, type DrawingKind, type DrawingPoint, type Delivery } from "@tradingworld/shared";
 import type { Zone, OutcomeLabel } from "@tradingworld/analysis-engine";
-import type { Repositories, User, Alert, JournalTrade, ZoneLogEntry, AuditEntry, TrackedZone, ZoneQuery, ZoneFeedbackEntry } from "./memory.js";
+import type { Repositories, User, Alert, JournalTrade, ZoneLogEntry, AuditEntry, TrackedZone, ZoneQuery, ZoneFeedbackEntry, PushSub, StoredNotification } from "./memory.js";
 
 const DEFAULT_WATCHLIST = ["XAUUSD", "EURUSD", "BTCUSD", "US100"];
 
@@ -50,7 +50,11 @@ const zoneWhere = (q: ZoneQuery): Prisma.ZoneWhereInput => ({
 });
 
 const toUser = (u: DbUser): User => ({ id: u.id, email: u.email, displayName: u.displayName, passwordHash: u.passwordHash, role: u.role as Role, createdAt: ms(u.createdAt), settings: (u.settings ?? {}) as Record<string, unknown> });
-const toAlert = (a: DbAlert): Alert => ({ id: a.id, userId: a.userId, symbol: a.symbol, kind: a.kind, price: opt(a.price), zoneId: opt(a.zoneId), note: opt(a.note), active: a.active, createdAt: ms(a.createdAt), triggeredAt: optMs(a.triggeredAt) });
+const toAlert = (a: DbAlert): Alert => ({ id: a.id, userId: a.userId, symbol: a.symbol, kind: a.kind, price: opt(a.price), zoneId: opt(a.zoneId), zoneTop: opt(a.zoneTop), zoneBottom: opt(a.zoneBottom), note: opt(a.note), active: a.active, createdAt: ms(a.createdAt), triggeredAt: optMs(a.triggeredAt) });
+type DbPush = Prisma.PushSubscriptionGetPayload<object>;
+const toPush = (p: DbPush): PushSub => ({ id: p.id, userId: p.userId, endpoint: p.endpoint, p256dh: p.p256dh, auth: p.auth, userAgent: opt(p.userAgent), createdAt: ms(p.createdAt), lastSuccessAt: optMs(p.lastSuccessAt), failures: p.failures });
+type DbNotification = Prisma.NotificationGetPayload<object>;
+const toNotification = (n: DbNotification): StoredNotification => ({ id: n.id, userId: n.userId, kind: n.kind as StoredNotification["kind"], title: n.title as StoredNotification["title"], body: n.body as StoredNotification["body"], url: opt(n.url), alertId: opt(n.alertId), deliveries: (n.deliveries ?? []) as unknown as Delivery[], readAt: optMs(n.readAt), createdAt: ms(n.createdAt) });
 const toTrade = (t: DbTrade): JournalTrade => ({
   id: t.id, userId: t.userId, symbol: t.symbol, direction: t.direction, entry: t.entry, stopLoss: t.stopLoss, takeProfit: opt(t.takeProfit), size: t.size, riskAmount: opt(t.riskAmount),
   openedAt: dateToSec(t.openedAt), closedAt: t.closedAt ? dateToSec(t.closedAt) : undefined, exitPrice: opt(t.exitPrice), rMultiple: opt(t.rMultiple), setup: opt(t.setup), strategy: opt(t.strategy),
@@ -112,7 +116,7 @@ export function createPrismaRepositories(databaseUrl: string, opts: { client?: P
     },
 
     alerts: {
-      async create(a) { return toAlert(await db.alert.create({ data: { userId: a.userId, symbol: a.symbol, kind: a.kind, price: a.price, zoneId: a.zoneId, note: a.note, triggeredAt: a.triggeredAt ? new Date(a.triggeredAt) : undefined } })); },
+      async create(a) { return toAlert(await db.alert.create({ data: { userId: a.userId, symbol: a.symbol, kind: a.kind, price: a.price, zoneId: a.zoneId, zoneTop: a.zoneTop, zoneBottom: a.zoneBottom, note: a.note, triggeredAt: a.triggeredAt ? new Date(a.triggeredAt) : undefined } })); },
       async list(userId) { return (await db.alert.findMany({ where: { userId }, orderBy: { createdAt: "asc" } })).map(toAlert); },
       async listActive() { return (await db.alert.findMany({ where: { active: true }, orderBy: { createdAt: "asc" } })).map(toAlert); },
       async update(id, patch) {
@@ -121,6 +125,33 @@ export function createPrismaRepositories(databaseUrl: string, opts: { client?: P
         try { return toAlert(await db.alert.update({ where: { id }, data })); } catch (e) { if (isNotFound(e)) return undefined; throw e; }
       },
       async remove(id, userId) { return (await db.alert.deleteMany({ where: { id, userId } })).count > 0; },
+      async trigger(id, at) {
+        // conditional update = the database decides who wins when the watcher and a live tick fire together
+        const res = await db.alert.updateMany({ where: { id, active: true }, data: { active: false, triggeredAt: new Date(at) } });
+        if (!res.count) return undefined;
+        const a = await db.alert.findUnique({ where: { id } });
+        return a ? toAlert(a) : undefined;
+      },
+    },
+
+    push: {
+      async upsert(userId, s) {
+        const data = { userId, p256dh: s.p256dh, auth: s.auth, userAgent: s.userAgent ?? null, failures: 0 };
+        return toPush(await db.pushSubscription.upsert({ where: { endpoint: s.endpoint }, create: { endpoint: s.endpoint, ...data }, update: data }));
+      },
+      async list(userId) { return (await db.pushSubscription.findMany({ where: { userId }, orderBy: { createdAt: "asc" } })).map(toPush); },
+      async remove(endpoint, userId) { return (await db.pushSubscription.deleteMany({ where: { endpoint, ...(userId ? { userId } : {}) } })).count > 0; },
+      async result(endpoint, ok) {
+        await db.pushSubscription.updateMany({ where: { endpoint }, data: ok ? { failures: 0, lastSuccessAt: new Date() } : { failures: { increment: 1 } } });
+      },
+    },
+
+    notifications: {
+      async create(n) { return toNotification(await db.notification.create({ data: { userId: n.userId, kind: n.kind, title: json(n.title), body: json(n.body), url: n.url, alertId: n.alertId, deliveries: json(n.deliveries) } })); },
+      async setDeliveries(id, deliveries) { await db.notification.updateMany({ where: { id }, data: { deliveries: json(deliveries) } }); },
+      async list(userId, limit) { return (await db.notification.findMany({ where: { userId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: limit })).map(toNotification); },
+      async unread(userId) { return db.notification.count({ where: { userId, readAt: null } }); },
+      async markRead(userId, ids) { return (await db.notification.updateMany({ where: { userId, readAt: null, ...(ids ? { id: { in: ids } } : {}) }, data: { readAt: new Date() } })).count; },
     },
 
     journal: {

@@ -4,7 +4,7 @@ import { findInstrument, isTimeframe, type Instrument, type Timeframe } from "@t
 import type { AppContext } from "../context.js";
 import type { CandleUpdate } from "../providers/types.js";
 
-type ClientMsg = { type: "subscribe"; symbol: string; timeframe: string; includeLowQuality?: boolean; includeInvalidated?: boolean } | { type: "unsubscribe" } | { type: "ping" };
+type ClientMsg = { type: "subscribe"; symbol: string; timeframe: string; includeLowQuality?: boolean; includeInvalidated?: boolean; token?: string } | { type: "auth"; token?: string } | { type: "unsubscribe" } | { type: "ping" };
 
 /**
  * /ws — one subscription per socket: {type:"subscribe", symbol, timeframe, includeLowQuality?, includeInvalidated?}.
@@ -20,7 +20,14 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
     let current: { symbol: string; instrument: Instrument; timeframe: Timeframe; includeLowQuality: boolean; includeInvalidated: boolean } | undefined;
     const send = (o: unknown) => { if (socket.readyState === 1) socket.send(JSON.stringify(o)); };
 
-    const offAlert = ctx.alerts.onTrigger((e) => { if (current && e.alert.symbol === current.symbol) send({ type: "alert", event: e }); });
+    // alerts and notifications are private: only the owner's sockets receive them (the token identifies the socket)
+    let userId: string | undefined;
+    const authenticate = (token?: string) => {
+      if (!token) return;
+      try { userId = (app.jwt.verify(token) as { id: string }).id; } catch { userId = undefined; send({ type: "error", message: "BAD_TOKEN" }); }
+    };
+    const offAlert = ctx.alerts.onTrigger((e) => { if (userId && e.alert.userId === userId) send({ type: "alert", event: e }); });
+    const offNotify = ctx.notifications.onNotify((n) => { if (userId && n.userId === userId) { const { userId: _u, ...rest } = n; send({ type: "notification", notification: rest }); } });
 
     const pushStatus = () => {
       if (!current) return;
@@ -45,10 +52,12 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
       try { msg = JSON.parse(raw.toString()) as ClientMsg; } catch { return send({ type: "error", message: "BAD_JSON" }); }
       if (msg.type === "ping") return send({ type: "pong", at: Date.now() });
       if (msg.type === "unsubscribe") return cleanup();
+      if (msg.type === "auth") return authenticate(msg.token);
       if (msg.type === "subscribe") {
         const instrument = findInstrument(msg.symbol);
         if (!instrument || !isTimeframe(msg.timeframe)) return send({ type: "error", message: "BAD_SUBSCRIPTION" });
         cleanup();
+        if (msg.token) authenticate(msg.token);
         current = { symbol: instrument.symbol, instrument, timeframe: msg.timeframe, includeLowQuality: msg.includeLowQuality === true, includeInvalidated: msg.includeInvalidated === true };
         const provider = ctx.providers.for(instrument);
         pushStatus();
@@ -61,6 +70,6 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
         void pushAnalysis();
       }
     });
-    socket.on("close", () => { cleanup(); offAlert(); });
+    socket.on("close", () => { cleanup(); offAlert(); offNotify(); });
   });
 }

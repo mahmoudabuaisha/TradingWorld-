@@ -41,7 +41,7 @@ Base URL: `http://localhost:4000/api/v1` · JSON · `Authorization: Bearer <jwt>
 | Method | Path | Body |
 |---|---|---|
 | GET/PUT | `/watchlist` | `{ symbols[] }` |
-| GET/POST/DELETE | `/alerts`, `/alerts/:id` | `{ symbol, kind: price_above|price_below|zone_enter, price?, zoneId?, note? }` |
+| GET/POST/DELETE | `/alerts`, `/alerts/:id` | `{ symbol, kind: price_above|price_below|zone_enter, price?, zoneId?, zoneTop?, zoneBottom?, note? }` — `zone_enter` يتطلب `zoneTop > zoneBottom` (400 `ZONE_REQUIRED`) |
 | GET/POST/PATCH/DELETE | `/journal`, `/journal/:id` | `{ symbol, direction, entry, stopLoss, takeProfit?, exitPrice?, size, openedAt, closedAt?, setup?, strategy?, reason?, emotion?, notes?, zoneId? }` → يحسب `rMultiple` · `openedAt/closedAt` بثواني Unix (UTC) |
 | PATCH | `/settings` | أي JSON يُدمج في `user.settings` |
 
@@ -65,14 +65,32 @@ Base URL: `http://localhost:4000/api/v1` · JSON · `Authorization: Bearer <jwt>
 
 `:key` = `zoneTrackKey(analysis, zone)` من `@tradingworld/shared` (مُرمَّز بـ`encodeURIComponent`). الإدارة: `GET /admin/feedback?includeDemo`.
 
+## الإشعارات (NOTIF-01) 🔒
+| Method | Path | Body | الرد |
+|---|---|---|---|
+| GET | `/notifications?limit` | — | `{ notifications: AppNotification[], unread }` — الأحدث أولًا، حتى 200 |
+| POST | `/notifications/read` | `{ ids? }` | `{ marked }` — بلا `ids` = الكل |
+| GET | `/notifications/settings` | — | `{ prefs{push,email}, push{configured,publicKey,subscriptions}, email{configured,address}, watcher{pollSeconds,enabled} }` |
+| PUT | `/notifications/settings` | `{ push?, email? }` | `{ prefs }` — يُحفظ في `user.settings.notifications`؛ الافتراضي push مفعّل وemail معطّل |
+| POST | `/push/subscriptions` | `{ endpoint (https), keys{p256dh,auth} }` | `{ ok, subscriptions }` — upsert بالـendpoint؛ 20/دقيقة |
+| POST | `/push/unsubscribe` | `{ endpoint }` | `{ removed }` — اشتراكك فقط |
+| POST | `/notifications/test` | — | `{ notification }` مع نتيجة كل قناة؛ 3/دقيقة |
+
+`AppNotification = { id, kind: alert|test, title{ar,en}, body{ar,en}, url?, alertId?, deliveries[{channel: push|email, status: sent|failed|skipped, detail?, at}], readAt?, createdAt }`.
+
+**المراقب**: `AlertService` يفحص التنبيهات النشطة على الخادم كل `ALERT_POLL_SECONDS` (آخر شمعتي 1m لكل رمز له تنبيه)، بلا حاجة لمتصفح مفتوح. `price_above` بأعلى الشمعة، `price_below` بأدناها، `zone_enter` بتقاطع الشمعة مع حدود المنطقة المخزنة؛ الشمعة التي بدأت قبل إنشاء التنبيه تُقيَّم بإغلاقها فقط. الإطلاق ذري (`alerts.trigger`: يُحدَّث فقط إن كان نشطًا) فيُطلق كل تنبيه مرة واحدة حتى مع مسارين متزامنين (WS والمراقب). عند الإطلاق: صف في صندوق الإشعارات دائمًا، ثم Web Push لكل أجهزة المستخدم (VAPID، TTL ساعة، 404/410 يحذف الاشتراك) والبريد (SMTP) حسب التفضيلات وتهيئة الخادم؛ نتيجة كل قناة تُسجَّل في `deliveries`.
+
 ## WebSocket `/ws`
-Client → `{"type":"subscribe","symbol":"XAUUSD","timeframe":"5m","includeLowQuality":false,"includeInvalidated":false}` | `{"type":"unsubscribe"}` | `{"type":"ping"}`
+Client → `{"type":"subscribe","symbol":"XAUUSD","timeframe":"5m","includeLowQuality":false,"includeInvalidated":false,"token?":"<JWT>"}` | `{"type":"auth","token":"<JWT>"}` | `{"type":"unsubscribe"}` | `{"type":"ping"}`
+
+الرمز اختياري للبيانات العامة؛ رسائل `alert` و`notification` تُرسل **لمقابس مالك التنبيه فقط** (رمز غير صالح = بلا هوية، لا خطأ).
 Server →
 - `{"type":"status","provider":ProviderStatus,"feed":FeedStatus}` (عند الاشتراك ومع كل دفعة تحليل — المصدر وحالة التدفق لهذه الأداة)
 - `{"type":"candle","update":{symbol,timeframe,candle,closed,receivedAt,eventTime}}` (كل tick؛ `closed: true` = الشمعة في هذه الرسالة نهائية)
 - `{"type":"analysis","result":AnalysisResult}` (عند إغلاق شمعة أو كل 15s)
-- `{"type":"alert","event":{alert,price,message{ar,en},at}}`
+- `{"type":"alert","event":{alert,price,title{ar,en},message{ar,en},at}}` (للمالك فقط)
+- `{"type":"notification","notification":AppNotification}` (للمالك فقط)
 - `{"type":"error","message"}`
 
 ## مخطط (P2+)
-`/strategies` · `/setups` · `/scenarios` · `/snapshots` · `/notes` · `/goals` · `/routine` · `/calendar` · `/news` · `/scanner` · `/zones/:id/feedback` · `/backtests` · `/community/*` · `/plans` · `/notifications`
+`/strategies` · `/setups` · `/scenarios` · `/snapshots` · `/notes` · `/goals` · `/routine` · `/calendar` · `/news` · `/scanner` · `/zones/:id/feedback` · `/backtests` · `/community/*` · `/plans`

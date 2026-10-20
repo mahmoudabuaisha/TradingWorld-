@@ -5,9 +5,14 @@ import { zoneTrackKey } from "@tradingworld/shared";
 
 let app: Awaited<ReturnType<typeof buildApp>>;
 let token = "";
+const sentPush: { endpoint: string; payload: string }[] = [];
+const sentEmail: { to: string; subject: string; text: string }[] = [];
 
 beforeAll(async () => {
-  app = await buildApp({ config: loadConfig({ NODE_ENV: "test", JWT_SECRET: "test-secret-test-secret-123456", MARKET_DATA_PROVIDER: "demo" }), logger: false });
+  app = await buildApp({ config: loadConfig({ NODE_ENV: "test", JWT_SECRET: "test-secret-test-secret-123456", MARKET_DATA_PROVIDER: "demo" }), logger: false, senders: {
+    push: async (sub, payload) => { sentPush.push({ endpoint: sub.endpoint, payload }); return { ok: true }; },
+    email: async (m) => { sentEmail.push(m); },
+  } });
   await app.ready();
 });
 afterAll(async () => { await app.close(); });
@@ -148,6 +153,58 @@ describe("api", () => {
     expect((await app.inject({ method: "DELETE", url: `/api/v1/alerts/${al.id}`, headers: { ...h, "content-type": "application/json" } })).statusCode).toBe(400);
     // what it sends now
     expect((await app.inject({ method: "DELETE", url: `/api/v1/alerts/${al.id}`, headers: h })).json()).toEqual({ ok: true });
+  });
+
+  it("notifications: alert fires from the watcher, lands in the inbox, goes out on enabled channels", async () => {
+    const h = { authorization: `Bearer ${token}` };
+    const settings = (await app.inject({ method: "GET", url: "/api/v1/notifications/settings", headers: h })).json();
+    expect(settings).toMatchObject({ prefs: { push: true, email: false }, push: { configured: true, subscriptions: 0 }, email: { configured: true, address: "a@b.co" } });
+    expect((await app.inject({ method: "POST", url: "/api/v1/push/subscriptions", headers: h, payload: { endpoint: "http://insecure.example/x", keys: { p256dh: "p".repeat(20), auth: "a".repeat(12) } } })).statusCode).toBe(400);
+    expect((await app.inject({ method: "POST", url: "/api/v1/push/subscriptions", headers: h, payload: { endpoint: "https://push.example.test/me", keys: { p256dh: "p".repeat(20), auth: "a".repeat(12) } } })).json()).toEqual({ ok: true, subscriptions: 1 });
+    expect((await app.inject({ method: "PUT", url: "/api/v1/notifications/settings", headers: h, payload: { email: true } })).json().prefs).toEqual({ push: true, email: true });
+    expect((await app.inject({ method: "POST", url: "/api/v1/alerts", headers: h, payload: { symbol: "XAUUSD", kind: "zone_enter", zoneId: "k" } })).json().error).toBe("VALIDATION");
+    for (const price of [-50, 0]) expect((await app.inject({ method: "POST", url: "/api/v1/alerts", headers: h, payload: { symbol: "XAUUSD", kind: "price_above", price } })).json().error).toBe("VALIDATION");
+    const al = (await app.inject({ method: "POST", url: "/api/v1/alerts", headers: h, payload: { symbol: "XAUUSD", kind: "price_above", price: 1 } })).json().alert;
+    expect(await app.ctx.alerts.watchOnce()).toBe(1);
+    await new Promise((r) => setTimeout(r, 50)); // notify() runs after the trigger
+    const inbox = (await app.inject({ method: "GET", url: "/api/v1/notifications", headers: h })).json();
+    expect(inbox.unread).toBe(1);
+    expect(inbox.notifications[0]).toMatchObject({ kind: "alert", alertId: al.id, url: "/chart?symbol=XAUUSD", deliveries: [{ channel: "push", status: "sent" }, { channel: "email", status: "sent" }] });
+    expect(inbox.notifications[0].userId).toBeUndefined();
+    expect(JSON.parse(sentPush.at(-1)!.payload).url).toBe("/chart?symbol=XAUUSD");
+    expect(sentEmail.at(-1)!.to).toBe("a@b.co");
+    expect((await app.inject({ method: "GET", url: "/api/v1/alerts", headers: h })).json().alerts.find((a: { id: string }) => a.id === al.id).active).toBe(false);
+    expect((await app.inject({ method: "POST", url: "/api/v1/notifications/read", headers: h, payload: {} })).json().marked).toBe(1);
+    const test = (await app.inject({ method: "POST", url: "/api/v1/notifications/test", headers: h })).json().notification;
+    expect(test).toMatchObject({ kind: "test", deliveries: [{ channel: "push", status: "sent" }, { channel: "email", status: "sent" }] });
+    expect((await app.inject({ method: "POST", url: "/api/v1/push/unsubscribe", headers: h, payload: { endpoint: "https://push.example.test/me" } })).json()).toEqual({ removed: true });
+    expect((await app.inject({ method: "GET", url: "/api/v1/notifications" })).statusCode).toBe(401);
+  });
+
+  it("alerts over the WebSocket reach only their owner", async () => {
+    const other = (await app.inject({ method: "POST", url: "/api/v1/auth/register", payload: { email: "ws-other@b.co", password: "password123", displayName: "Other" } })).json();
+    // a real port and real WebSocket clients (injectWS has no socket address, which trustProxy needs)
+    const address = await app.listen({ port: 0, host: "127.0.0.1" });
+    const url = address.replace(/^http/, "ws") + "/ws";
+    const collect = async (tok?: string) => {
+      const ws = new WebSocket(url);
+      const got: { type: string }[] = [];
+      ws.onmessage = (ev) => got.push(JSON.parse(String(ev.data)));
+      await new Promise<void>((resolve, reject) => { ws.onopen = () => resolve(); ws.onerror = () => reject(new Error("ws error")); });
+      ws.send(JSON.stringify({ type: "subscribe", symbol: "EURUSD", timeframe: "15m", token: tok }));
+      return { ws, got };
+    };
+    const mine = await collect(token), theirs = await collect(other.token), anon = await collect();
+    await new Promise((r) => setTimeout(r, 300));
+    const h = { authorization: `Bearer ${token}` };
+    await app.inject({ method: "POST", url: "/api/v1/alerts", headers: h, payload: { symbol: "EURUSD", kind: "price_above", price: 0.5 } });
+    await app.ctx.alerts.evaluate("EURUSD", 1.1);
+    await new Promise((r) => setTimeout(r, 200));
+    const kinds = (g: { type: string }[]) => g.map((m) => m.type).filter((t) => t === "alert" || t === "notification");
+    expect(kinds(mine.got).sort()).toEqual(["alert", "notification"]);
+    expect(kinds(theirs.got)).toEqual([]);
+    expect(kinds(anon.got)).toEqual([]);
+    for (const c of [mine, theirs, anon]) c.ws.close();
   });
 
   it("ai chat answers deterministically without a key", async () => {

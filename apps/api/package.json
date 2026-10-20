@@ -13,7 +13,8 @@
     "test": "vitest run",
     "lint": "echo \"(api) lint skipped\"",
     "feed:check": "node dist/tools/feed-check.js",
-    "backfill": "node dist/tools/backfill.js"
+    "backfill": "node dist/tools/backfill.js",
+    "vapid-keys": "node dist/tools/vapid-keys.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
@@ -27,12 +28,16 @@
     "@tradingworld/shared": "workspace:*",
     "fastify": "^5.1.0",
     "fastify-plugin": "^5.0.1",
+    "nodemailer": "^6.10.1",
     "pg": "^8.23.1",
+    "web-push": "^3.6.7",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
+    "@types/nodemailer": "^6.4.24",
     "@types/pg": "^8.23.1",
+    "@types/web-push": "^3.6.4",
     "@types/ws": "^8.5.13",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
