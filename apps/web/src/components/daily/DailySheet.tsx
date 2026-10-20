@@ -10,7 +10,6 @@ import { Terrain } from "../marks/Terrain";
 import { Dimension } from "../marks/Dimension";
 import { SessionDial } from "../marks/SessionDial";
 import { Icon } from "../Icon";
-import { FeedMark } from "../marks/FeedMark";
 
 const ROUTINE = [
   { id: "calendar", ar: "فحص التقويم الاقتصادي", en: "Check the economic calendar" },

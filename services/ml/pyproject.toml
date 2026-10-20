@@ -24,3 +24,8 @@ include = ["app*"]
 
 [tool.ruff]
 line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# pyflakes + pycodestyle + import order + pyupgrade + bugbear + ruff's own checks
+select = ["F", "E", "W", "I", "UP", "B", "RUF"]

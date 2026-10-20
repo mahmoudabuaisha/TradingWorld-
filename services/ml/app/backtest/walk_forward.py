@@ -3,6 +3,7 @@
 Data MUST be sorted by detection time. Each fold trains on [0, split) and tests on [split, split+test_size).
 No shuffling, no random K-fold: that would leak future market regimes into training.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

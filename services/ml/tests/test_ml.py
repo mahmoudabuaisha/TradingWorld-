@@ -7,7 +7,12 @@ from app.registry import propose_weights
 
 
 def test_features_shape():
-    zone = {"top": 10, "bottom": 9, "direction": "bullish", "factors": [{"key": k, "present": i % 2 == 0} for i, k in enumerate(FACTOR_KEYS)]}
+    zone = {
+        "top": 10,
+        "bottom": 9,
+        "direction": "bullish",
+        "factors": [{"key": k, "present": i % 2 == 0} for i, k in enumerate(FACTOR_KEYS)],
+    }
     f = zone_features(zone, {"trend": "RANGING", "volatility": "NORMAL", "atr": 0.5}, "LONDON")
     assert len(f) == len(feature_names())
     assert f[0] == 1.0 and f[1] == 0.0

@@ -39,7 +39,7 @@ export function AdminView() {
   const runBackfill = async () => {
     if (!token) return;
     setBusy(true);
-    try { await api.triggerBackfill(token, { kind: "cycle" }); setTimeout(() => api.adminBackfill(token).then(setBackfill).catch(() => {}), 1500); } finally { setBusy(false); }
+    try { await api.triggerBackfill(token, { kind: "cycle" }); setTimeout(() => void api.adminBackfill(token).then(setBackfill).catch(() => {}), 1500); } finally { setBusy(false); }
   };
   const stamp = (s?: number) => (s ? new Date(s * 1000).toISOString().slice(5, 16).replace("T", " ") : "—");
   const ago = (ms?: number) => (ms ? `${Math.max(0, Math.round((Date.now() - ms) / 60000))} MIN AGO` : "—");

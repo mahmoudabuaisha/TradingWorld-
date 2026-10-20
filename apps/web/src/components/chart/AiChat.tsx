@@ -36,7 +36,7 @@ export function AiChat({ zoneId }: { zoneId?: string }) {
         {msgs.map((m, i) => <div key={i} className={`whitespace-pre-wrap rounded px-3 py-2 ${m.role === "user" ? "bg-ink text-field" : "bg-raised"}`}>{m.text}{m.provider && <div className="mono mt-1 text-2xs opacity-60">{m.provider}</div>}</div>)}
         {busy && <div className="mono text-xs text-ink-3">…</div>}
       </div>
-      <form onSubmit={(e) => { e.preventDefault(); ask(q); }} className="flex gap-2 border-t border-hair p-2">
+      <form onSubmit={(e) => { e.preventDefault(); void ask(q); }} className="flex gap-2 border-t border-hair p-2">
         <input id="ai-question" className="input py-1.5" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t(locale, "chart", "askAi")} />
         <button className="btn py-1.5" disabled={busy}>↵</button>
       </form>

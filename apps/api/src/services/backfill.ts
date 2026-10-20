@@ -1,4 +1,4 @@
-import { aggregate, bucketStart, canAggregate, type Candle } from "@tradingworld/analysis-engine";
+import { aggregate, bucketStart, canAggregate } from "@tradingworld/analysis-engine";
 import { DEFAULT_INSTRUMENTS, TIMEFRAMES, TIMEFRAME_SECONDS, findInstrument, type Instrument, type Timeframe } from "@tradingworld/shared";
 import type { ProviderRegistry } from "../providers/registry.js";
 import type { CandleStore } from "../store/candleStore.js";

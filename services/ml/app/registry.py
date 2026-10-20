@@ -3,11 +3,12 @@
 A proposal contains new factor weights derived from a validated model. Deployment is a
 human decision recorded in PROGRESS.md and in the EngineVersion table (packages/db).
 """
+
 from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 REGISTRY_DIR = Path(__file__).resolve().parent.parent / "registry"
@@ -45,7 +46,7 @@ def load_all() -> list[ModelRecord]:
 
 
 def next_version(prefix: str = "ml") -> str:
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     return f"{prefix}-{stamp}"
 
 

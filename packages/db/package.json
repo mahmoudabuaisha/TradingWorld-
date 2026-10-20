@@ -9,7 +9,6 @@
     "build": "prisma generate && tsc -p tsconfig.json",
     "typecheck": "prisma generate >/dev/null && tsc -p tsconfig.json --noEmit",
     "test": "echo \"(db) schema covered by apps/api repository tests\"",
-    "lint": "echo \"(db) lint skipped\"",
     "generate": "prisma generate",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",

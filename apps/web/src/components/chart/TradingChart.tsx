@@ -116,7 +116,7 @@ export function TradingChart({ candles, analysis, liveCandle, precision, selecte
         if (hit) onSelectZone?.(hit);
       });
       setData();
-    })();
+    })().catch((e: unknown) => console.error("chart init failed", e));
     return () => { disposed = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tokens]);
@@ -139,7 +139,9 @@ export function TradingChart({ candles, analysis, liveCandle, precision, selecte
     s.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close })));
     draw();
   };
-  useEffect(() => { setData(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [candles]);
+  // setData/applyAnalysis/draw read the latest props through closures; each effect re-runs on the inputs that change the picture
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setData(); }, [candles]);
 
   useEffect(() => {
     if (liveCandle && seriesRef.current) {
@@ -173,7 +175,8 @@ export function TradingChart({ candles, analysis, liveCandle, precision, selecte
     zonesRef.current = analysis?.zones ?? [];
     draw();
   }
-  useEffect(() => { applyAnalysis(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [analysis, showLevels, showStructure]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { applyAnalysis(); }, [analysis, showLevels, showStructure]);
   // the price scale stretches to keep the selected zone in view, so the leader line and the distance dimension always land
   useEffect(() => {
     const s = seriesRef.current;
@@ -193,7 +196,8 @@ export function TradingChart({ candles, analysis, liveCandle, precision, selecte
     draw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedZoneId, analysis]);
-  useEffect(() => { draw(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [calloutAnchor, trades, drawings, selectedDrawingId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { draw(); }, [calloutAnchor, trades, drawings, selectedDrawingId]);
 
   // a drawing tool takes the pointer: the chart must not pan or zoom under it; switching tools drops a half-placed drawing
   useEffect(() => {

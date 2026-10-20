@@ -7,6 +7,7 @@ Endpoints:
 Detection stays deterministic in the TypeScript engine; this service only studies outcomes
 and proposes new (versioned) scoring weights.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -51,7 +52,7 @@ def train(req: TrainRequest) -> dict[str, Any]:
     make = lambda: LogisticRegression(max_iter=500, C=0.5)  # noqa: E731
     report = walk_forward(X, y, make, n_folds=req.n_folds)
     model = make().fit(X, y)
-    coefs = dict(zip(feature_names(), model.coef_[0].tolist()))
+    coefs = dict(zip(feature_names(), model.coef_[0].tolist(), strict=True))
     factor_coefs = {k: coefs[f"factor_{k}"] for k in FACTOR_KEYS}
     proposal = registry.propose_weights(factor_coefs)
     record = registry.ModelRecord(
@@ -67,7 +68,11 @@ def train(req: TrainRequest) -> dict[str, Any]:
         extra={"coefficients": coefs, "folds": [f.__dict__ for f in report.folds]},
     )
     registry.save(record)
-    return {"record": record.__dict__, "deploy": False, "message": "Proposal saved. Deployment requires human approval + new SCORING_VERSION."}
+    return {
+        "record": record.__dict__,
+        "deploy": False,
+        "message": "Proposal saved. Deployment requires human approval + new SCORING_VERSION.",
+    }
 
 
 @app.get("/registry")

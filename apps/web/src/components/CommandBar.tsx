@@ -18,9 +18,11 @@ export function CommandBar({ onClose }: { onClose: () => void }) {
     return { mods, inst };
   }, [q]);
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-20" onClick={onClose}>
-      <div className="sheet w-full max-w-xl shadow-sheet" onClick={(e) => e.stopPropagation()}>
+    <div role="presentation" className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-20" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-label={t(locale, "shell", "search")} className="sheet w-full max-w-xl shadow-sheet">
         <div className="flex items-center gap-2 border-b border-hair px-4"><Icon name="search" size={16} className="text-ink-3" />
+          {/* a dialog opened by the user moves focus into itself (WAI-ARIA dialog pattern) */}
+          {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t(locale, "shell", "search")} className="w-full bg-transparent py-3 text-sm outline-none" />
           <span className="kbd">ESC</span></div>
         <div className="max-h-80 overflow-y-auto p-2">

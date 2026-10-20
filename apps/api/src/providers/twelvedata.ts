@@ -189,7 +189,7 @@ export class TwelveDataProvider implements MarketDataProvider {
         lastTime = last.time;
       } catch { /* status() carries the error; keep polling */ }
     };
-    const timer = setInterval(tick, (this.opts.pollSeconds ?? 15) * 1000);
+    const timer = setInterval(() => void tick(), (this.opts.pollSeconds ?? 15) * 1000);
     return () => clearInterval(timer);
   }
 

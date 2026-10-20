@@ -41,6 +41,8 @@ export const zoneFeedbackSchema = z.object({
   /** the factor that convinced the user most — must be present on that zone (checked by the API) */
   bestFactor: z.enum(FACTOR_KEYS).optional(),
   comment: z.string().max(FEEDBACK_COMMENT_MAX * 2).optional()
+    // stripping control characters is the point of this pattern
+    // eslint-disable-next-line no-control-regex
     .transform((s) => (s === undefined ? undefined : s.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, FEEDBACK_COMMENT_MAX) || undefined)),
 });
 export type ZoneFeedbackInput = z.infer<typeof zoneFeedbackSchema>;

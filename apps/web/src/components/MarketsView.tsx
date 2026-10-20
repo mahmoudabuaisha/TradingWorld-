@@ -32,8 +32,8 @@ export function MarketsView() {
   const L = (ar: string, en: string) => (locale === "ar" ? ar : en);
   useEffect(() => {
     const load = () => api.overview(DEFAULT_INSTRUMENTS.map((i) => i.symbol)).then((r) => { setRows(r.rows); setAt(r.generatedAt); setErr(undefined); }).catch((e) => setErr((e as Error).message));
-    load();
-    const id = setInterval(load, 30_000);
+    void load();
+    const id = setInterval(() => void load(), 30_000);
     return () => clearInterval(id);
   }, []);
   return (

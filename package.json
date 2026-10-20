@@ -15,10 +15,38 @@
     "build:packages": "pnpm -r --filter ./packages/* build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
-    "clean": "pnpm -r exec rm -rf dist .next node_modules && rm -rf node_modules"
+    "lint": "eslint . --max-warnings=0 --cache --cache-location node_modules/.cache/eslint/",
+    "lint:fix": "eslint . --fix --cache --cache-location node_modules/.cache/eslint/",
+    "lint:py": "cd services/ml && ruff check . && ruff format --check .",
+    "format": "prettier --write . --cache",
+    "format:check": "prettier --check . --cache",
+    "clean": "pnpm -r exec rm -rf dist .next node_modules && rm -rf node_modules",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "@eslint/js": "^9.39.5",
+    "@next/eslint-plugin-next": "^15.5.28",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.9.10",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.72.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "prettier --write",
+      "eslint --fix --max-warnings=0"
+    ],
+    "*.{json,css,yml,yaml}": "prettier --write",
+    "services/ml/**/*.py": [
+      "ruff check --fix",
+      "ruff format"
+    ]
   }
 }

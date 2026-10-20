@@ -258,7 +258,7 @@ describe("Polygon", () => {
   });
 
   it("authenticates the cluster socket, subscribes after auth_success and folds minute aggregates", async () => {
-    let t = Date.UTC(2026, 9, 19, 12, 0, 0);
+    const t = Date.UTC(2026, 9, 19, 12, 0, 0);
     const p = new PolygonProvider({ apiKey: "pk", requestsPerMinute: 100, useWebSocket: true, WebSocketCtor: FakeSocketCtor, now: () => t, fetchImpl: fetchMock(() => ({ status: "OK", results: [] })) });
     const got: CandleUpdate[] = [];
     p.subscribe(EURUSD, "5m", (u) => got.push(u));

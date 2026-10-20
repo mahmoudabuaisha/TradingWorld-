@@ -15,5 +15,5 @@ try {
 }
 
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
-  process.on(sig, async () => { await app.close(); process.exit(0); });
+  process.on(sig, () => { app.close().then(() => process.exit(0), (e: unknown) => { app.log.error(e); process.exit(1); }); });
 }

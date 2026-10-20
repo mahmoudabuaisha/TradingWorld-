@@ -8,8 +8,7 @@
     "build": "next build",
     "start": "next start -p 3000",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "echo \"(web) no unit tests yet\"",
-    "lint": "echo \"(web) eslint config pending — QA-01\""
+    "test": "echo \"(web) no unit tests yet\""
   },
   "dependencies": {
     "@tradingworld/analysis-engine": "workspace:*",

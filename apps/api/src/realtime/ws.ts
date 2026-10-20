@@ -47,7 +47,7 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
 
     const cleanup = () => { unsub?.(); unsub = undefined; if (analysisTimer) clearInterval(analysisTimer); analysisTimer = undefined; current = undefined; };
 
-    socket.on("message", async (raw: Buffer) => {
+    socket.on("message", (raw: Buffer) => {
       let msg: ClientMsg;
       try { msg = JSON.parse(raw.toString()) as ClientMsg; } catch { return send({ type: "error", message: "BAD_JSON" }); }
       if (msg.type === "ping") return send({ type: "pong", at: Date.now() });
@@ -66,7 +66,7 @@ export default async function realtime(app: FastifyInstance, ctx: AppContext) {
           if (u.closed) void pushAnalysis();
           else void ctx.alerts.evaluate(u.symbol, u.candle.close);
         });
-        analysisTimer = setInterval(pushAnalysis, 15_000);
+        analysisTimer = setInterval(() => void pushAnalysis(), 15_000);
         void pushAnalysis();
       }
     });

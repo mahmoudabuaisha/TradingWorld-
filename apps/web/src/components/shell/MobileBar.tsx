@@ -27,8 +27,8 @@ export function MobileBar() {
         <button onClick={() => setOpen(true)} className="flex flex-col items-center gap-0.5 py-2 text-[10px] text-ink-3"><Icon name="menu" /><span>{t(locale, "shell", "more")}</span></button>
       </nav>
       {open && (
-        <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setOpen(false)}>
-          <div className="absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-lg border-t border-hair bg-sheet p-4" onClick={(e) => e.stopPropagation()}>
+        <div role="presentation" className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }} onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}>
+          <div role="dialog" aria-modal="true" aria-label="ATLASES" className="absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-lg border-t border-hair bg-sheet p-4">
             <div className="mb-3 flex items-center justify-between"><span className="eyebrow">ATLASES</span><button className="btn-ghost px-2" onClick={() => setOpen(false)} aria-label="close"><Icon name="close" size={16} /></button></div>
             {ATLASES.filter((a) => a.id !== "home").map((a) => (
               <div key={a.id} className="mb-4">

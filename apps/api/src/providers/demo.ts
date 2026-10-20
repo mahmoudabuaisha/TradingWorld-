@@ -53,7 +53,7 @@ export class DemoProvider implements MarketDataProvider {
   subscribe(i: Instrument, tf: Timeframe, onUpdate: (u: CandleUpdate) => void): () => void {
     const key = `${i.symbol}:${tf}`;
     const step = TIMEFRAME_SECONDS[tf];
-    const timer = setInterval(async () => {
+    const tick = async () => {
       const series = await this.getCandles(i, tf, 2);
       const last = series[series.length - 1]!;
       const now = Math.floor(Date.now() / 1000);
@@ -75,7 +75,9 @@ export class DemoProvider implements MarketDataProvider {
       this.lastEventTime = now;
       this.seen.set(i.symbol, { receivedAt, eventTime: now });
       onUpdate({ symbol: i.symbol, timeframe: tf, candle, closed: false, receivedAt, eventTime: now });
-    }, 1000);
+    };
+    // a throw inside onUpdate must not become an unhandled rejection: that would stop the whole process
+    const timer = setInterval(() => void tick().catch((e: unknown) => console.warn(`demo tick ${key}:`, e)), 1000);
     return () => clearInterval(timer);
   }
 

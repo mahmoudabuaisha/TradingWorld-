@@ -16,9 +16,10 @@ export function useUnread(token?: string): number {
     let live = true;
     const tick = () => api.notifications(token, 1).then((r) => { if (live) setN(r.unread); }).catch(() => undefined);
     void tick();
-    const id = setInterval(tick, 30_000);
-    window.addEventListener(INBOX_EVENT, tick);
-    return () => { live = false; clearInterval(id); window.removeEventListener(INBOX_EVENT, tick); };
+    const onEvent = () => void tick();
+    const id = setInterval(onEvent, 30_000);
+    window.addEventListener(INBOX_EVENT, onEvent);
+    return () => { live = false; clearInterval(id); window.removeEventListener(INBOX_EVENT, onEvent); };
   }, [token]);
   return n;
 }

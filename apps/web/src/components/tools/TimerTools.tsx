@@ -5,14 +5,13 @@ import { useApp } from "@/store/useApp";
 function fmt(ms: number) { const s = Math.max(0, Math.floor(ms / 1000)); return `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; }
 
 export function Timer() {
-  const { locale } = useApp();
   const PRESETS = [["Study 25m", 25], ["Backtest 45m", 45], ["Session 90m", 90]] as const;
   const [total, setTotal] = useState(25 * 60_000);
   const [left, setLeft] = useState(total);
   const [running, setRunning] = useState(false);
   useEffect(() => {
     if (!running) return;
-    const id = setInterval(() => setLeft((l) => { if (l <= 1000) { setRunning(false); try { new AudioContext().resume(); } catch { /* ignore */ } return 0; } return l - 1000; }), 1000);
+    const id = setInterval(() => setLeft((l) => { if (l <= 1000) { setRunning(false); try { void new AudioContext().resume().catch(() => undefined); } catch { /* ignore */ } return 0; } return l - 1000; }), 1000);
     return () => clearInterval(id);
   }, [running]);
   return (
@@ -30,7 +29,6 @@ export function Timer() {
 }
 
 export function Stopwatch() {
-  const { locale } = useApp();
   const [elapsed, setElapsed] = useState(0);
   const [running, setRunning] = useState(false);
   const [laps, setLaps] = useState<number[]>([]);

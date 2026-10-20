@@ -3,13 +3,22 @@
 The ML layer never sees raw price alone: it sees the SAME explainable factors the user sees,
 plus market context (regime, session, volatility). This keeps every model auditable.
 """
+
 from __future__ import annotations
 
 from typing import Any
 
 FACTOR_KEYS = [
-    "HTF_LEVEL", "LIQUIDITY_SWEEP", "STRUCTURE_SHIFT", "DISPLACEMENT", "FVG",
-    "ORDER_BLOCK", "HTF_BIAS_ALIGN", "SESSION_RELEVANCE", "VOLATILITY_CONDITION", "FRESH",
+    "HTF_LEVEL",
+    "LIQUIDITY_SWEEP",
+    "STRUCTURE_SHIFT",
+    "DISPLACEMENT",
+    "FVG",
+    "ORDER_BLOCK",
+    "HTF_BIAS_ALIGN",
+    "SESSION_RELEVANCE",
+    "VOLATILITY_CONDITION",
+    "FRESH",
 ]
 REGIME_TREND = ["TRENDING_UP", "TRENDING_DOWN", "RANGING"]
 REGIME_VOL = ["HIGH", "NORMAL", "LOW"]

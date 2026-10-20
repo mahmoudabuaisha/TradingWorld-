@@ -7,7 +7,7 @@ on:
 
 jobs:
   node:
-    name: Typecheck · Test · Build
+    name: Format · Lint · Typecheck · Test · Build
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -32,8 +32,11 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
       - run: pnpm build:packages
       - run: pnpm typecheck
+      # after the packages build and Prisma generates: the type-aware rules need the real types of workspace imports
+      - run: pnpm lint
       - run: pnpm test
         env:
           # the candle store tests run against real PostgreSQL (plain Postgres; the Timescale layer is SQL-only)
@@ -45,7 +48,7 @@ jobs:
           NEXT_PUBLIC_WS_URL: ws://localhost:4000/ws
 
   python:
-    name: ML service · tests
+    name: ML service · ruff · tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -56,4 +59,6 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
       - run: pytest -q
