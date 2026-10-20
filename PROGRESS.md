@@ -140,7 +140,7 @@
 | OPS-01 | Monitoring (OpenTelemetry) + logs + alerting | 🟠 | ⬜ |
 | OPS-02 | Backups يومية + اختبار استرجاع | 🔴 | ⬜ |
 | NOTIF-01 | Push (Web Push) + Email للتنبيهات | 🟠 | 🟩 مراقب على الخادم، إطلاق ذري مرة واحدة، صندوق إشعارات، Web Push (VAPID) لكل الأجهزة، بريد SMTP اختياري، تفضيلات لكل مستخدم، أحداث WS للمالك فقط |
-| QA-01 | ESLint + Prettier + husky pre-commit لكل الحزم | 🟢 | ⬜ |
+| QA-01 | ESLint + Prettier + husky pre-commit لكل الحزم | 🟢 | 🟩 ESLint بإعداد واحد (قواعد وعود تعتمد الأنواع، hooks، Next، a11y)، Prettier، ruff لخدمة ML، husky + lint-staged، فحص أنواع الاختبارات، بوابات CI |
 
 ---
 
@@ -150,6 +150,10 @@
 
 | التاريخ | النطاق | التغيير | الحالة | معتمد |
 |---|---|---|---|---|
+| 2026-10-20 | repo (QA-01) | جودة الكود: `eslint.config.mjs` واحد للمستودع (typescript-eslint + `no-floating-promises`/`no-misused-promises`/`await-thenable` بالأنواع + react-hooks + Next.js core-web-vitals + jsx-a11y)؛ Prettier (عرض 140) مع `.prettierignore` (docs/ كما هي)؛ ruff لـ`services/ml`؛ husky + lint-staged قبل كل commit؛ `tsconfig.test.json` لكل حزمة لها اختبارات (كانت كل tsconfig تستثني `__tests__` فلم تُفحص أنواع الاختبارات قط)؛ سكربتات `lint`، `lint:fix`، `format`، `format:check`، `lint:py`، `check`؛ الـCI يشغّل format:check وlint وruff؛ تنسيق المستودع في commit مستقل مثبت أنه بلا تغيير في الكود (مقارنة شجرة الصياغة لكل ملف) ومسجل في `.git-blame-ignore-revs` | 🟩 | ☐ |
+| 2026-10-20 | apps/api (إصلاحات من ESLint) | دوال async تُمرر إلى `setInterval` ومعالج الإشارات ومقبس WS: رفض غير معالج فيها يوقف عملية Node كاملة (نبضة المزود التجريبي، استطلاع Polygon وTwelve Data، مؤقت التحليل في WS، الإغلاق)؛ الآن كل وعد معالج | 🟩 | ☐ |
+| 2026-10-20 | apps/web (إصلاحات من ESLint والتحقق) | (1) لوحة البحث ⌘K تعرض تلميح ESC لكن Escape لم يغلقها؛ هي وقائمة الأطالس في الهاتف الآن حوارات (`role="dialog"`) تُغلق بـEscape وبالنقر خارجها. (2) ثلاثة تعطيلات لـexhaustive-deps في الشارت كانت بعد السطر المقصود فلم تعطّل شيئًا. (3) سباق في تهيئة الشارت: المكتبة تُحمّل بشكل غير متزامن، فإن وصلت الشموع قبلها رسمت التهيئة بيانات قديمة فارغة، وظهرت شمعة حية واحدة تتكدس عليها كل العلامات. أُعيد إنتاجه بتأخير حزمة المكتبة 2.5 ثانية (8 أعمدة شموع بدل نحو 450)، والآن حالة `ready` تعيد تشغيل تأثيرات البيانات والتحليل والرسم بالقيم الحالية (454 عمودًا مع تأخير 6 ثوانٍ) | 🟩 | ☐ |
+| 2026-10-20 | services/ml | ruff (F, E, W, I, UP, B, RUF) وتنسيقه؛ `zip(strict=True)` بين أسماء الخصائص ومعاملات النموذج | 🟩 | ☐ |
 | 2026-10-20 | apps/api · packages/shared · packages/db (NOTIF-01) | التنبيهات تعمل بلا متصفح: `AlertService` أعيد بناؤه بمراقب على الخادم كل `ALERT_POLL_SECONDS` (آخر شمعتي 1m لكل رمز له تنبيه نشط)، `price_above` بالأعلى و`price_below` بالأدنى و`zone_enter` بحدود مخزنة (`zoneTop/zoneBottom`)، الشمعة الجارية عند إنشاء التنبيه تُقيَّم بإغلاقها فقط، والإطلاق ذري (`alerts.trigger`) فلا يتكرر بين المراقب وWS؛ `NotificationService`: صف في الصندوق دائمًا ثم Web Push (VAPID، TTL ساعة، حذف الاشتراك عند 404/410) وبريد SMTP (نص + HTML مع رابط وإخلاء مسؤولية) حسب التفضيلات (push مفعّل، email معطّل افتراضيًا) مع سجل نتيجة كل قناة؛ نماذج `PushSubscription` و`Notification` وترحيل `20261020210000_notifications`؛ مسارات `/notifications`، `/notifications/read`، `/notifications/settings`، `/push/subscriptions`، `/push/unsubscribe`، `/notifications/test`؛ أداة `vapid-keys`؛ 9 اختبارات جديدة (83 في الـAPI) | 🟩 | ☐ |
 | 2026-10-20 | apps/api (إصلاح أمني) | أحداث التنبيه في WebSocket كانت تُبث لكل مشتركي الرمز، فيرى مستخدم آخر نص تنبيهك وملاحظتك. الآن المقبس يعرّف نفسه بـJWT (`token` في `subscribe` أو رسالة `auth`) وتُرسل `alert` و`notification` لمقابس المالك فقط؛ اختبار خصوصية بمقبسين حقيقيين | 🟩 | ☐ |
 | 2026-10-20 | packages/shared (إصلاح) | تنبيه السعر كان يقبل سعرًا سالبًا أو صفرًا؛ الآن `price` موجب + اختبار | 🟩 | ☐ |

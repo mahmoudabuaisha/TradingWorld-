@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { IChartApi, ISeriesApi, UTCTimestamp, IPriceLine, LineStyle, Logical } from "lightweight-charts";
 import type { AnalysisResult, Candle, Zone } from "@tradingworld/analysis-engine";
 import {
@@ -133,6 +133,9 @@ export function TradingChart({
   const lastClose = liveCandle?.close ?? candles[candles.length - 1]?.close;
   lastRef.current = lastClose !== undefined ? { price: lastClose, atr: analysis?.base.atr ?? 0 } : undefined;
 
+  // flips once the chart exists. The library loads asynchronously, so candles or an analysis can arrive first; their
+  // effects re-run on `ready` with the current props (calling setData from the init closure drew stale, often empty, data)
+  const [ready, setReady] = useState(false);
   useEffect(() => {
     if (!tokens || chartRef.current) return;
     let disposed = false;
@@ -175,7 +178,7 @@ export function TradingChart({
         const hit = zonesRef.current.find((z) => price <= z.top && price >= z.bottom);
         if (hit) onSelectZone?.(hit);
       });
-      setData();
+      setReady(true);
     })().catch((e: unknown) => console.error("chart init failed", e));
     return () => {
       disposed = true;
@@ -225,7 +228,7 @@ export function TradingChart({
   useEffect(() => {
     setData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candles]);
+  }, [candles, ready]);
 
   useEffect(() => {
     if (liveCandle && seriesRef.current) {
@@ -239,7 +242,7 @@ export function TradingChart({
       draw();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveCandle]);
+  }, [liveCandle, ready]);
 
   function applyAnalysis() {
     const s = seriesRef.current,
@@ -280,7 +283,7 @@ export function TradingChart({
   useEffect(() => {
     applyAnalysis();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [analysis, showLevels, showStructure]);
+  }, [analysis, showLevels, showStructure, ready]);
   // the price scale stretches to keep the selected zone in view, so the leader line and the distance dimension always land
   useEffect(() => {
     const s = seriesRef.current;
@@ -308,7 +311,7 @@ export function TradingChart({
   useEffect(() => {
     draw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calloutAnchor, trades, drawings, selectedDrawingId]);
+  }, [calloutAnchor, trades, drawings, selectedDrawingId, ready]);
 
   // a drawing tool takes the pointer: the chart must not pan or zoom under it; switching tools drops a half-placed drawing
   useEffect(() => {

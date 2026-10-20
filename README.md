@@ -66,10 +66,17 @@ pnpm dev:web                   # http://localhost:3000
 ### الاختبارات والفحص
 
 ```bash
-pnpm typecheck      # كل الحزم
+pnpm check          # الكل بالترتيب: format:check ثم lint ثم typecheck ثم test
+pnpm format         # Prettier على المستودع (format:check للفحص فقط)
+pnpm lint           # ESLint بإعداد واحد في الجذر، صفر تحذيرات (lint:fix للإصلاح التلقائي)
+pnpm typecheck      # كل الحزم، والاختبارات أيضًا (tsconfig.test.json)
 pnpm test           # shared (5) + engine (18) + api (83؛ اختبارات المخزن والمستودعات على Postgres حقيقي عند ضبط TEST_DATABASE_URL)
-cd services/ml && pip install -e ".[dev]" && pytest -q   # ml (3)
+cd services/ml && pip install -e ".[dev]" && ruff check . && ruff format --check . && pytest -q   # ml (3)
 ```
+
+**قبل كل commit** يشغّل husky `lint-staged` على الملفات المرحَّلة فقط: Prettier ثم ESLint بالإصلاح التلقائي، وruff لملفات Python. يُفعَّل تلقائيًا مع `pnpm install`. خطأ لا يُصلح تلقائيًا يوقف الـcommit. الـCI يعيد الفحوص نفسها على المستودع كاملًا.
+
+القواعد في `eslint.config.mjs`: typescript-eslint، وثلاث قواعد تعتمد الأنواع للوعود غير المنتظرة (`no-floating-promises` و`no-misused-promises` و`await-thenable`: رفض غير معالج يوقف عملية Node)، وقواعد الـhooks وNext.js وjsx-a11y لتطبيق الويب. لعرض `git blame` بلا commit التنسيق: `git config blame.ignoreRevsFile .git-blame-ignore-revs` (GitHub يطبقه تلقائيًا).
 
 ### البنية التحتية (اختياري)
 

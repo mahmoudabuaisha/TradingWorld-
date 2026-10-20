@@ -70,7 +70,7 @@ export default tseslint.config(
     files: ["apps/web/**/*.{ts,tsx}"],
     plugins: { "react-hooks": reactHooks, "@next/next": nextPlugin, "jsx-a11y": jsxA11y },
     languageOptions: { globals: { ...globals.browser } },
-    settings: { next: { rootDir: "apps/web" } },
+    settings: { next: { rootDir: `${root}/apps/web` } },
     rules: {
       // the two classic hook rules; the React Compiler rules in plugin v7 assume the compiler, which this app does not use
       "react-hooks/rules-of-hooks": "error",
@@ -78,6 +78,8 @@ export default tseslint.config(
       ...nextPlugin.configs.recommended.rules,
       ...nextPlugin.configs["core-web-vitals"].rules,
       ...jsxA11y.flatConfigs.recommended.rules,
+      // App Router only: there is no pages/ directory for this rule to check against
+      "@next/next/no-html-link-for-pages": "off",
     },
   },
 
