@@ -1,0 +1,21 @@
+# DEPLOY-01 — what never goes into an image: dependencies and builds are made inside it, secrets stay on the server
+**/node_modules
+**/dist
+**/.next
+**/*.tsbuildinfo
+**/coverage
+packages/db/generated
+.git
+.husky
+.github
+docs
+services
+backups
+deploy/.env
+deploy/secrets
+deploy/.state
+secrets
+.env
+.env.*
+!.env.example
+*.log

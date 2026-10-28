@@ -10,7 +10,7 @@ import {
   type FeedStatus,
   TIMEFRAME_SECONDS,
 } from "@tradingworld/shared";
-import { api } from "@/lib/api";
+import { api, apiOrigin } from "@/lib/api";
 import { subscribeMarket } from "@/lib/ws";
 import { useApp } from "@/store/useApp";
 import { t } from "@/i18n/dictionary";
@@ -244,8 +244,7 @@ export function ChartWorkspace() {
       </div>
       {error && (
         <div className="border-b border-stamp/40 bg-sheet px-4 py-2 text-xs text-stamp md:px-6">
-          {error} · {locale === "ar" ? "تأكد من تشغيل الـ API على" : "make sure the API is running at"}{" "}
-          {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}
+          {error} · {locale === "ar" ? "تأكد من تشغيل الـ API على" : "make sure the API is running at"} {apiOrigin()}
         </div>
       )}
       {toast && (

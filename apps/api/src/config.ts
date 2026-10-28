@@ -28,6 +28,16 @@ const schema = z.object({
   EMAIL_FROM: z.string().default("TradingWorld <alerts@tradingworld.local>"),
   /** public web URL used in notification links (defaults to the first CORS origin) */
   APP_URL: z.string().optional(),
+  /**
+   * DEPLOY-01: the admin account, created (or promoted) at startup. The password only sets the account up: an existing
+   * account keeps its password (reset with node apps/api/dist/tools/admin.js reset-password EMAIL).
+   */
+  ADMIN_EMAIL: z.string().email().optional(),
+  ADMIN_PASSWORD: z.string().min(12).optional(),
+  /** first registered account becomes admin; default on outside production, off in production (use ADMIN_EMAIL) */
+  FIRST_USER_ADMIN: z.preprocess((v) => (v === undefined ? undefined : v === true || v === "true" || v === "1"), z.boolean().optional()),
+  /** commit the images were built from, shown by /health (set by the deploy) */
+  GIT_SHA: z.string().optional(),
   /** OPS-01 logs: pino level */
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   /** OPS-01 OpenTelemetry: OTLP/HTTP base URL (collector, Grafana Cloud, Honeycomb…); enables traces and metric push */

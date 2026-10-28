@@ -3,6 +3,7 @@ import { DEFAULT_INSTRUMENTS, TIMEFRAMES, type Timeframe } from "@tradingworld/s
 import { useApp } from "@/store/useApp";
 import { useEffect, useState } from "react";
 import { NotificationsSettings } from "./NotificationsSettings";
+import { apiOrigin } from "@/lib/api";
 
 export function SettingsView() {
   const s = useApp();
@@ -99,7 +100,10 @@ export function SettingsView() {
           <input id="set-inv" type="checkbox" className="accent-ink" checked={s.showInvalidated} onChange={s.toggleInvalidated} />
           {L("إظهار المناطق المبطلة حديثًا على الشارت", "Show recently invalidated zones on the chart")}
         </label>
-        <div className="mono text-[11px] text-ink-3">API {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}</div>
+        {/* the server renders before it knows the page's origin */}
+        <div className="mono text-[11px] text-ink-3" suppressHydrationWarning>
+          API {apiOrigin()}
+        </div>
       </div>
       <div id="notifications">
         <NotificationsSettings />

@@ -27,6 +27,7 @@ TradingWorld هي بيئة متكاملة للمتداول: **شارت + محر�
 | [docs/12-design-system-kharita.md](./docs/12-design-system-kharita.md) | نظام التصميم «خريطة»: الرموز، المكوّنات، الأوراق، الوصولية، ولوحة الألوان الكلاسيكية |
 | [docs/13-backups.md](./docs/13-backups.md) | النسخ الاحتياطي واختبار الاسترجاع: التشفير، النسخة الخارجية، الاحتفاظ، ودليل الاسترجاع عند الكارثة |
 | [docs/14-observability.md](./docs/14-observability.md) | المراقبة: المقاييس (`/metrics`)، التتبع (OpenTelemetry)، السجلات، المراقب الداخلي وتنبيهاته، Prometheus وGrafana وJaeger |
+| [docs/15-deployment.md](./docs/15-deployment.md) | النشر على الخادم: الإعداد لمرة واحدة، التحديث التلقائي بعد الدمج، الأوامر اليومية، الأمان |
 
 ## 🏗️ هيكل المستودع
 
@@ -72,7 +73,7 @@ pnpm check          # الكل بالترتيب: format:check ثم lint ثم typ
 pnpm format         # Prettier على المستودع (format:check للفحص فقط)
 pnpm lint           # ESLint بإعداد واحد في الجذر، صفر تحذيرات (lint:fix للإصلاح التلقائي)
 pnpm typecheck      # كل الحزم، والاختبارات أيضًا (tsconfig.test.json)
-pnpm test           # shared (5) + engine (18) + api (101؛ اختبارات المخزن والمستودعات على Postgres حقيقي عند ضبط TEST_DATABASE_URL)
+pnpm test           # shared (5) + engine (18) + api (105؛ اختبارات المخزن والمستودعات على Postgres حقيقي عند ضبط TEST_DATABASE_URL)
 cd services/ml && pip install -e ".[dev]" && ruff check . && ruff format --check . && pytest -q   # ml (3)
 ```
 

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# DEPLOY-01 — docker compose for the production stack, with the right files and the running image tag:
+#   deploy/tw ps | logs -f api | exec api node apps/api/dist/tools/admin.js list | restart web | …
+set -euo pipefail
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TAG_FILE="$DIR/.state/current-tag"
+export IMAGE_TAG="${IMAGE_TAG:-$( [ -f "$TAG_FILE" ] && cat "$TAG_FILE" || echo latest )}"
+exec docker compose --env-file "$DIR/.env" -f "$DIR/docker-compose.prod.yml" "$@"

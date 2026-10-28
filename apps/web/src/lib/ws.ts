@@ -1,4 +1,4 @@
-import { WS_URL } from "./api";
+import { wsUrl } from "./api";
 import type { AnalysisResult, Candle } from "@tradingworld/analysis-engine";
 import type { Timeframe, ProviderStatus, FeedStatus, AppNotification } from "@tradingworld/shared";
 
@@ -23,7 +23,7 @@ export function subscribeMarket(
   let closed = false;
   let retry = 1000;
   const connect = () => {
-    ws = new WebSocket(WS_URL);
+    ws = new WebSocket(wsUrl());
     ws.onopen = () => {
       retry = 1000;
       ws?.send(JSON.stringify({ type: "subscribe", symbol, timeframe, ...flags }));

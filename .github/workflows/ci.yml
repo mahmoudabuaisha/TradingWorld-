@@ -109,14 +109,53 @@ jobs:
           node apps/api/dist/tools/backup.js restore .backups/local/*.manifest.json --target postgresql://tradingworld:tradingworld@localhost:5432/tw_recovered
           psql -h localhost -U tradingworld -d tw_recovered -At -c "SELECT count(*) FROM market.candles" -c "SELECT count(*) FROM timescaledb_information.hypertables"
 
-  docker-api:
-    # the image the API and the backup job run from: it builds, and carries pg_dump 16, age and rclone
-    name: Docker · API image
+  deploy-stack:
+    # DEPLOY-01: the production stack exactly as the server runs it. deploy.sh builds the images, starts Caddy, the
+    # database, API, web app and backup job, and waits for the API to report this commit; then the smoke test checks
+    # the site through Caddy (HTTPS, same-origin API, WebSocket, closed ports) and the backup job does a real drill.
+    name: Deploy · production stack end to end
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -f infra/Dockerfile.api -t tradingworld-api:ci .
-      - run: docker run --rm tradingworld-api:ci sh -c 'pg_dump --version && pg_restore --version && age --version && rclone version | head -1 && node apps/api/dist/tools/backup.js status'
+        with:
+          fetch-depth: 0
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+      - name: deploy/.env and keys, as setup.sh writes them
+        run: |
+          mkdir -p deploy/secrets
+          age-keygen -o deploy/secrets/age-identity.txt 2>/dev/null
+          cat > deploy/.env <<EOF
+          DOMAIN=localhost
+          POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          JWT_SECRET=$(openssl rand -hex 32)
+          METRICS_TOKEN=$(openssl rand -hex 24)
+          ADMIN_EMAIL=admin@example.test
+          ADMIN_PASSWORD=ci-admin-password-123
+          BACKUP_AGE_RECIPIENTS=$(age-keygen -y deploy/secrets/age-identity.txt)
+          MARKET_DATA_PROVIDER=demo
+          EOF
+      - name: deploy.sh (build, start, wait for this commit)
+        env:
+          DEPLOY_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: deploy/deploy.sh --force
+      - name: Smoke test through Caddy
+        run: deploy/smoke-test.sh localhost
+      - name: Accounts in production
+        run: |
+          B=https://localhost/api/v1
+          login=$(curl -sk -X POST $B/auth/login -H 'content-type: application/json' -d '{"email":"admin@example.test","password":"ci-admin-password-123"}')
+          echo "$login" | grep -q '"role":"admin"' || { echo "admin login failed: $login"; exit 1; }
+          reg=$(curl -sk -X POST $B/auth/register -H 'content-type: application/json' -d '{"email":"first@visitor.test","password":"visitor-pass-1","displayName":"Visitor"}')
+          echo "$reg" | grep -q '"role":"user"' || { echo "first registration must not be admin: $reg"; exit 1; }
+          echo "admin from ADMIN_EMAIL, first visitor is a user"
+      - name: Backup tools and a real drill inside the stack
+        run: |
+          deploy/tw exec -T backup sh -c 'pg_dump --version && age --version && rclone version | head -1'
+          deploy/tw exec -T backup node apps/api/dist/tools/backup.js run
+          deploy/tw exec -T backup node apps/api/dist/tools/backup.js drill --local
+      - name: Logs on failure
+        if: failure()
+        run: deploy/tw logs --tail 100
 
   python:
     name: ML service · ruff · tests

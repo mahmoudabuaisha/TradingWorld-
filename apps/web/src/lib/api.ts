@@ -13,8 +13,20 @@ import type {
   NotificationPrefs,
 } from "@tradingworld/shared";
 
+/**
+ * Where the API lives. Unset: the development API on localhost:4000. Empty: the page's own origin, the production setup
+ * where one domain serves the web app and, under /api and /ws, the API (deploy/Caddyfile), so one image fits any domain.
+ */
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:4000/ws";
+
+/** The API origin as the user sees it (the page's origin when API_URL is empty). */
+export const apiOrigin = () => API_URL || (typeof window === "undefined" ? "" : window.location.origin);
+
+/** NEXT_PUBLIC_WS_URL when set, otherwise /ws on the API origin (wss: on an https page). */
+export function wsUrl(): string {
+  if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
+  return `${apiOrigin().replace(/^http/, "ws")}/ws`;
+}
 
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   const res = await fetch(`${API_URL}/api/v1${path}`, {
