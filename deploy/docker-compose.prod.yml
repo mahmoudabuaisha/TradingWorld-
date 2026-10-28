@@ -1,0 +1,112 @@
+# DEPLOY-01 — production on one server (docs/15-deployment.md). Only Caddy is reachable from the internet (80/443):
+# it terminates HTTPS for DOMAIN and serves the web app, with /api/* and /ws going to the API. The database and the
+# backups never leave the internal network. Run it through deploy/tw (it passes the env file and project name).
+name: tradingworld
+
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+      - web
+
+  db:
+    # pinned: a restore needs the same TimescaleDB version as the dump (docs/13)
+    image: timescale/timescaledb:2.30.2-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tradingworld
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: tradingworld
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ../packages/db/prisma/sql/0001_timescale.sql:/docker-entrypoint-initdb.d/0001_timescale.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tradingworld"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: tradingworld-api:${IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://tradingworld:${POSTGRES_PASSWORD}@db:5432/tradingworld?schema=public
+      CORS_ORIGIN: https://${DOMAIN}
+      APP_URL: https://${DOMAIN}
+      BACKUP_DIR: /backups
+      GIT_SHA: ${IMAGE_TAG:-latest}
+    volumes:
+      # read-only: the admin sheet shows the backup job's status.json
+      - backups:/backups:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: tradingworld-web:${IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.web
+      args:
+        # empty = the browser calls /api and /ws on its own origin (Caddy routes them)
+        NEXT_PUBLIC_API_URL: ""
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  backup:
+    # the API image carries pg_dump 16, age and rclone (OPS-02)
+    image: tradingworld-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://tradingworld:${POSTGRES_PASSWORD}@db:5432/tradingworld?schema=public
+      BACKUP_DIR: /backups
+      BACKUP_AGE_IDENTITY_FILE: /run/secrets/age-identity
+    command: ["node", "apps/api/dist/tools/backup.js", "schedule"]
+    volumes:
+      - backups:/backups
+      - ./secrets/age-identity.txt:/run/secrets/age-identity:ro
+    healthcheck:
+      test: ["CMD", "node", "apps/api/dist/tools/backup.js", "status", "--check"]
+      interval: 1h
+      start_period: 5m
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  backups:
+  caddy-data:
+  caddy-config:

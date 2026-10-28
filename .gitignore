@@ -38,3 +38,5 @@ data/cache/
 services/ml/registry/
 # OPS-02 local backups (BACKUP_DIR default)
 backups/
+# DEPLOY-01: deploy state on the server (deploy/.env and deploy/secrets are covered by the patterns above)
+deploy/.state/

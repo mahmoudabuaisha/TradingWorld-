@@ -66,11 +66,14 @@ export function AuthForm() {
       >
         {mode === "login" ? t(locale, "common", "register") : t(locale, "nav", "login")}
       </button>
-      <p className="text-[11px] text-ink-3">
-        {locale === "ar"
-          ? "أول حساب يُسجَّل يصبح Admin تلقائيًا (بيئة التطوير)."
-          : "The first registered account becomes admin automatically (dev environment)."}
-      </p>
+      {/* local development only (next dev): in production the admin comes from ADMIN_EMAIL, never from registration */}
+      {process.env.NODE_ENV === "development" && (
+        <p className="text-[11px] text-ink-3">
+          {locale === "ar"
+            ? "أول حساب يُسجَّل يصبح Admin تلقائيًا (بيئة التطوير)."
+            : "The first registered account becomes admin automatically (dev environment)."}
+        </p>
+      )}
     </form>
   );
 }

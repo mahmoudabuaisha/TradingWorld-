@@ -9,7 +9,9 @@ export default async function authRoutes(app: FastifyInstance, ctx: AppContext) 
     if (!body.success) return reply.code(400).send({ error: "VALIDATION", issues: body.error.issues });
     const email = body.data.email.toLowerCase();
     if (await ctx.repos.users.byEmail(email)) return reply.code(409).send({ error: "EMAIL_TAKEN" });
-    const isFirst = (await ctx.repos.users.list()).length === 0;
+    // production: the admin comes from ADMIN_EMAIL; elsewhere the first account is the admin (local development)
+    const firstIsAdmin = ctx.config.FIRST_USER_ADMIN ?? ctx.config.NODE_ENV !== "production";
+    const isFirst = firstIsAdmin && (await ctx.repos.users.list()).length === 0;
     const user = await ctx.repos.users.create({
       email,
       displayName: body.data.displayName,

@@ -29,6 +29,7 @@ import { instruments, observe, RequestWindow } from "./ops/metrics.js";
 import { buildRules, eventLoopMonitor, opsNotifier, Watchdog } from "./ops/watchdog.js";
 import { readStatus } from "./ops/backup.js";
 import { resolve } from "node:path";
+import { ensureAdmin } from "./ops/admin.js";
 
 export interface BuildOptions {
   config?: Config;
@@ -61,6 +62,8 @@ export async function createRepositories(config: Config): Promise<Repositories &
 export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance & { ctx: AppContext }> {
   const config = opts.config ?? loadConfig();
   const repos: Repositories & { close?: () => Promise<void> } = opts.repos ?? (await createRepositories(config));
+  const admin =
+    config.ADMIN_EMAIL && config.ADMIN_PASSWORD ? await ensureAdmin(repos, config.ADMIN_EMAIL, config.ADMIN_PASSWORD) : undefined;
   const store = createCandleStore(config);
   const providers = new ProviderRegistry(config, { store });
   const analysis = new AnalysisService(providers, repos);
@@ -128,6 +131,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
       })
       .catch((err) => app.log.error(err));
   });
+  if (admin) app.log.info(`admin account ${config.ADMIN_EMAIL}: ${admin}`);
   const ops: AppContext["ops"] = { telemetry: tel, window, ws: { open: 0 } } as AppContext["ops"];
   const ctx: AppContext = { config, repos, providers, analysis, ai, alerts, store, backfill, outcomes, notifications, ops };
   const loop = eventLoopMonitor();
