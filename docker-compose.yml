@@ -132,7 +132,7 @@ services:
     depends_on:
       - prometheus
 
-  # traces: set OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318 in .env (or point it at a hosted backend instead)
+  # traces: set OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://jaeger:4318/v1/traces in .env (Jaeger takes no OTLP metrics)
   jaeger:
     profiles: ["monitoring"]
     image: jaegertracing/all-in-one:1.62.0
@@ -142,6 +142,17 @@ services:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:
       - "127.0.0.1:16686:16686"
+
+  # OPS-01b: the machine's CPU, memory, disk and network for the "TradingWorld · Server" dashboard
+  node-exporter:
+    profiles: ["monitoring"]
+    image: prom/node-exporter:v1.9.1
+    container_name: tw-node-exporter
+    restart: unless-stopped
+    command: ["--path.rootfs=/host"]
+    pid: host
+    volumes:
+      - /:/host:ro
 
   ml:
     profiles: ["ml"]

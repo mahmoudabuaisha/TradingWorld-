@@ -94,6 +94,7 @@ export default async function adminRoutes(app: FastifyInstance, ctx: AppContext)
         otlp: ctx.ops.telemetry.otlp,
         metrics: c.METRICS_TOKEN ? "token" : c.NODE_ENV === "production" ? "disabled" : "open",
         sampleRatio: c.OTEL_TRACES_SAMPLE_RATIO,
+        dashboardUrl: c.MONITORING_URL ?? null,
       },
       watchdog: { enabled: c.OPS_WATCHDOG_ENABLED, webhook: !!c.OPS_ALERT_WEBHOOK_URL, repeatHours: c.OPS_ALERT_REPEAT_HOURS },
       signals: {

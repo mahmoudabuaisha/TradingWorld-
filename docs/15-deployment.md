@@ -7,14 +7,16 @@
 ```
 الزائر ──HTTPS──► Caddy (المنفذان 80 و443 فقط، شهادة Let's Encrypt تلقائية)
                     ├─ /api/* و /ws ──► api   (Fastify، المنفذ 4000 داخل شبكة Docker)
+                    ├─ /grafana ──────► grafana (لوحات المراقبة بتسجيل دخول، OPS-01b)
                     └─ كل ما عدا ذلك ──► web   (Next.js، المنفذ 3000 داخل شبكة Docker)
                                          db     (TimescaleDB 2.30.2 / PostgreSQL 16، داخلي فقط)
                                          backup (نسخة يومية مشفرة + اختبار استرجاع أسبوعي، OPS-02)
+                                         prometheus · jaeger · node-exporter (المراقبة، داخلية فقط)
 ```
 
 - **أصل واحد**: المتصفح يطلب `/api` و`/ws` من نطاق الصفحة نفسه. صورة الويب لا تحمل أي عنوان مثبت، فتصلح لأي نطاق دون إعادة بناء.
 - **لا شيء مكشوف** إلا Caddy: قاعدة البيانات والـAPI بلا منافذ على الخادم، والجدار الناري يسمح بـSSH و80 و443 فقط.
-- **الملفات**: `deploy/docker-compose.prod.yml`، `deploy/Caddyfile`، `deploy/setup.sh`، `deploy/deploy.sh`، `deploy/tw`، `deploy/smoke-test.sh`.
+- **الملفات**: `deploy/docker-compose.prod.yml`، `deploy/caddy/Caddyfile`، `deploy/setup.sh`، `deploy/deploy.sh`، `deploy/tw`، `deploy/smoke-test.sh`، وإعدادات المراقبة في `infra/monitoring/`.
 
 ## 2. قبل الإعداد: سجل DNS
 
@@ -54,6 +56,7 @@ bash /opt/tradingworld/deploy/setup.sh trading.mediatechnologies.uk
 ```
 
 - **التحقق**: يبني الصور بوسم الـcommit، يشغّلها، ثم ينتظر حتى يرد الـAPI بالـcommit الجديد في `/api/v1/health` وتجيب الواجهة.
+- **الإعدادات المركّبة**: إن تغيّر `deploy/caddy/` يعيد تحميل Caddy (ملف مرفوض يُفشل النشر ويعيد السابق)، وإن تغيّر `infra/monitoring/` يعيد تشغيل Prometheus وGrafana.
 - **إن فشل**: يعيد النسخة السابقة بصورها، ويسجّل الـcommit الفاشل فلا يعيد المحاولة حتى يأتي commit أحدث.
 - **أي نسخة تعمل الآن؟** `https://trading.mediatechnologies.uk/api/v1/health` ثم الحقل `commit`.
 - **السجل**: `journalctl -u tradingworld-deploy -f`
@@ -68,6 +71,8 @@ bash /opt/tradingworld/deploy/setup.sh trading.mediatechnologies.uk
 | حالة الحاويات | `deploy/tw ps` |
 | السجلات | `deploy/tw logs -f api` (أو `web`، `caddy`، `db`، `backup`) |
 | فحص الموقع من الخارج | `deploy/smoke-test.sh trading.mediatechnologies.uk` |
+| لوحات المراقبة | `https://trading.mediatechnologies.uk/grafana/` (بريد المشرف وكلمة سره) |
+| كلمة سر جديدة لـGrafana | `deploy/tw exec grafana grafana cli admin reset-admin-password 'NEW'` |
 | نسيت كلمة سر المشرف | `deploy/tw exec api node apps/api/dist/tools/admin.js reset-password admin@mediatechnologies.uk` |
 | ترقية حساب إلى مشرف | `deploy/tw exec api node apps/api/dist/tools/admin.js promote EMAIL` |
 | حالة النسخ الاحتياطي | `deploy/tw exec backup node apps/api/dist/tools/backup.js status` |
@@ -85,13 +90,14 @@ bash /opt/tradingworld/deploy/setup.sh trading.mediatechnologies.uk
 | SSH | fail2ban يحظر التخمين. يُنصح بالدخول بمفتاح SSH وتعطيل كلمة السر |
 | عنوان العميل | Caddy يضع `X-Forwarded-For` بنفسه، فلا يمكن تزويره لتجاوز حدود الطلبات |
 | `/metrics` | غير متاح من الخارج (404 عبر Caddy) |
+| المراقبة | Grafana بتسجيل دخول وحظر للتخمين، بلا تسجيل ذاتي أو دخول مجهول، ولا يبدأ بكلمة سر افتراضية. Prometheus وJaeger ومُصدِّر الخادم بلا أي مسار من الخارج |
 
 ## 7. ما يبقى بعد الإطلاق
 
 | البند | لماذا |
 |---|---|
-| **تفعيل المراقبة (OPS-01)**: Prometheus وGrafana وJaeger | معطّلة الآن بطلب صاحب المشروع. **يجب التذكير بها.** التفعيل: ملف تعريف `monitoring` (docs/14) |
-| فحص خارجي لتوقف الخادم | المراقب الداخلي لا يرى توقف العملية نفسها (docs/14 §5) |
+| ~~تفعيل المراقبة~~ | ✓ OPS-01b: Grafana على `/grafana`، وPrometheus وJaeger ومقاييس الخادم (docs/14 §6) |
+| ~~فحص خارجي لتوقف الخادم~~ | ✓ OPS-01b: GitHub Actions كل 10 دقائق يرسل بريدًا عند الفشل (docs/14 §5) |
 | نسخة خارجية للنسخ الاحتياطي | النسخ الآن على الخادم نفسه ومشفرة. ضياع الخادم يعني ضياعها؛ Cloudflare R2 يكفي (docs/13 §6) |
 | مزود بيانات مرخص | الأسعار الآن تجريبية، ولوحة الإدارة تنبّه لذلك (docs/03) |
 | البريد (SMTP) | لإرسال التنبيهات بالبريد |
@@ -101,7 +107,7 @@ bash /opt/tradingworld/deploy/setup.sh trading.mediatechnologies.uk
 
 | السيناريو | أين |
 |---|---|
-| الحزمة كاملة كما على الخادم: `deploy.sh` يبني ويشغّل وينتظر الـcommit، ثم فحص عبر Caddy (HTTPS، API من الأصل نفسه، WebSocket، منافذ مغلقة)، دخول المشرف، أول مسجّل ليس مشرفًا، أدوات النسخ واختبار استرجاع حقيقي داخل الحزمة | وظيفة CI `deploy-stack` مع كل push |
+| الحزمة كاملة كما على الخادم: نشر `main` ثم الترقية بـ`deploy.sh` الموجود فيه، ثم فحص عبر Caddy (HTTPS، API من الأصل نفسه، WebSocket، Grafana، منافذ مغلقة)، المراقبة كاملة، دخول المشرف، أول مسجّل ليس مشرفًا، أدوات النسخ واختبار استرجاع حقيقي داخل الحزمة | وظيفة CI `deploy-stack` مع كل push |
 | منطق `deploy.sh`: أول نشر، لا شيء جديد، فشل الفحص مع العودة للنسخة السابقة، تجاهل الـcommit الفاشل، commit أحدث ينجح وتُحذف الصور القديمة | محليًا بـ`docker` مزيف |
 | صورة الويب بلا `localhost:4000` (كانت في 10 ملفات)، Caddy يوجّه `/api` و`/ws` والواجهة، الدخول من النموذج الحقيقي، الشارت يعمل مباشرة | محليًا عبر `https://localhost` |
 | مفاتيح Web Push المولّدة بـopenssl صالحة | محليًا بمكتبة web-push |

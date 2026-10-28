@@ -57,6 +57,9 @@ export interface TelemetryOptions {
   environment?: string;
   /** OTLP/HTTP base URL, e.g. http://otel-collector:4318 — enables trace export and metric push */
   otlpEndpoint?: string;
+  /** full OTLP/HTTP traces URL (OTEL_EXPORTER_OTLP_TRACES_ENDPOINT); wins over the base URL for traces. Alone it
+   * exports traces only, for a backend without a metrics receiver such as Jaeger (Prometheus scrapes the metrics) */
+  otlpTracesEndpoint?: string;
   /** extra OTLP headers, "k=v,k2=v2" (vendor API keys) */
   otlpHeaders?: string;
   /** 0..1 of new traces kept (children follow their parent) */
@@ -100,6 +103,7 @@ export function startTelemetry(o: TelemetryOptions = {}): Telemetry {
   });
   const headers = parseHeaders(o.otlpHeaders);
   const base = o.otlpEndpoint?.replace(/\/$/, "");
+  const tracesUrl = o.otlpTracesEndpoint || (base ? `${base}/v1/traces` : undefined);
 
   // metrics
   const prom = new PrometheusExporter({ preventServerStart: true });
@@ -117,7 +121,7 @@ export function startTelemetry(o: TelemetryOptions = {}): Telemetry {
 
   // traces
   const processors: SpanProcessor[] = [...(o.spanProcessors ?? [])];
-  if (base) processors.push(new BatchSpanProcessor(new OTLPTraceExporter({ url: `${base}/v1/traces`, headers })));
+  if (tracesUrl) processors.push(new BatchSpanProcessor(new OTLPTraceExporter({ url: tracesUrl, headers })));
   if (o.consoleTraces) processors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()));
   const tracing = processors.length > 0;
   let tracerProvider: NodeTracerProvider | undefined;
@@ -157,7 +161,7 @@ export function startTelemetry(o: TelemetryOptions = {}): Telemetry {
     meter: metrics.getMeter("tradingworld-api", o.serviceVersion),
     tracer: trace.getTracer("tradingworld-api", o.serviceVersion),
     tracing,
-    otlp: !!base,
+    otlp: !!tracesUrl,
     async prometheus() {
       const { resourceMetrics, errors } = await prom.collect();
       for (const e of errors) console.warn("metrics collection:", e);

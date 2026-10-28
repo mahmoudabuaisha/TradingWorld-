@@ -72,3 +72,22 @@ groups:
         labels: { severity: critical }
         annotations:
           summary: "the last restore drill failed: the newest backup may not be restorable"
+
+      # OPS-01b: the server (node exporter). The API's own `disk` rule watches the same disk and notifies admins
+      - alert: TradingWorldDiskSpace
+        # as df: used / (used + available), the same as the API's disk rule
+        expr: |
+          (node_filesystem_size_bytes{mountpoint="/", fstype!~"tmpfs|overlay"} - node_filesystem_free_bytes{mountpoint="/", fstype!~"tmpfs|overlay"})
+            / (node_filesystem_size_bytes{mountpoint="/", fstype!~"tmpfs|overlay"} - node_filesystem_free_bytes{mountpoint="/", fstype!~"tmpfs|overlay"}
+               + node_filesystem_avail_bytes{mountpoint="/", fstype!~"tmpfs|overlay"}) > 0.85
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "disk {{ $value | humanizePercentage }} full: the database and backups stop when it fills"
+
+      - alert: TradingWorldHostMemory
+        expr: 1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes > 0.9
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "server memory {{ $value | humanizePercentage }} used"

@@ -66,46 +66,68 @@
 | `alert_watcher` | حرجة | آخر فحص لتنبيهات المستخدمين أقدم من 3 دورات + 60 ث | — |
 | `event_loop` | تحذير | p99 لتأخر حلقة الأحداث أكثر من `OPS_EVENT_LOOP_P99_MS` (500 ms) | دقيقتان |
 | `memory` | تحذير | الـheap أكثر من `OPS_HEAP_RATIO` (85%) من حد V8 | 5 دقائق |
+| `disk` (OPS-01b) | حرجة | القرص الذي عليه القاعدة والنسخ ممتلئ أكثر من `OPS_DISK_RATIO` (85%) كما يحسبه `df` | — |
 | `background_jobs` | تحذير | آخر تشغيل لمتتبع النتائج أو التعبئة فشل | — |
 | `data_routing` (إنتاج فقط) | تحذير | فئات أصول تُخدم من البيانات التجريبية | — |
 | `backups` (إنتاج فقط) | حرجة | أي مشكلة من `backup status` (نسخة متقادمة، فشل، اختبار استرجاع فاشل أو متأخر) | — |
 
 **القنوات**: كل مشرف (دور admin أو أعلى) يتلقى إشعارًا من نوع `ops` في صندوقه، ثم Push والبريد حسب تفضيلاته (NOTIF-01)، والرابط يفتح `/admin#ops`. و`OPS_ALERT_WEBHOOK_URL` يتلقى JSON فيه `text` (Slack، Teams، Mattermost) و`content` (Discord) وكائن `alert` كاملًا.
 
-**في لوحة الإدارة** (قسم «صحة النظام»): حالة كل قاعدة، الطلبات في الدقيقة، نسبة 5xx، p95، حلقة الأحداث، الذاكرة، WebSocket، المصادر المتوقفة، آخر التحولات، وزرّا «فحص الآن» و«إرسال تنبيه تجريبي». الثاني يثبت أن البريد والـwebhook مضبوطان قبل أن يُحتاج إليهما.
+**في لوحة الإدارة** (قسم «صحة النظام»): حالة كل قاعدة، الطلبات في الدقيقة، نسبة 5xx، p95، حلقة الأحداث، الذاكرة، WebSocket، المصادر المتوقفة، آخر التحولات، وزرّا «فحص الآن» و«إرسال تنبيه تجريبي». الثاني يثبت أن البريد والـwebhook مضبوطان قبل أن يُحتاج إليهما. وعند ضبط `MONITORING_URL` يظهر زر «لوحات المراقبة ↗» إلى Grafana.
 
 ## 5. ما لا يراه المراقب الداخلي
 
 المراقب يعيش داخل العملية: إن توقفت العملية توقف معه. لذلك:
 
-1. **فحص خارجي إلزامي في الإنتاج**: خدمة مراقبة خارجية (UptimeRobot أو Better Stack، ولهما خطط مجانية) تطلب `GET /api/v1/health` كل دقيقة وتنبّه عند الفشل. أو Prometheus مع القاعدة `TradingWorldApiDown` وAlertmanager.
-2. **إعادة التشغيل**: خدمات `api` و`web` و`backup` في docker-compose بـ`restart: unless-stopped`، و`api` له healthcheck على `/api/v1/health`.
+1. **فحص خارجي (OPS-01b)**: `.github/workflows/uptime.yml` يشغّل `deploy/smoke-test.sh` على الموقع الحي كل 10 دقائق من خوادم GitHub: الصفحة، الـAPI، الـWebSocket، HTTPS وHSTS، Grafana، والمنافذ المغلقة. يرى ما لا يراه الخادم عن نفسه: توقف الخادم كله أو Docker أو Caddy، أو DNS، أو الشهادة. الفشل يُعاد بعد دقيقة (النشر يعيد تشغيل الـAPI لثوانٍ)، ثم يرسل GitHub بريدًا لصاحب المستودع (Settings ثم Notifications ثم Actions: «Only notify for failed workflows»). نطاق آخر: متغير المستودع `SITE_DOMAIN`. حدود: جدولة GitHub قد تتأخر دقائق، وتتوقف تلقائيًا إن لم يتغير المستودع 60 يومًا (يكفي تشغيلها يدويًا مرة من Actions).
+2. **إعادة التشغيل**: كل الخدمات بـ`restart: unless-stopped`، والـAPI والويب وPrometheus وGrafana لها healthcheck.
 3. **حاوية النسخ** لها healthcheck مستقل (`backup status --check`)، فتعطّل النسخ يظهر حتى لو توقف الـAPI.
 
-## 6. Prometheus وGrafana وJaeger (اختياري)
+## 6. Prometheus وGrafana وJaeger
 
-ملف التعريف `monitoring` في docker-compose:
+### في الإنتاج (OPS-01b، تعمل دائمًا)
+
+| الخدمة | أين | المحتوى |
+|---|---|---|
+| Grafana | `https://DOMAIN/grafana/` بتسجيل دخول | لوحة «TradingWorld · API» (الصفحة الأولى بعد الدخول) ولوحة «TradingWorld · Server»، والآثار من Explore ثم Jaeger. وزر «لوحات المراقبة ↗» في لوحة الإدارة يفتحها |
+| Prometheus | داخلي فقط | يجمع `/metrics` من الـAPI بالرمز ومقاييس الخادم كل 15 ث، احتفاظ 30 يومًا أو 4 GB، والقواعد الـ12 في `infra/monitoring/alerts.yml` |
+| Jaeger | داخلي فقط | آخر 20,000 أثر في الذاكرة (تضيع عند إعادة تشغيله). الـAPI يرسل إليه بـ`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` |
+| node-exporter | داخلي فقط | المعالج والذاكرة والقرص والشبكة والحمل للخادم نفسه |
+
+- **الدخول إلى Grafana**: بريد المشرف (`ADMIN_EMAIL`) أو `admin`، وكلمة السر هي `ADMIN_PASSWORD` من `deploy/.env` (أو `GRAFANA_ADMIN_PASSWORD` إن ضُبط). تُضبط مرة واحدة عند أول تشغيل لـGrafana؛ تغييرها لاحقًا:
+  ```bash
+  deploy/tw exec grafana grafana cli admin reset-admin-password 'NEW-PASSWORD'
+  ```
+- **لا يبدأ Grafana أبدًا بـadmin/admin**: إن لم توجد كلمة سر عند أول تشغيل يرفض البدء ويكتب السبب في سجله، وبقية المنصة تعمل.
+- **الحماية**: التسجيل الذاتي والدخول المجهول معطلان، والكوكي آمنة، وGrafana يحظر تخمين كلمة السر بعد محاولات فاشلة. Prometheus وJaeger بلا أي مسار من الخارج.
+- **الذاكرة**: حدود 768 MB لـPrometheus وJaeger، و512 MB لـGrafana، و128 MB للمُصدِّر.
+- **القرص**: لوحة «Server» وقاعدة `TradingWorldDiskSpace` وقاعدة `disk` في المراقب الداخلي تحسب كلها مثل `df`: المستخدم ÷ (المستخدم + المتاح).
+- **تعديل الإعدادات**: `deploy.sh` يعيد تشغيل Prometheus وGrafana عند تغيّر `infra/monitoring/`، ويعيد تحميل Caddy عند تغيّر `deploy/caddy/`.
+
+قواعد Prometheus تظهر في Grafana (Alerting ثم Alert rules) وفي اللوحات. الإشعار نفسه يأتي من المراقب الداخلي (صندوق المشرفين والإشعارات والبريد والـwebhook) ومن الفحص الخارجي، فلا حاجة لـAlertmanager على خادم واحد.
+
+### محليًا (ملف التعريف `monitoring`)
+
 ```bash
 echo -n "$METRICS_TOKEN" > secrets/metrics-token.txt      # نفس قيمة METRICS_TOKEN في .env
-# في .env: GRAFANA_ADMIN_PASSWORD=… و OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+# في .env: GRAFANA_ADMIN_PASSWORD=… و OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://jaeger:4318/v1/traces
 docker compose --profile app --profile monitoring up -d
 ```
-| الخدمة | العنوان (محلي فقط) | المحتوى |
-|---|---|---|
-| Prometheus | `127.0.0.1:9090` | يجمع `/metrics` كل 15 ث بالرمز، احتفاظ 30 يومًا، والقواعد في `infra/monitoring/alerts.yml` |
-| Grafana | `127.0.0.1:3001` | لوحة «TradingWorld · API» جاهزة: الطلبات والأخطاء وp95 لكل مسار، المحرك، استعلامات القاعدة، عمر كل مصدر، الميزانيات، حلقة الأحداث، الذاكرة، الإشعارات، المراقب، النسخ |
-| Jaeger | `127.0.0.1:16686` | الآثار |
-
-المنافذ مربوطة بـ`127.0.0.1`: يُوصل إليها بنفق SSH أو عبر وكيل بمصادقة، ولا تُفتح للعامة.
-
-قواعد Prometheus العشر تطابق قواعد المراقب الداخلي، وتضيف `TradingWorldApiDown`. إرسال تنبيهاتها يحتاج Alertmanager أو Grafana Alerting، وهذا غير مضبوط هنا، فالمراقب الداخلي والفحص الخارجي يكفيان ما دام هناك خادم واحد.
+| الخدمة | العنوان (محلي فقط) |
+|---|---|
+| Prometheus | `127.0.0.1:9090` |
+| Grafana | `127.0.0.1:3001` |
+| Jaeger | `127.0.0.1:16686` |
 
 ## 7. المتغيرات
 
 | المتغير | الافتراضي |
 |---|---|
 | `LOG_LEVEL` | `info` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` · `OTEL_EXPORTER_OTLP_HEADERS` | — |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` · `OTEL_EXPORTER_OTLP_HEADERS` | — (خدمة OTLP مستضافة: آثار ومقاييس) |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | — (آثار فقط؛ الإنتاج: `http://jaeger:4318/v1/traces`) |
+| `MONITORING_URL` | — (الإنتاج: `https://DOMAIN/grafana/`) |
+| `GRAFANA_ADMIN_PASSWORD` | — (الإنتاج: `ADMIN_PASSWORD` عند أول تشغيل) |
 | `OTEL_SERVICE_NAME` | `tradingworld-api` |
 | `OTEL_TRACES_SAMPLE_RATIO` | `1` |
 | `OTEL_TRACES_CONSOLE` · `OTEL_LOG_LEVEL` | `false` · — |
@@ -113,7 +135,7 @@ docker compose --profile app --profile monitoring up -d
 | `OPS_WATCHDOG_ENABLED` | `true` |
 | `OPS_ALERT_WEBHOOK_URL` | — |
 | `OPS_ALERT_REPEAT_HOURS` | `4` |
-| `OPS_ERROR_RATIO` · `OPS_P95_MS` · `OPS_FEED_DOWN_MINUTES` · `OPS_EVENT_LOOP_P99_MS` · `OPS_HEAP_RATIO` | `0.05` · `2000` · `5` · `500` · `0.85` |
+| `OPS_ERROR_RATIO` · `OPS_P95_MS` · `OPS_FEED_DOWN_MINUTES` · `OPS_EVENT_LOOP_P99_MS` · `OPS_HEAP_RATIO` · `OPS_DISK_RATIO` | `0.05` · `2000` · `5` · `500` · `0.85` · `0.85` |
 
 ## 8. ما تم التحقق منه
 
@@ -127,10 +149,18 @@ docker compose --profile app --profile monitoring up -d
 | المراقب في الإنتاج | `data_routing` و`backups` قامتا فعلًا؛ وصل الـwebhook إلى مستقبل HTTP حقيقي بالنص المتوقع |
 | الاختبارات (11) | نافذة الطلبات، دورة حياة القاعدة (انتظار ← قيام ← تكرار ← عودة، والقفزة الأقصر من المهلة لا تُبلغ)، القواعد على تطبيق حقيقي، المشرفون فقط يتلقون، الـwebhook، معرّف الطلب، إخفاء الأسرار، ربط السجل بالأثر، `/metrics` في الإنتاج، spans المهام، إسقاط Prisma اليتيم |
 
+| **الإنتاج (OPS-01b)**: ملف الإنتاج نفسه محليًا عبر `https://localhost` | 11 فحصًا من `smoke-test.sh` نجحت؛ Prometheus يجمع الـAPI والخادم (`up` = 1 لكليهما) والقواعد الـ12 سليمة؛ اللوحتان وأثر حقيقي من Jaeger داخل Grafana؛ الدخول بالبريد وبـ`admin`؛ كلمة سر خاطئة 401 |
+| تعديل `Caddyfile` بعد استبداله (كما يفعل git) | Caddy رأى الملف الجديد عبر المجلد وأعاد التحميل؛ ملف مكسور رُفض والموقع استمر |
+| تعديل القواعد | بعد إعادة تشغيل Prometheus صارت 13 قاعدة، ثم 12 بعد التراجع |
+| Grafana بلا كلمة سر | أول تشغيل يرفض البدء؛ Grafana قائم يستمر إن حُذف السطر |
+| منطق `deploy.sh` بـ`docker` مزيف | تغيير Caddyfile ← إعادة تحميل فقط؛ تغيير القواعد ← إعادة تشغيل فقط؛ تغيير التطبيق ← لا شيء؛ Caddyfile مرفوض ← فشل وعودة للسابق ولا إعادة محاولة |
+| وظيفة CI `deploy-stack` | تنشر `main` أولًا ثم تُرقّي بـ`deploy.sh` الموجود فيه، كما سيحدث على الخادم، ثم تتحقق من المراقبة كاملة |
+
 خطأ وجدته أثناء التحقق: دقة قياس حلقة الأحداث كانت 5000 ms، والمقياس يتضمن فترة أخذ العينة، فقرأ 5 ثوانٍ «تأخيرًا» على عملية خاملة، وكانت قاعدة Prometheus ستقوم دائمًا. عادت الدقة إلى الافتراضي (10 ms).
 
 ## 9. حدود معروفة وخطوات لاحقة
 
 - نافذة الطلبات التي يقرأها المراقب داخل كل عملية: مع أكثر من نسخة للـAPI يرى كل مراقب نسخته فقط، والصورة الكاملة في Prometheus.
 - تطبيق الويب (Next.js) غير مُقاس بعد: أخطاء المتصفح وWeb Vitals خطوة لاحقة (OTel للمتصفح أو Sentry).
-- Alertmanager غير مضبوط (انظر §6).
+- Alertmanager غير مضبوط: الإشعار من المراقب الداخلي والفحص الخارجي (انظر §5 و§6).
+- Jaeger يحفظ الآثار في الذاكرة: تضيع عند إعادة تشغيله، وهذا مقصود لخادم واحد.

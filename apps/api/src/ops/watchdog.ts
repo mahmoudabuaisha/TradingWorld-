@@ -2,13 +2,14 @@
  * OPS-01 — the in-process watchdog: alerting that works without a metrics backend.
  *
  * Every minute each rule looks at what the process already knows (requests of the last 5 minutes, feeds, providers,
- * the alert watcher, event loop, heap, the backup job's status) and says firing or not. A rule must stay firing for its
+ * the alert watcher, event loop, heap, disk space, the backup job's status) and says firing or not. A rule must stay firing for its
  * `forSeconds` before it notifies; a firing rule is re-notified every `repeatMs`; recovery is notified too. Notices go
  * to every admin through the notification channels (inbox, push, email per their preferences) and to an optional
  * webhook. The same conditions exist as Prometheus rules (infra/monitoring/alerts.yml) for teams running Prometheus.
  */
 import { monitorEventLoopDelay, type IntervalHistogram } from "node:perf_hooks";
 import { getHeapStatistics } from "node:v8";
+import { existsSync, statfsSync } from "node:fs";
 import { resolve } from "node:path";
 import { roleAtLeast } from "@tradingworld/shared";
 import type { AppContext } from "../context.js";
@@ -300,6 +301,29 @@ export function buildRules(ctx: AppContext, d: RuleDeps): Rule[] {
           summary: {
             ar: `الـheap عند ${pct(ratio)} من حده (الحد ${pct(c.OPS_HEAP_RATIO)})`,
             en: `heap at ${pct(ratio)} of its limit (limit ${pct(c.OPS_HEAP_RATIO)})`,
+          },
+        };
+      },
+    },
+    {
+      // OPS-01b: the server's disk as df reports it. In the container the backups volume and the overlay root both
+      // sit on the host's disk, which also holds the database: a full disk stops writes and backups alike
+      id: "disk",
+      severity: "critical",
+      title: { ar: "القرص يمتلئ", en: "Disk filling up" },
+      forSeconds: 0,
+      evaluate: () => {
+        const dir = resolve(c.BACKUP_DIR);
+        const s = statfsSync(existsSync(dir) ? dir : process.cwd());
+        const used = s.blocks - s.bfree;
+        const ratio = used / (used + s.bavail);
+        const free = `${((s.bavail * s.bsize) / 1024 ** 3).toFixed(1)} GB`;
+        return {
+          firing: ratio > c.OPS_DISK_RATIO,
+          value: ratio,
+          summary: {
+            ar: `القرص ممتلئ بنسبة ${pct(ratio)}، المتبقي ${free} (الحد ${pct(c.OPS_DISK_RATIO)})`,
+            en: `disk ${pct(ratio)} full, ${free} free (limit ${pct(c.OPS_DISK_RATIO)})`,
           },
         };
       },
