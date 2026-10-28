@@ -246,11 +246,13 @@ jobs:
           wait_api
           [[ "$(login first@visitor.test visitor-pass-1)" == *INVALID_CREDENTIALS* ]]
 
-          echo "── a wrong key changes nothing"
+          echo "── a wrong key changes nothing (the R2 settings it asked for stay saved)"
           deploy/tw up -d fakes3
-          before=$(sha256sum deploy/secrets/age-identity.txt deploy/.env)
+          key() { sha256sum deploy/secrets/age-identity.txt; grep '^BACKUP_AGE_RECIPIENTS=' deploy/.env; }
+          before=$(key)
           ! sudo -E env "PATH=$PATH" BACKUP_KEY="$(age-keygen 2>/dev/null | grep '^AGE-SECRET-KEY-')" deploy/restore.sh --latest --yes
-          [ "$before" = "$(sha256sum deploy/secrets/age-identity.txt deploy/.env)" ]
+          [ "$before" = "$(key)" ]
+          grep -q '^BACKUP_RCLONE_REMOTE=r2:tw-backups/db$' deploy/.env
           wait_api
 
           echo "── the saved key brings the data back"

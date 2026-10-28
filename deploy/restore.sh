@@ -4,7 +4,8 @@
 #   deploy/restore.sh                                                       (as root)
 # It asks for the backup key saved from the old server (deploy/offsite.sh --show-key) and, if this server has none yet,
 # the R2 settings; lists the backups on R2 with their date and row counts; restores the chosen one (default: newest)
-# and starts the platform on it. The database it replaces is kept, renamed tradingworld_before_<UTC time>.
+# and starts the platform on it. The database it replaces is kept, renamed tradingworld_before_<UTC time>. On any
+# failure the data and the backup key are left as they were (R2 settings entered here stay saved for the next try).
 #   deploy/restore.sh [--latest] [--yes]    tests: BACKUP_KEY=AGE-SECRET-KEY-1… and the R2_* variables of offsite.sh
 set -euo pipefail
 
@@ -94,7 +95,7 @@ main() {
     psql "ALTER DATABASE tradingworld ALLOW_CONNECTIONS true" || true
     rm -f "$TRY"
     "$TW" start api backup || true
-    echo "nothing changed: the data, the key and deploy/.env are as before"
+    echo "nothing changed: the data and the backup key are as before (R2 settings entered here stay saved)"
   }
   trap undo EXIT
 
