@@ -150,6 +150,7 @@ EOF
   echo
   echo "  site   : https://$DOMAIN"
   echo "  monitor: https://$DOMAIN/grafana/  (same email and password)"
+  echo "  next   : deploy/offsite.sh  (copies of the backups outside this server, docs/13 §6)"
   echo "  admin  : $(grep '^ADMIN_EMAIL=' "$ENV" | cut -d= -f2)"
   if [ -n "${FIRST_PASSWORD:-}" ]; then
     echo "  password: $FIRST_PASSWORD"

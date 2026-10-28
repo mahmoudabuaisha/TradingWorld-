@@ -1,9 +1,13 @@
+import { mkdtemp, rm } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { trace } from "@opentelemetry/api";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../app.js";
 import { loadConfig } from "../config.js";
+import { writeStatus } from "../ops/backup.js";
 import { startTelemetry } from "../ops/telemetry.js";
 
 // OPS-01b — production monitoring: traces to Jaeger (which has no OTLP metrics receiver), dashboards linked for admins.
@@ -101,5 +105,55 @@ describe("disk rule", () => {
       await app.close();
     }
     expect(states).toEqual({ "0.01": "firing", "1": "ok" });
+  });
+});
+
+describe("backup_offsite rule (OPS-02b)", () => {
+  it("warns in production while the last backup has no offsite copy", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tw-offsite-"));
+    const app = await buildApp({
+      config: loadConfig({
+        NODE_ENV: "production",
+        JWT_SECRET: "test-secret-test-secret-123456",
+        DATABASE_URL: "postgresql://tw@db.internal:5432/tradingworld",
+        REPOSITORIES: "memory",
+        CANDLE_STORE: "memory",
+        MARKET_DATA_PROVIDER: "demo",
+        BACKUP_DIR: dir,
+        FIRST_USER_ADMIN: "true",
+        OPS_WATCHDOG_ENABLED: "false",
+        ALERT_WATCH_ENABLED: "false",
+        OUTCOME_ENABLED: "false",
+      }),
+      logger: false,
+    });
+    try {
+      const reg = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/register",
+        payload: { email: "ops@example.test", password: "kharita-2026", displayName: "Ops" },
+      });
+      const evaluate = async () =>
+        (
+          (
+            await app.inject({
+              method: "POST",
+              url: "/api/v1/admin/ops/evaluate",
+              headers: { authorization: `Bearer ${reg.json().token as string}` },
+            })
+          ).json().alerts as { id: string; state: string; severity: string; summary: { en: string } }[]
+        ).find((a) => a.id === "backup_offsite")!;
+      const at = new Date().toISOString();
+      const before = await evaluate(); // no backup yet
+      expect(before).toMatchObject({ state: "firing", severity: "warning" });
+      expect(before.summary.en).toMatch(/^the last backup has no offsite copy/);
+      await writeStatus(dir, { lastBackup: { file: "tw-1.dump.age", at, bytes: 9, encrypted: true, durationMs: 1 } });
+      expect((await evaluate()).state).toBe("firing"); // local only
+      await writeStatus(dir, { lastBackup: { file: "tw-2.dump.age", at, bytes: 9, encrypted: true, remote: "r2:tw/db", durationMs: 1 } });
+      expect(await evaluate()).toMatchObject({ state: "ok", summary: { en: "last backup copied to r2:tw/db" } });
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
