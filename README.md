@@ -73,7 +73,7 @@ pnpm check          # الكل بالترتيب: format:check ثم lint ثم typ
 pnpm format         # Prettier على المستودع (format:check للفحص فقط)
 pnpm lint           # ESLint بإعداد واحد في الجذر، صفر تحذيرات (lint:fix للإصلاح التلقائي)
 pnpm typecheck      # كل الحزم، والاختبارات أيضًا (tsconfig.test.json)
-pnpm test           # shared (5) + engine (18) + api (109؛ اختبارات المخزن والمستودعات على Postgres حقيقي عند ضبط TEST_DATABASE_URL)
+pnpm test           # shared (5) + engine (18) + api (110؛ اختبارات المخزن والمستودعات على Postgres حقيقي عند ضبط TEST_DATABASE_URL)
 cd services/ml && pip install -e ".[dev]" && ruff check . && ruff format --check . && pytest -q   # ml (3)
 ```
 
