@@ -110,9 +110,11 @@ jobs:
           psql -h localhost -U tradingworld -d tw_recovered -At -c "SELECT count(*) FROM market.candles" -c "SELECT count(*) FROM timescaledb_information.hypertables"
 
   deploy-stack:
-    # DEPLOY-01: the production stack exactly as the server runs it. deploy.sh builds the images, starts Caddy, the
-    # database, API, web app and backup job, and waits for the API to report this commit; then the smoke test checks
-    # the site through Caddy (HTTPS, same-origin API, WebSocket, closed ports) and the backup job does a real drill.
+    # DEPLOY-01: the production stack exactly as the server runs it. First main is deployed, as the server runs it now;
+    # then main's own deploy.sh (the timer's job) upgrades to this branch: images built, Caddy, the database, API, web
+    # app, backup job and monitoring started, and the API must report this commit. Then the smoke test checks the site
+    # through Caddy (HTTPS, same-origin API, WebSocket, Grafana, closed ports), the monitoring is checked end to end
+    # (OPS-01b) and the backup job does a real drill.
     name: Deploy · production stack end to end
     runs-on: ubuntu-24.04
     steps:
@@ -134,10 +136,15 @@ jobs:
           BACKUP_AGE_RECIPIENTS=$(age-keygen -y deploy/secrets/age-identity.txt)
           MARKET_DATA_PROVIDER=demo
           EOF
-      - name: deploy.sh (build, start, wait for this commit)
+      - name: Start from main, as the server runs it now
+        if: (github.head_ref || github.ref_name) != 'main'
+        env:
+          DEPLOY_BRANCH: main
+        run: deploy/deploy.sh --force && deploy/tw ps
+      - name: Upgrade to this commit with the deploy.sh now on disk (main's), as the timer does
         env:
           DEPLOY_BRANCH: ${{ github.head_ref || github.ref_name }}
-        run: deploy/deploy.sh --force
+        run: deploy/deploy.sh
       - name: Smoke test through Caddy
         run: deploy/smoke-test.sh localhost
       - name: Accounts in production
@@ -148,6 +155,41 @@ jobs:
           reg=$(curl -sk -X POST $B/auth/register -H 'content-type: application/json' -d '{"email":"first@visitor.test","password":"visitor-pass-1","displayName":"Visitor"}')
           echo "$reg" | grep -q '"role":"user"' || { echo "first registration must not be admin: $reg"; exit 1; }
           echo "admin from ADMIN_EMAIL, first visitor is a user"
+      - name: Monitoring end to end (OPS-01b)
+        run: |
+          set -euo pipefail
+          G=https://localhost/grafana
+          GA=(curl -skf -u admin:ci-admin-password-123)
+          # traffic, so there is a trace to find
+          for p in health "candles?symbol=XAUUSD&timeframe=H1" instruments; do curl -sk -o /dev/null "https://localhost/api/v1/$p"; done
+          # Prometheus scrapes the API (with the token) and the server, and loads every rule
+          for i in $(seq 1 24); do
+            up=$(deploy/tw exec -T prometheus wget -qO- 'http://127.0.0.1:9090/api/v1/query?query=up' | jq -r '.data.result[] | "\(.metric.job)=\(.value[1])"' | sort | tr '\n' ' ')
+            [ "$up" = "node=1 tradingworld-api=1 " ] && break
+            sleep 5
+          done
+          echo "targets: $up"; [ "$up" = "node=1 tradingworld-api=1 " ]
+          for i in $(seq 1 24); do
+            rules=$(deploy/tw exec -T prometheus wget -qO- http://127.0.0.1:9090/api/v1/rules | jq '[.data.groups[].rules[] | select(.health == "ok")] | length')
+            [ "$rules" = 12 ] && break
+            sleep 5
+          done
+          echo "rules ok: $rules"; [ "$rules" = 12 ]
+          # Grafana: both dashboards, both data sources, and queries through them
+          "${GA[@]}" "$G/api/search?query=TradingWorld&type=dash-db" | jq -e '[.[].uid] | sort == ["tradingworld-api","tradingworld-server"]'
+          "${GA[@]}" "$G/api/datasources" | jq -e '[.[].uid] | sort == ["jaeger","prometheus"]'
+          "${GA[@]}" "$G/api/datasources/proxy/uid/prometheus/api/v1/query?query=tw_feed_up" | jq -e '.data.result | length > 0'
+          "${GA[@]}" "$G/api/datasources/proxy/uid/prometheus/api/v1/query?query=node_filesystem_size_bytes" | jq -e '.data.result | length > 0'
+          for i in $(seq 1 12); do
+            "${GA[@]}" "$G/api/datasources/proxy/uid/jaeger/api/services" | jq -e '.data | index("tradingworld-api")' >/dev/null && break
+            sleep 5
+          done
+          "${GA[@]}" "$G/api/datasources/proxy/uid/jaeger/api/traces?service=tradingworld-api&limit=5" | jq -e '.data | length > 0'
+          # wrong password refused; the admin sheet links the dashboards and traces leave over OTLP
+          [ "$(curl -sk -o /dev/null -w '%{http_code}' -u admin:wrong "$G/api/search")" = 401 ]
+          T=$(curl -sk -X POST https://localhost/api/v1/auth/login -H 'content-type: application/json' -d '{"email":"admin@example.test","password":"ci-admin-password-123"}' | jq -r .token)
+          curl -skf https://localhost/api/v1/admin/ops -H "authorization: Bearer $T" | jq -e '.telemetry.dashboardUrl == "https://localhost/grafana/" and .telemetry.otlp and ([.alerts[].id] | index("disk"))'
+          echo "monitoring OK"
       - name: Backup tools and a real drill inside the stack
         run: |
           deploy/tw exec -T backup sh -c 'pg_dump --version && age --version && rclone version | head -1'

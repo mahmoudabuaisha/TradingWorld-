@@ -1,0 +1,8 @@
+# OPS-01b — traces in Grafana (Explore → Jaeger): Jaeger's own UI is not published
+apiVersion: 1
+datasources:
+  - name: Jaeger
+    uid: jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686

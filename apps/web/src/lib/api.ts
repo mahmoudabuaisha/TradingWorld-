@@ -15,7 +15,7 @@ import type {
 
 /**
  * Where the API lives. Unset: the development API on localhost:4000. Empty: the page's own origin, the production setup
- * where one domain serves the web app and, under /api and /ws, the API (deploy/Caddyfile), so one image fits any domain.
+ * where one domain serves the web app and, under /api and /ws, the API (deploy/caddy/Caddyfile), so one image fits any domain.
  */
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -219,7 +219,7 @@ export interface OpsAlert {
   error?: string;
 }
 export interface AdminOps {
-  telemetry: { tracing: boolean; otlp: boolean; metrics: "token" | "disabled" | "open"; sampleRatio: number };
+  telemetry: { tracing: boolean; otlp: boolean; metrics: "token" | "disabled" | "open"; sampleRatio: number; dashboardUrl?: string | null };
   watchdog: { enabled: boolean; webhook: boolean; repeatHours: number };
   signals: {
     requests: { requests: number; errors: number; errorRatio: number; p50Ms?: number; p95Ms?: number; perMinute: number };

@@ -6,7 +6,8 @@ import { loadConfig } from "./config.js";
 import { startTelemetry } from "./ops/telemetry.js";
 
 const cfg = loadConfig();
-const tracing = !!cfg.OTEL_EXPORTER_OTLP_ENDPOINT || cfg.OTEL_TRACES_CONSOLE;
+const tracesTo = cfg.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ?? cfg.OTEL_EXPORTER_OTLP_ENDPOINT;
+const tracing = !!tracesTo || cfg.OTEL_TRACES_CONSOLE;
 // ESM modules are only patched through the import hook (CommonJS ones through require hooks)
 if (tracing) register("@opentelemetry/instrumentation/hook.mjs", import.meta.url);
 const tel = startTelemetry({
@@ -14,6 +15,7 @@ const tel = startTelemetry({
   serviceVersion: (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version,
   environment: cfg.NODE_ENV,
   otlpEndpoint: cfg.OTEL_EXPORTER_OTLP_ENDPOINT,
+  otlpTracesEndpoint: cfg.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
   otlpHeaders: cfg.OTEL_EXPORTER_OTLP_HEADERS,
   sampleRatio: cfg.OTEL_TRACES_SAMPLE_RATIO,
   consoleTraces: cfg.OTEL_TRACES_CONSOLE,
@@ -31,7 +33,7 @@ try {
   app.log.info(`TradingWorld API ready on http://${API_HOST}:${API_PORT}/api/v1 (ws: /ws) — data routes: ${routes}`);
   for (const w of app.ctx.providers.warnings) app.log.warn(`market data: ${w}`);
   app.log.info(
-    `telemetry: metrics at /metrics${cfg.METRICS_TOKEN ? " (bearer token)" : cfg.NODE_ENV === "production" ? " DISABLED (set METRICS_TOKEN)" : " (open, development)"}; traces ${tel.tracing ? `on${tel.otlp ? ` → ${cfg.OTEL_EXPORTER_OTLP_ENDPOINT}` : " (console)"}` : "off (set OTEL_EXPORTER_OTLP_ENDPOINT)"}; watchdog ${cfg.OPS_WATCHDOG_ENABLED ? "on" : "off"}${cfg.OPS_ALERT_WEBHOOK_URL ? " + webhook" : ""}`,
+    `telemetry: metrics at /metrics${cfg.METRICS_TOKEN ? " (bearer token)" : cfg.NODE_ENV === "production" ? " DISABLED (set METRICS_TOKEN)" : " (open, development)"}; traces ${tel.tracing ? `on${tel.otlp ? ` → ${tracesTo}` : " (console)"}` : "off (set OTEL_EXPORTER_OTLP_ENDPOINT)"}; watchdog ${cfg.OPS_WATCHDOG_ENABLED ? "on" : "off"}${cfg.OPS_ALERT_WEBHOOK_URL ? " + webhook" : ""}`,
   );
   app.log.info(`repositories: ${"client" in app.ctx.repos ? "postgres (prisma)" : "memory — nothing persists across restarts"}`);
   app.log.info(

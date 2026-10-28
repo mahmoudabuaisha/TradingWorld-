@@ -1,6 +1,6 @@
 {
   "uid": "tradingworld-api",
-  "title": "TradingWorld \u00b7 API",
+  "title": "TradingWorld · API",
   "tags": ["tradingworld", "OPS-01"],
   "timezone": "utc",
   "schemaVersion": 39,
@@ -370,7 +370,7 @@
     },
     {
       "id": 11,
-      "title": "Database operation p95",
+      "title": "Candle store query p95 (TimescaleDB)",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -395,7 +395,8 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "Queries of the TimescaleDB candle store (pg). Empty while the backfill job is off (BACKFILL_ENABLED=false) and no candles are stored. Account, alert and journal queries go through Prisma: see their spans in Explore → Jaeger."
     },
     {
       "id": 12,
@@ -415,7 +416,7 @@
         {
           "refId": "A",
           "expr": "tw_feed_age",
-          "legendFormat": "{{symbol}} \u00b7 {{provider}}"
+          "legendFormat": "{{symbol}} · {{provider}}"
         }
       ],
       "fieldConfig": {
@@ -466,7 +467,8 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "Licensed providers only (Twelve Data, Polygon…). Empty while every asset class is on demo data."
     },
     {
       "id": 14,

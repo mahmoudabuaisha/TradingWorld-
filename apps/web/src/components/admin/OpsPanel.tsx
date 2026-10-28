@@ -126,6 +126,11 @@ export function OpsPanel({
         >
           {L("إرسال تنبيه تجريبي", "Send a test alert")}
         </button>
+        {t.dashboardUrl && (
+          <a className="btn-ghost" href={t.dashboardUrl} target="_blank" rel="noopener noreferrer">
+            {L("لوحات المراقبة ↗", "Dashboards ↗")}
+          </a>
+        )}
         {msg && (
           <span role="status" className="mono text-2xs text-ink-2">
             {msg}

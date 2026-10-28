@@ -34,6 +34,21 @@ main() {
 
   compose() { IMAGE_TAG="$1" docker compose --env-file "$DIR/.env" -f "$DIR/docker-compose.prod.yml" "${@:2}"; }
 
+  # Compose recreates a container when its definition changes, not when a mounted config file does: after moving
+  # from commit $1 to the checked-out one, reload Caddy and restart the monitoring services if their files changed.
+  # A Caddyfile that fails to load fails the deploy (the running Caddy keeps the old one until the rollback).
+  refresh() {
+    [ "$1" = none ] && return 0
+    if ! git diff --quiet "$1" HEAD -- deploy/caddy; then
+      log "Caddyfile changed: reloading Caddy"
+      compose "$2" exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile || return 1
+    fi
+    if ! git diff --quiet "$1" HEAD -- infra/monitoring; then
+      log "monitoring config changed: restarting Prometheus and Grafana"
+      compose "$2" restart prometheus grafana || return 1
+    fi
+  }
+
   healthy() {
     # the API reports the commit it was built from; the web app answers its home page
     for _ in $(seq 1 "${DEPLOY_HEALTH_TRIES:-60}"); do
@@ -46,7 +61,7 @@ main() {
     return 1
   }
 
-  if compose "$tag" build && compose "$tag" up -d --remove-orphans && healthy "$tag"; then
+  if compose "$tag" build && compose "$tag" up -d --remove-orphans && refresh "$current" "$tag" && healthy "$tag"; then
     echo "$target" >"$STATE/current"
     echo "$tag" >"$STATE/current-tag"
     rm -f "$STATE/failed"
@@ -65,6 +80,7 @@ main() {
   if [ -n "$prev_tag" ] && [ "$current" != none ]; then
     git reset --quiet --hard "$current"
     compose "$prev_tag" up -d --remove-orphans
+    refresh "$target" "$prev_tag" || log "WARNING: could not reload the previous configs"
     log "rolled back to $prev_tag"
   fi
   exit 1

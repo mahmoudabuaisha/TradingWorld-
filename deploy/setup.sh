@@ -149,6 +149,7 @@ EOF
   "$DIR/tw" ps --format 'table {{.Service}}\t{{.Status}}'
   echo
   echo "  site   : https://$DOMAIN"
+  echo "  monitor: https://$DOMAIN/grafana/  (same email and password)"
   echo "  admin  : $(grep '^ADMIN_EMAIL=' "$ENV" | cut -d= -f2)"
   if [ -n "${FIRST_PASSWORD:-}" ]; then
     echo "  password: $FIRST_PASSWORD"

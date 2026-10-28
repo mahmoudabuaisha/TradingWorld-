@@ -24,8 +24,13 @@ ws="$("${CURL[@]}" --http1.1 -i -N --max-time 4 "$BASE/ws" -H "Connection: Upgra
   -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" 2>/dev/null | head -1 || true)"
 check "WebSocket upgrades on /ws" '[[ "$ws" == *" 101"* ]]'
 check "/metrics is not public" '[ "$("${CURL[@]}" -o /dev/null -w "%{http_code}" "$BASE/metrics")" = 404 ]'
+grafana="$("${CURL[@]}" "$BASE/grafana/api/health" 2>/dev/null || true)"
+check "Grafana answers on /grafana (OPS-01b)" '[[ "$grafana" == *"\"database\""*"\"ok\""* ]]'
+check "Grafana data needs a login" '[ "$("${CURL[@]}" -o /dev/null -w "%{http_code}" "$BASE/grafana/api/search")" = 401 ]'
 check "the database port is closed to the outside" '! timeout 4 bash -c "</dev/tcp/$DOMAIN/5432"'
 check "the API port is closed to the outside" '! timeout 4 bash -c "</dev/tcp/$DOMAIN/4000"'
+check "Prometheus, Jaeger and the node exporter are closed to the outside" \
+  '! timeout 4 bash -c "</dev/tcp/$DOMAIN/9090" && ! timeout 4 bash -c "</dev/tcp/$DOMAIN/16686" && ! timeout 4 bash -c "</dev/tcp/$DOMAIN/9100"'
 
 echo
 [ "$fails" = 0 ] && echo "all checks passed" || echo "$fails check(s) failed"
