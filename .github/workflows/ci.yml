@@ -195,6 +195,77 @@ jobs:
           deploy/tw exec -T backup sh -c 'pg_dump --version && age --version && rclone version | head -1'
           deploy/tw exec -T backup node apps/api/dist/tools/backup.js run
           deploy/tw exec -T backup node apps/api/dist/tools/backup.js drill --local
+      - name: Offsite copy, then losing the server and recovering on a new one (OPS-02b)
+        # an rclone S3 server stands in for Cloudflare R2; it lives outside the "server" (its data is a runner folder)
+        env:
+          R2_ACCOUNT_ID: 0123456789abcdef0123456789abcdef
+          R2_BUCKET: tw-backups
+          R2_ACCESS_KEY_ID: 0123456789abcdef0123456789abcdef
+          R2_SECRET_ACCESS_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+          R2_ENDPOINT: http://fakes3:8080
+          OFFSITE_YES: "1"
+          DEPLOY_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/s3/tw-backups"
+          cat > "$RUNNER_TEMP/fakes3.yml" <<EOF
+          services:
+            fakes3:
+              image: rclone/rclone:1.69.1
+              command: ["serve", "s3", "--auth-key", "$R2_ACCESS_KEY_ID,$R2_SECRET_ACCESS_KEY", "--addr", ":8080", "/data"]
+              volumes: ["$RUNNER_TEMP/s3:/data"]
+          EOF
+          export TW_EXTRA_COMPOSE="$RUNNER_TEMP/fakes3.yml"
+          B=https://localhost/api/v1
+          login() { curl -sk -X POST $B/auth/login -H 'content-type: application/json' -d "{\"email\":\"$1\",\"password\":\"$2\"}"; }
+          wait_api() { for i in $(seq 1 60); do curl -skf $B/health >/dev/null && return 0; sleep 3; done; return 1; }
+
+          deploy/tw up -d fakes3
+          deploy/offsite.sh
+          compgen -G "$RUNNER_TEMP/s3/tw-backups/db/*.dump.age" >/dev/null
+          grep '^AGE-SECRET-KEY-' deploy/secrets/age-identity.txt > "$RUNNER_TEMP/saved-key"
+
+          echo "── the server is lost: containers, volumes, local backups, deploy/.env and the keys"
+          deploy/tw down -v
+          rm -rf deploy/.env deploy/secrets deploy/.state
+          echo "── a new server, as setup.sh makes it: new secrets, new backup key, another admin password"
+          mkdir -p deploy/secrets
+          age-keygen -o deploy/secrets/age-identity.txt 2>/dev/null
+          cat > deploy/.env <<EOF
+          DOMAIN=localhost
+          POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          JWT_SECRET=$(openssl rand -hex 32)
+          METRICS_TOKEN=$(openssl rand -hex 24)
+          ADMIN_EMAIL=admin@example.test
+          ADMIN_PASSWORD=new-server-password-456
+          BACKUP_AGE_RECIPIENTS=$(age-keygen -y deploy/secrets/age-identity.txt)
+          BACKUP_RCLONE_REMOTE=
+          MARKET_DATA_PROVIDER=demo
+          EOF
+          deploy/deploy.sh --force
+          wait_api
+          [[ "$(login first@visitor.test visitor-pass-1)" == *INVALID_CREDENTIALS* ]]
+
+          echo "── a wrong key changes nothing (the R2 settings it asked for stay saved)"
+          deploy/tw up -d fakes3
+          key() { sha256sum deploy/secrets/age-identity.txt; grep '^BACKUP_AGE_RECIPIENTS=' deploy/.env; }
+          before=$(key)
+          ! sudo -E env "PATH=$PATH" BACKUP_KEY="$(age-keygen 2>/dev/null | grep '^AGE-SECRET-KEY-')" deploy/restore.sh --latest --yes
+          [ "$before" = "$(key)" ]
+          grep -q '^BACKUP_RCLONE_REMOTE=r2:tw-backups/db$' deploy/.env
+          wait_api
+
+          echo "── the saved key brings the data back"
+          sudo -E env "PATH=$PATH" BACKUP_KEY="$(cat "$RUNNER_TEMP/saved-key")" deploy/restore.sh --latest --yes
+          wait_api
+          [[ "$(login first@visitor.test visitor-pass-1)" == *'"role":"user"'* ]]
+          [[ "$(login admin@example.test ci-admin-password-123)" == *'"role":"admin"'* ]]
+          [[ "$(login admin@example.test new-server-password-456)" == *INVALID_CREDENTIALS* ]]
+          diff <(sudo grep '^AGE-SECRET-KEY-' deploy/secrets/age-identity.txt) "$RUNNER_TEMP/saved-key"
+          deploy/smoke-test.sh localhost
+          deploy/tw exec -T backup node apps/api/dist/tools/backup.js run
+          deploy/tw exec -T backup node apps/api/dist/tools/backup.js drill
+          echo "recovered from the offsite copy: accounts, passwords and the backup key"
       - name: Logs on failure
         if: failure()
         run: deploy/tw logs --tail 100

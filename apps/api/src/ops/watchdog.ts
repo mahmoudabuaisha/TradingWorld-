@@ -383,6 +383,26 @@ export function buildRules(ctx: AppContext, d: RuleDeps): Rule[] {
           };
         },
       },
+      {
+        // OPS-02b: a backup kept only on the server it protects is lost with that server
+        id: "backup_offsite",
+        severity: "warning",
+        title: { ar: "النسخ الاحتياطي على هذا الخادم فقط", en: "Backups only on this server" },
+        forSeconds: 0,
+        evaluate: async () => {
+          if (!c.DATABASE_URL) return { firing: false, summary: { ar: "لا قاعدة بيانات", en: "no database" } };
+          const remote = (await readStatus(resolve(c.BACKUP_DIR)))?.lastBackup?.remote;
+          return {
+            firing: !remote,
+            summary: remote
+              ? { ar: `آخر نسخة منسوخة إلى ${remote}`, en: `last backup copied to ${remote}` }
+              : {
+                  ar: "آخر نسخة ليست خارج الخادم: ضياع الخادم يعني ضياعها. الإعداد: deploy/offsite.sh (docs/13)",
+                  en: "the last backup has no offsite copy: losing this server loses it. Set up: deploy/offsite.sh (docs/13)",
+                },
+          };
+        },
+      },
     );
   }
   return rules;

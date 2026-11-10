@@ -76,6 +76,9 @@ bash /opt/tradingworld/deploy/setup.sh trading.mediatechnologies.uk
 | نسيت كلمة سر المشرف | `deploy/tw exec api node apps/api/dist/tools/admin.js reset-password admin@mediatechnologies.uk` |
 | ترقية حساب إلى مشرف | `deploy/tw exec api node apps/api/dist/tools/admin.js promote EMAIL` |
 | حالة النسخ الاحتياطي | `deploy/tw exec backup node apps/api/dist/tools/backup.js status` |
+| ربط النسخ بـCloudflare R2 (مرة واحدة) | `deploy/offsite.sh` |
+| عرض مفتاح فك تشفير النسخ (لحفظه خارج الخادم) | `deploy/offsite.sh --show-key` |
+| استرجاع البيانات من R2 (خادم جديد أو بيانات تالفة) | `deploy/restore.sh` |
 | بعد تعديل `deploy/.env` | `deploy/deploy.sh --force` |
 | إيقاف التحديث التلقائي مؤقتًا | `systemctl stop tradingworld-deploy.timer` |
 
@@ -98,7 +101,7 @@ bash /opt/tradingworld/deploy/setup.sh trading.mediatechnologies.uk
 |---|---|
 | ~~تفعيل المراقبة~~ | ✓ OPS-01b: Grafana على `/grafana`، وPrometheus وJaeger ومقاييس الخادم (docs/14 §6) |
 | ~~فحص خارجي لتوقف الخادم~~ | ✓ OPS-01b: GitHub Actions كل 10 دقائق يرسل بريدًا عند الفشل (docs/14 §5) |
-| نسخة خارجية للنسخ الاحتياطي | النسخ الآن على الخادم نفسه ومشفرة. ضياع الخادم يعني ضياعها؛ Cloudflare R2 يكفي (docs/13 §6) |
+| ~~نسخة خارجية للنسخ الاحتياطي~~ | ✓ OPS-02b: `deploy/offsite.sh` ينسخ كل نسخة إلى Cloudflare R2 ويختبر استرجاعها من هناك؛ `deploy/restore.sh` يعيد البيانات على خادم جديد (docs/13 §6 و§8) |
 | مزود بيانات مرخص | الأسعار الآن تجريبية، ولوحة الإدارة تنبّه لذلك (docs/03) |
 | البريد (SMTP) | لإرسال التنبيهات بالبريد |
 | مفتاح SSH بدل كلمة السر | أمان الدخول للخادم |
