@@ -152,7 +152,7 @@ export function MarketsView() {
                     type="button"
                     onClick={() => setWatchlist(inWl ? watchlist.filter((s) => s !== i.symbol) : [...watchlist, i.symbol])}
                     aria-pressed={inWl}
-                    className={`chip justify-self-end hover:text-ink ${inWl ? "border-ink text-ink" : ""}`}
+                    className={`chip justify-self-end hover:text-ink ${inWl ? "border-accent-line text-accent-ink" : ""}`}
                   >
                     {inWl ? L("متابَع", "watched") : L("تابع", "watch")}
                   </button>

@@ -34,17 +34,10 @@ export function SettingsView() {
           <label htmlFor="set-palette" className="label">
             {L("ألوان الاتجاه", "Directional colours")}
           </label>
-          <select
-            id="set-palette"
-            className="input"
-            value={s.palette}
-            onChange={(e) => s.setPalette(e.target.value as "kharita" | "classic")}
-          >
+          <select id="set-palette" className="input" value={s.palette} onChange={(e) => s.setPalette(e.target.value as "gold" | "kharita")}>
+            <option value="gold">{L("أخضر للطلب وأحمر للعرض (الافتراضي)", "Green demand, red supply (default)")}</option>
             <option value="kharita">
-              {L("خريطة: زنجار للطلب وكهرمان للعرض (آمن لعمى الألوان)", "Kharita: verdigris demand, amber supply (colourblind-safe)")}
-            </option>
-            <option value="classic">
-              {L("كلاسيكي: أخضر وأحمر (غير آمن لعمى الألوان)", "Classic: green and red (not colourblind-safe)")}
+              {L("زنجار للطلب وكهرمان للعرض (آمن لعمى الألوان)", "Verdigris demand, amber supply (colourblind-safe)")}
             </option>
           </select>
           <p className="mt-1 text-[11px] text-ink-3">
@@ -122,7 +115,7 @@ export function ProfileView() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="sheet flex items-center gap-4 p-6">
-        <div className="grid h-16 w-16 place-items-center border border-ink text-2xl font-semibold">
+        <div className="grid h-16 w-16 place-items-center rounded-full border border-accent-line bg-accent-wash text-2xl font-semibold text-accent-ink">
           {user.displayName.slice(0, 2).toUpperCase()}
         </div>
         <div>

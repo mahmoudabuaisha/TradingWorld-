@@ -4,100 +4,128 @@
 @tailwind utilities;
 
 /* ─────────────────────────────────────────────────────────────
-   Kharita (خريطة) design tokens — docs/12-design-system-kharita.md
-   Night survey is the default. Day survey is a cool map paper.
-   Two colours belong to the engine (verdigris/amber), one to the
-   human (chalk/ink), one stamp for invalidation. Nothing else.
-   --up-ink/--down-ink are the text-safe variants (AA on every surface);
+   Design tokens — docs/12-design-system-kharita.md ("the gold skin").
+   Black and gold: night is the default, day is ivory paper with the same gold.
+   Gold (--accent) is the brand and the interface: buttons, the selected item, focus.
+   Two colours belong to the engine: green for demand/up, red for supply/down
+   (or verdigris/amber with data-palette="kharita", colourblind-safe).
+   One belongs to the human (chalk/ink, --flag), one stamp for invalidation.
+   --up-ink/--down-ink/--accent-ink are the text-safe variants (AA on every surface);
    marks (hatch, candles, arcs) use --up/--down.
    ───────────────────────────────────────────────────────────── */
 :root {
-  --field: #13181b;
-  --sheet: #191f23;
-  --raised: #1f262b;
-  --hair: #243036;
-  --rule: #2f3b42;
-  --ink: #e8ebe6;
-  --ink-2: #a3adae;
-  --ink-3: #84939a;
-  --up: #22a08a;
-  --down: #c0821a;
-  --up-ink: #22a08a;
-  --down-ink: #c0821a;
-  --stamp: #e5648a;
-  --up-wash: rgba(34, 160, 138, 0.16);
-  --down-wash: rgba(192, 130, 26, 0.16);
-  --flag: #e8ebe6;
-  --font-ui: "IBM Plex Sans Arabic", "IBM Plex Sans", system-ui, "Segoe UI", Tahoma, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --field: #0b0b0b;
+  --sheet: #131313;
+  --raised: #1c1c1c;
+  --hair: #272420;
+  --rule: #3b362c;
+  --ink: #f6f3ec;
+  --ink-2: #a8a39a;
+  --ink-3: #8c877d;
+  --accent: #d4af37;
+  --accent-hi: #f6dc8c;
+  --accent-lo: #8e6b1f;
+  --accent-ink: #dcb94a;
+  --on-accent: #0b0b0b;
+  --accent-wash: rgba(212, 175, 55, 0.12);
+  --accent-line: rgba(212, 175, 55, 0.45);
+  --up: #10b981;
+  --down: #ef4444;
+  --up-ink: #19c08a;
+  --down-ink: #f87171;
+  --stamp: #e879a6;
+  --up-wash: rgba(16, 185, 129, 0.16);
+  --down-wash: rgba(239, 68, 68, 0.16);
+  --flag: #f6f3ec;
+  --glow: radial-gradient(1100px 420px at 88% -120px, rgba(212, 175, 55, 0.09), transparent 70%);
+  --font-ui: "Space Grotesk", "IBM Plex Sans Arabic", "IBM Plex Sans", system-ui, "Segoe UI", Tahoma, sans-serif;
+  /* Arabic inside mono labels comes from the UI face, not from whatever monospace the system has */
+  --font-mono: "IBM Plex Mono", "IBM Plex Sans Arabic", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --rail-w: 72px;
   --bar-h: 48px;
   color-scheme: dark;
+  accent-color: var(--accent);
+}
+/* the previous engine pair, kept as an option: verdigris demand, amber supply (colourblind-safe) */
+:root[data-palette="kharita"] {
+  --up: #22a08a;
+  --down: #c0821a;
+  --up-ink: #2bb39b;
+  --down-ink: #d39226;
+  --up-wash: rgba(34, 160, 138, 0.16);
+  --down-wash: rgba(192, 130, 26, 0.16);
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --field: #eef0ec;
-    --sheet: #f6f7f4;
+    --field: #f3efe6;
+    --sheet: #faf8f2;
     --raised: #ffffff;
-    --hair: #d8ded9;
-    --rule: #bfc9c4;
-    --ink: #1a2124;
-    --ink-2: #4f5c61;
-    --ink-3: #616e74;
+    --hair: #e3dccb;
+    --rule: #c8bea6;
+    --ink: #17130b;
+    --ink-2: #5a5347;
+    --ink-3: #6c6457;
+    --accent: #b8892b;
+    --accent-hi: #8a6a12;
+    --accent-lo: #8e6b1f;
+    --accent-ink: #7d5f10;
+    --on-accent: #17130b;
+    --accent-wash: rgba(184, 137, 43, 0.14);
+    --accent-line: rgba(138, 106, 18, 0.5);
+    --up: #0f9a6b;
+    --down: #d63d3d;
+    --up-ink: #0b7a55;
+    --down-ink: #b12c2c;
+    --stamp: #b83556;
+    --up-wash: rgba(15, 154, 107, 0.14);
+    --down-wash: rgba(214, 61, 61, 0.14);
+    --flag: #17130b;
+    --glow: radial-gradient(1100px 420px at 88% -120px, rgba(212, 175, 55, 0.16), transparent 70%);
+    color-scheme: light;
+  }
+  :root:not([data-theme="dark"])[data-palette="kharita"] {
     --up: #0f9a82;
     --down: #b9781a;
     --up-ink: #0a7a66;
     --down-ink: #8f5c10;
-    --stamp: #b83556;
     --up-wash: rgba(15, 154, 130, 0.14);
     --down-wash: rgba(185, 120, 26, 0.14);
-    --flag: #1a2124;
-    color-scheme: light;
-  }
-  :root:not([data-theme="dark"])[data-palette="classic"] {
-    --up: #1f9a57;
-    --down: #c43d3d;
-    --up-ink: #157a44;
-    --down-ink: #a33232;
-    --up-wash: rgba(31, 154, 87, 0.14);
-    --down-wash: rgba(196, 61, 61, 0.14);
   }
 }
 :root[data-theme="light"] {
-  --field: #eef0ec;
-  --sheet: #f6f7f4;
+  --field: #f3efe6;
+  --sheet: #faf8f2;
   --raised: #ffffff;
-  --hair: #d8ded9;
-  --rule: #bfc9c4;
-  --ink: #1a2124;
-  --ink-2: #4f5c61;
-  --ink-3: #616e74;
+  --hair: #e3dccb;
+  --rule: #c8bea6;
+  --ink: #17130b;
+  --ink-2: #5a5347;
+  --ink-3: #6c6457;
+  --accent: #b8892b;
+  --accent-hi: #8a6a12;
+  --accent-lo: #8e6b1f;
+  --accent-ink: #7d5f10;
+  --on-accent: #17130b;
+  --accent-wash: rgba(184, 137, 43, 0.14);
+  --accent-line: rgba(138, 106, 18, 0.5);
+  --up: #0f9a6b;
+  --down: #d63d3d;
+  --up-ink: #0b7a55;
+  --down-ink: #b12c2c;
+  --stamp: #b83556;
+  --up-wash: rgba(15, 154, 107, 0.14);
+  --down-wash: rgba(214, 61, 61, 0.14);
+  --flag: #17130b;
+  --glow: radial-gradient(1100px 420px at 88% -120px, rgba(212, 175, 55, 0.16), transparent 70%);
+  color-scheme: light;
+}
+:root[data-theme="light"][data-palette="kharita"] {
   --up: #0f9a82;
   --down: #b9781a;
   --up-ink: #0a7a66;
   --down-ink: #8f5c10;
-  --stamp: #b83556;
   --up-wash: rgba(15, 154, 130, 0.14);
   --down-wash: rgba(185, 120, 26, 0.14);
-  --flag: #1a2124;
-  color-scheme: light;
-}
-/* Classic directional palette (optional, user preference): the familiar green/red. Not colourblind-safe; the hatch direction still encodes demand/supply. */
-:root[data-palette="classic"] {
-  --up: #35b872;
-  --down: #e35d5d;
-  --up-ink: #35b872;
-  --down-ink: #e35d5d;
-  --up-wash: rgba(53, 184, 114, 0.16);
-  --down-wash: rgba(227, 93, 93, 0.16);
-}
-:root[data-theme="light"][data-palette="classic"] {
-  --up: #1f9a57;
-  --down: #c43d3d;
-  --up-ink: #157a44;
-  --down-ink: #a33232;
-  --up-wash: rgba(31, 154, 87, 0.14);
-  --down-wash: rgba(196, 61, 61, 0.14);
 }
 
 html,
@@ -105,7 +133,9 @@ body {
   height: 100%;
 }
 body {
-  background: var(--field);
+  background:
+    var(--glow) no-repeat,
+    var(--field);
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: 14.5px;
@@ -125,7 +155,7 @@ body {
   border-radius: 8px;
 }
 :focus-visible {
-  outline: 2px solid var(--flag);
+  outline: 2px solid var(--accent-hi);
   outline-offset: 2px;
 }
 h1,
@@ -139,11 +169,12 @@ h3 {
     @apply sr-only;
   }
   .skip:focus {
-    @apply not-sr-only fixed start-3 top-3 z-50 rounded border border-ink bg-ink px-3 py-2 text-sm text-field;
+    @apply not-sr-only fixed start-3 top-3 z-50 rounded border border-accent bg-accent px-3 py-2 text-sm text-on-accent;
   }
   /* surfaces */
   .sheet {
-    @apply rounded border border-hair bg-sheet;
+    @apply rounded-lg border border-hair bg-sheet;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
   }
   .raised {
     @apply rounded border border-hair bg-raised;
@@ -159,9 +190,9 @@ h3 {
   .eyebrow {
     font-family: var(--font-mono);
     font-size: 10.5px;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--ink-3);
+    color: color-mix(in srgb, var(--accent-ink) 78%, var(--ink-3));
     direction: ltr;
     unicode-bidi: isolate;
     display: inline-block;
@@ -174,15 +205,40 @@ h3 {
     color: var(--ink-2);
   }
 
-  /* controls — the human colour is chalk */
+  /* controls: gold is the interface. The primary button is the gold bar of the sign-in screen */
   .btn {
-    @apply inline-flex items-center gap-2 rounded border border-ink bg-ink px-3 py-1.5 text-sm font-medium text-field transition hover:opacity-90 disabled:opacity-40;
+    @apply inline-flex items-center gap-2 rounded px-3.5 py-1.5 text-sm font-semibold text-on-accent transition disabled:opacity-40;
+    border: 1px solid color-mix(in srgb, var(--accent-lo) 70%, transparent);
+    background: linear-gradient(100deg, #b8892b 0%, #e9c766 36%, #f6dc8c 52%, #dfb650 70%, #b07f24 100%);
+    box-shadow:
+      0 6px 18px rgba(212, 175, 55, 0.16),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+  .btn:hover:not(:disabled) {
+    filter: brightness(1.06);
+    box-shadow:
+      0 8px 24px rgba(212, 175, 55, 0.26),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
   }
   .btn-ghost {
-    @apply inline-flex items-center gap-2 rounded border border-hair bg-transparent px-3 py-1.5 text-sm text-ink-2 transition hover:border-rule hover:text-ink;
+    @apply inline-flex items-center gap-2 rounded border border-hair bg-transparent px-3 py-1.5 text-sm text-ink-2 transition hover:text-ink;
+  }
+  .btn-ghost:hover {
+    border-color: var(--accent-line);
+    background: var(--accent-wash);
   }
   .input {
-    @apply w-full rounded border border-hair bg-raised px-3 py-2 text-sm text-ink outline-none transition focus:border-ink;
+    @apply w-full rounded border border-hair bg-raised px-3 py-2 text-sm text-ink outline-none transition;
+  }
+  .input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-wash);
+  }
+  /* the selected item of a set: an atlas in the rail, a timeframe, a tool */
+  .sel {
+    background: linear-gradient(180deg, var(--accent-wash), transparent 140%), var(--raised);
+    color: var(--accent-ink);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
   }
   .chip {
     font-family: var(--font-mono);
@@ -271,6 +327,13 @@ h3 {
     border-radius: 50%;
     background: var(--ink);
   }
+}
+
+/* Arabic is a joined script: tracking pulls its letters apart, so labels are not tracked in right-to-left pages */
+[dir="rtl"] .eyebrow,
+[dir="rtl"] .chip,
+[dir="rtl"] .stamp {
+  letter-spacing: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

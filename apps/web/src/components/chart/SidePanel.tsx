@@ -23,7 +23,7 @@ function ZoneItem({
     <li>
       <button
         onClick={() => onSelect(z)}
-        className={`grid w-full grid-cols-[12px_1fr_auto] items-start gap-2 rounded border px-2 py-1.5 text-start text-xs transition ${selected === z.id ? "border-ink bg-raised" : "border-hair hover:bg-raised"} ${dead ? "opacity-70" : ""}`}
+        className={`grid w-full grid-cols-[12px_1fr_auto] items-start gap-2 rounded border px-2 py-1.5 text-start text-xs transition ${selected === z.id ? "border-accent-line bg-raised" : "border-hair hover:bg-raised"} ${dead ? "opacity-70" : ""}`}
       >
         <span className={`sw mt-0.5 h-8 ${z.direction === "bullish" ? "hatch-up" : "hatch-down"} ${dead ? "opacity-40" : ""}`} />
         <span className="min-w-0">

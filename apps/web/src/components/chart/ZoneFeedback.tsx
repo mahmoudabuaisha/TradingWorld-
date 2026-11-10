@@ -140,7 +140,7 @@ export function ZoneFeedback({ zone, ctx }: { zone: Zone; ctx: TrackContext }) {
                 type="button"
                 aria-pressed={best === f.key}
                 onClick={() => setBest(best === f.key ? undefined : f.key)}
-                className={`rounded border px-2 py-1 text-xs ${best === f.key ? "border-ink text-ink" : "border-hair text-ink-2 hover:border-rule"}`}
+                className={`rounded border px-2 py-1 text-xs ${best === f.key ? "border-accent-line bg-accent-wash text-accent-ink" : "border-hair text-ink-2 hover:border-rule"}`}
               >
                 <span className="sw me-1.5 inline-block h-2 w-2 align-middle hatch-up" />
                 {f.label[locale]}

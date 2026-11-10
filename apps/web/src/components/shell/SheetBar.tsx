@@ -93,7 +93,7 @@ export function SheetBar({ onSearch }: { onSearch: () => void }) {
             >
               <Icon name="bell" size={16} />
               {unread > 0 && (
-                <span className="mono absolute -end-0.5 -top-0.5 min-w-[16px] border border-ink bg-field px-0.5 text-center text-[10px] leading-[14px]">
+                <span className="mono absolute -end-0.5 -top-0.5 min-w-[16px] rounded-sm bg-accent px-0.5 text-center text-[10px] font-semibold leading-[14px] text-on-accent">
                   {unread > 99 ? "99+" : unread}
                 </span>
               )}
