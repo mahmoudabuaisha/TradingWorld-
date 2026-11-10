@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { PLATFORM_MODULES, atlasForRoute } from "@tradingworld/shared";
 import { useApp, type Theme } from "@/store/useApp";
 import { useClock, fmtMinutes, sessionLabel } from "@/hooks/useClock";
@@ -23,6 +23,7 @@ export function SheetBar({ onSearch }: { onSearch: () => void }) {
   const { locale, setLocale, theme, setTheme, user, token, setAuth } = useApp();
   const unread = useUnread(token);
   const pathname = usePathname();
+  const router = useRouter();
   const clock = useClock();
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -103,7 +104,16 @@ export function SheetBar({ onSearch }: { onSearch: () => void }) {
             </Link>
             <button
               className="btn-ghost px-2"
-              onClick={() => setAuth(undefined, undefined)}
+              onClick={() => {
+                setAuth(undefined, undefined);
+                // the sign-in screen greets a sign-out with the globe gliding back in
+                try {
+                  sessionStorage.setItem("tw-auth-flash", "signed-out");
+                } catch {
+                  /* storage blocked: no greeting */
+                }
+                router.push("/login");
+              }}
               title={t(locale, "shell", "signout")}
               aria-label="sign out"
             >

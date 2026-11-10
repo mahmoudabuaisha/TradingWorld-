@@ -18,6 +18,8 @@ interface AppState {
   palette: Palette;
   token?: string;
   user?: User;
+  /** "Remember me" at the last sign-in. Off = the session lives in this browser tab only (sessionStorage) */
+  remember: boolean;
   symbol: string;
   timeframe: Timeframe;
   mode: "manual" | "ai";
@@ -29,7 +31,8 @@ interface AppState {
   setLocale: (l: Locale) => void;
   setTheme: (t: Theme) => void;
   setPalette: (p: Palette) => void;
-  setAuth: (token?: string, user?: User) => void;
+  /** Signs in (or out, with no arguments). `remember: false` keeps the session out of localStorage. */
+  setAuth: (token?: string, user?: User, remember?: boolean) => void;
   setSymbol: (s: string) => void;
   setTimeframe: (t: Timeframe) => void;
   setMode: (m: "manual" | "ai") => void;
@@ -54,6 +57,17 @@ export function applyTheme(theme: Theme) {
   else r.removeAttribute("data-theme");
 }
 
+/** A session that is not remembered lives here, for this tab only. */
+const TAB_SESSION = "tw-auth";
+function tabSession(value?: { token: string; user: User }) {
+  try {
+    if (value) sessionStorage.setItem(TAB_SESSION, JSON.stringify(value));
+    else sessionStorage.removeItem(TAB_SESSION);
+  } catch {
+    /* storage blocked: the session then lasts until the page is closed */
+  }
+}
+
 /** Persists the trader's last state: chart, timeframe, watchlist, locale, theme, routine. */
 export const useApp = create<AppState>()(
   persist(
@@ -61,6 +75,7 @@ export const useApp = create<AppState>()(
       locale: "ar",
       theme: "night",
       palette: "kharita",
+      remember: true,
       symbol: "XAUUSD",
       timeframe: "5m",
       mode: "ai",
@@ -77,7 +92,10 @@ export const useApp = create<AppState>()(
         applyPalette(palette);
         set({ palette });
       },
-      setAuth: (token, user) => set({ token, user }),
+      setAuth: (token, user, remember = true) => {
+        tabSession(token && user && !remember ? { token, user } : undefined);
+        set(token ? { token, user, remember } : { token: undefined, user: undefined });
+      },
       setSymbol: (symbol) => set({ symbol }),
       setTimeframe: (timeframe) => set({ timeframe }),
       setMode: (mode) => set({ mode }),
@@ -91,6 +109,21 @@ export const useApp = create<AppState>()(
           return { routineDone: { ...s.routineDone, [dateKey]: next } };
         }),
     }),
-    { name: "tw-app", version: 2 },
+    {
+      name: "tw-app",
+      version: 2,
+      // a session that is not remembered never reaches localStorage
+      partialize: (s) => (s.remember ? s : { ...s, token: undefined, user: undefined }),
+    },
   ),
 );
+
+// in the browser, once localStorage has been read: pick up a session that was kept for this tab only
+if (typeof window !== "undefined" && !useApp.getState().token) {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(TAB_SESSION) ?? "null") as { token: string; user: User } | null;
+    if (saved?.token) useApp.setState({ token: saved.token, user: saved.user, remember: false });
+  } catch {
+    /* nothing saved */
+  }
+}

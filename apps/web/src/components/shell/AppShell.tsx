@@ -41,6 +41,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setCmdOpen(false);
   }, [pathname]);
 
+  // the sign-in screen is its own full-bleed stage, outside the sheet
+  if (pathname === "/login") return <>{children}</>;
+
   return (
     <div className="flex min-h-screen">
       <a href="#main" className="skip">
