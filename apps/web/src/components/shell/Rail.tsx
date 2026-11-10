@@ -6,6 +6,7 @@ import { ATLASES, atlasForRoute, modulesOfAtlas, type AtlasId, type ModuleStatus
 import { useApp } from "@/store/useApp";
 import { t } from "@/i18n/dictionary";
 import { Icon, type IconName } from "../Icon";
+import { BrandMark } from "../auth/BrandMark";
 
 const ICONS: Record<AtlasId, IconName> = {
   home: "home",
@@ -65,7 +66,7 @@ export function Rail() {
     <div ref={ref} className="relative hidden md:block">
       <aside className="sticky top-0 flex h-screen w-[var(--rail-w)] flex-col border-e border-hair bg-sheet">
         <Link href="/" className="grid h-[var(--bar-h)] place-items-center border-b border-hair" title="TradingWorld">
-          <span className="grid h-8 w-8 place-items-center border border-ink text-base font-bold leading-none">خ</span>
+          <BrandMark size={34} />
         </Link>
         <nav className="flex flex-1 flex-col gap-0.5 p-1.5">
           {ATLASES.map((a) => {
@@ -76,7 +77,7 @@ export function Rail() {
                 type="button"
                 onClick={() => (a.id === "home" ? router.push("/") : setOpen((o) => (o === a.id ? null : a.id)))}
                 onDoubleClick={() => router.push(a.route)}
-                className={`flex flex-col items-center gap-1 rounded py-2 text-[10px] leading-none transition ${isActive ? "bg-ink text-field" : open === a.id ? "bg-raised text-ink" : "text-ink-2 hover:bg-raised hover:text-ink"}`}
+                className={`flex flex-col items-center gap-1 rounded py-2 text-[10px] leading-none transition ${isActive ? "sel" : open === a.id ? "bg-raised text-ink" : "text-ink-2 hover:bg-raised hover:text-ink"}`}
                 aria-expanded={open === a.id}
                 title={locale === "ar" ? a.nameAr : a.nameEn}
               >
@@ -90,7 +91,7 @@ export function Rail() {
           {mounted && user?.role === "admin" && (
             <Link
               href="/admin"
-              className={`flex flex-col items-center gap-1 rounded py-2 text-[10px] leading-none ${pathname.startsWith("/admin") ? "bg-ink text-field" : "text-ink-2 hover:bg-raised hover:text-ink"}`}
+              className={`flex flex-col items-center gap-1 rounded py-2 text-[10px] leading-none ${pathname.startsWith("/admin") ? "sel" : "text-ink-2 hover:bg-raised hover:text-ink"}`}
               title={t(locale, "shell", "admin")}
             >
               <Icon name="admin" />
@@ -99,7 +100,7 @@ export function Rail() {
           )}
           <Link
             href="/settings"
-            className={`flex flex-col items-center gap-1 rounded py-2 text-[10px] leading-none ${pathname.startsWith("/settings") ? "bg-ink text-field" : "text-ink-2 hover:bg-raised hover:text-ink"}`}
+            className={`flex flex-col items-center gap-1 rounded py-2 text-[10px] leading-none ${pathname.startsWith("/settings") ? "sel" : "text-ink-2 hover:bg-raised hover:text-ink"}`}
             title={t(locale, "nav", "settings")}
           >
             <Icon name="settings" />

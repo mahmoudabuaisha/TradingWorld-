@@ -46,7 +46,7 @@ export function DrawingToolbar({
           aria-pressed={tool === t.id}
           aria-label={`${L(t.ar, t.en)} (${t.key})`}
           title={`${L(t.ar, t.en)} · ${t.key}`}
-          className={`grid h-8 w-8 place-items-center rounded ${tool === t.id ? "bg-ink text-field" : "text-ink-2 hover:bg-raised hover:text-ink"}`}
+          className={`grid h-8 w-8 place-items-center rounded ${tool === t.id ? "sel" : "text-ink-2 hover:bg-raised hover:text-ink"}`}
         >
           <Icon name={t.icon} size={16} />
         </button>

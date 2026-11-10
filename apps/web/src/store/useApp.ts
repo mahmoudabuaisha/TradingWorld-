@@ -10,7 +10,8 @@ interface User {
   role: string;
 }
 export type Theme = "night" | "day" | "system";
-export type Palette = "kharita" | "classic";
+/** gold = green/red engine colours (default); kharita = verdigris/amber, colourblind-safe */
+export type Palette = "gold" | "kharita";
 
 interface AppState {
   locale: Locale;
@@ -45,7 +46,7 @@ interface AppState {
 export function applyPalette(palette: Palette) {
   if (typeof document === "undefined") return;
   const r = document.documentElement;
-  if (palette === "classic") r.setAttribute("data-palette", "classic");
+  if (palette === "kharita") r.setAttribute("data-palette", "kharita");
   else r.removeAttribute("data-palette");
 }
 
@@ -74,7 +75,7 @@ export const useApp = create<AppState>()(
     (set) => ({
       locale: "ar",
       theme: "night",
-      palette: "kharita",
+      palette: "gold",
       remember: true,
       symbol: "XAUUSD",
       timeframe: "5m",
@@ -111,7 +112,9 @@ export const useApp = create<AppState>()(
     }),
     {
       name: "tw-app",
-      version: 2,
+      version: 3,
+      // v3 (the gold skin): everyone starts on the new default engine colours; verdigris/amber stays one setting away
+      migrate: (persisted, version) => (version < 3 ? { ...(persisted as object), palette: "gold" } : persisted) as AppState,
       // a session that is not remembered never reaches localStorage
       partialize: (s) => (s.remember ? s : { ...s, token: undefined, user: undefined }),
     },

@@ -64,7 +64,10 @@ export function AiChat({ zoneId }: { zoneId?: string }) {
           </div>
         )}
         {msgs.map((m, i) => (
-          <div key={i} className={`whitespace-pre-wrap rounded px-3 py-2 ${m.role === "user" ? "bg-ink text-field" : "bg-raised"}`}>
+          <div
+            key={i}
+            className={`whitespace-pre-wrap rounded px-3 py-2 ${m.role === "user" ? "border border-accent-line bg-accent-wash" : "bg-raised"}`}
+          >
             {m.text}
             {m.provider && <div className="mono mt-1 text-2xs opacity-60">{m.provider}</div>}
           </div>

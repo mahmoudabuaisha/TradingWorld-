@@ -35,7 +35,7 @@ export function MobileBar() {
           <Link
             key={a.id}
             href={a.route}
-            className={`flex flex-col items-center gap-0.5 py-2 text-[10px] ${active === a.id ? "text-ink" : "text-ink-3"}`}
+            className={`flex flex-col items-center gap-0.5 py-2 text-[10px] ${active === a.id ? "text-accent-ink" : "text-ink-3"}`}
           >
             <Icon name={ICONS[a.id]} />
             <span>{locale === "ar" ? a.nameAr : a.nameEn}</span>

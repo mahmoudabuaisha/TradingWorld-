@@ -211,7 +211,7 @@ export function ChartWorkspace() {
               key={tf}
               onClick={() => setTimeframe(tf as Timeframe)}
               aria-pressed={tf === timeframe}
-              className={`mono min-h-[32px] rounded px-2 py-1 text-xs ${tf === timeframe ? "bg-ink text-field" : "text-ink-3 hover:bg-raised hover:text-ink"}`}
+              className={`mono min-h-[32px] rounded px-2 py-1 text-xs ${tf === timeframe ? "sel" : "text-ink-3 hover:bg-raised hover:text-ink"}`}
             >
               {tf}
             </button>
@@ -221,14 +221,14 @@ export function ChartWorkspace() {
           <button
             onClick={() => setMode("manual")}
             aria-pressed={mode === "manual"}
-            className={`px-3 py-1 ${mode === "manual" ? "bg-ink text-field" : "text-ink-3"}`}
+            className={`px-3 py-1 ${mode === "manual" ? "sel" : "text-ink-3"}`}
           >
             {t(locale, "chart", "manual")}
           </button>
           <button
             onClick={() => setMode("ai")}
             aria-pressed={mode === "ai"}
-            className={`px-3 py-1 ${mode === "ai" ? "bg-ink text-field" : "text-ink-3"}`}
+            className={`px-3 py-1 ${mode === "ai" ? "sel" : "text-ink-3"}`}
           >
             {t(locale, "chart", "ai")}
           </button>
